@@ -26,6 +26,62 @@ milestone lands.
 | Frontend | Server-rendered pages progressively enhanced with a small amount of client-side JS, framework TBD at Milestone 1 (candidates: htmx, or a minimal React/Vite SPA) | Deferred until the API shape from Milestone 1 (recipe CRUD) exists; no UI framework decision should predate the API it renders. |
 | Online recipe search | Provider TBD at the milestone that implements AI suggestions | Needs to weigh available web-search APIs against cost/rate limits; deferred rather than picked speculatively. |
 | Weekly scheduling | In-process scheduler (e.g. APScheduler) triggered by the backend process | Single-user, single-host — no need for an external job queue/broker at this scale. |
+| Remote access | [Tailscale](https://tailscale.com) private mesh network (WireGuard-based) | See "Remote access & network security" below. |
+
+## Remote access & network security
+
+The backend runs on one machine at home; it must be reachable from the household's
+phones away from home, without exposing it to the public internet or routing its
+data through a third party that could read it.
+
+**Chosen approach: Tailscale, tailnet-only (`tailscale serve`, never `tailscale
+funnel`).**
+
+- Tailscale creates a private mesh network (a *tailnet*) of the household's
+  devices, connected over direct, end-to-end encrypted WireGuard tunnels. There is
+  no open inbound port on the home router and no public URL — a device that isn't
+  a member of the tailnet cannot reach the app at all, at the network level. This
+  is what satisfies the requirement to *stop*, not just gate, internet-originated
+  access.
+- Tailscale's coordination servers only help member devices discover each other
+  (NAT traversal); they do not proxy or read application traffic in normal
+  operation (occasional relay via Tailscale's DERP servers when a direct path
+  can't be established is itself end-to-end encrypted, so DERP cannot read it
+  either).
+- **Free plan ("Personal") is sufficient**: up to 6 users per tailnet with
+  unlimited devices per user, which covers the two household members plus all
+  their devices, at no cost.
+- **Authentication is handled by Tailscale, not a password shared over the wire**:
+  each person joins the tailnet by signing in once through an identity provider
+  (Google, Microsoft, GitHub, Apple, or passkey) — no separate Tailscale account
+  password to manage, and no root/admin device access required, just the OS's
+  standard "allow VPN configuration" permission when installing the app.
+- **`tailscale serve`, not `tailscale funnel`**, exposes the app: `serve` makes a
+  local port reachable only to other tailnet members over HTTPS; `funnel` would
+  make it reachable to the public internet and must not be used here. The two are
+  mutually exclusive per port, which makes the private-only choice explicit and
+  easy to audit (`tailscale serve status` shows exactly what's exposed and to
+  whom).
+- **MagicDNS + `tailscale cert`** give the app a stable hostname
+  (`little-meals.<tailnet-name>.ts.net`) with a real, browser-trusted HTTPS
+  certificate (via Let's Encrypt), auto-renewed by `tailscaled` — so the phone
+  browser gets a plain `https://` URL and a padlock, not a raw IP and a
+  certificate warning. (Enabling this publishes the device's hostname, but not
+  its contents, to the public Certificate Transparency log — a Tailscale-documented
+  tradeoff, not a data leak.)
+- **Tailnet ACLs** (`autogroup:member` restricted to a tag on the home server, or
+  an explicit grant between the two users) further restrict which tailnet members
+  can reach the app's port, so joining the tailnet for an unrelated reason
+  wouldn't implicitly grant `little-meals` access.
+- App-level login (a username/password inside `little-meals` itself) is not
+  required for this to be secure, since tailnet membership is already the access
+  gate for a two-person household, and is left as optional/deferred rather than a
+  hard requirement.
+
+Setup is host-machine configuration (installing/configuring `tailscaled` and
+`tailscale serve`), not application code — it doesn't produce `src/` changes, but
+is tracked as its own milestone (see `milestones.md`) since it has real setup
+steps, a definition of done, and should be documented as it's done.
 
 ## Build
 

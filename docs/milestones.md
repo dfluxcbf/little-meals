@@ -18,6 +18,7 @@ the documentation policy.
 | M5 | Shopping list generation: ingredient merge/dedup across a finalized plan, quantity scaling to each recipe's servings (including per-recipe override away from the default), checkbox UI, actual-cost entry. | TBD | Not started |
 | M6 | Guided cook-along mode: step-by-step walkthrough UI for a recipe's cooking steps. | TBD | Not started |
 | M7 | Weekly scheduling end-to-end: the M3 scheduler actually firing at the user-configured day/time and notifying the user a new plan is ready. | TBD | Not started |
+| M8 | Remote access: Tailscale set up on the home server, tailnet ACLs restricting access to the two household members, `tailscale serve` (not `funnel`) exposing the app over HTTPS via MagicDNS, both phones enrolled in the tailnet. See `architecture.md`'s "Remote access & network security" section. | TBD | Not started |
 
 ## Sequencing notes
 
@@ -29,3 +30,6 @@ the documentation policy.
   schedule).
 - M5 (shopping list) depends on a finalized plan, which depends on M3 and, if AI
   suggestions are enabled, M4.
+- M8 only needs M1 (something running to expose) and can otherwise be done at any
+  point in parallel with M2–M7 — it's host/network configuration, not application
+  logic, so it doesn't block or get blocked by the feature milestones.
