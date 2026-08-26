@@ -1,0 +1,19 @@
+# Requirements policy
+
+This project follows the super-repo's
+[requirements policy](../../docs/policies/requirements_policy.md). Requirements and
+test coverage are tracked exclusively through **little-requirements**
+(`lreq` / `mcp__little-requirements__*`), against a project database at
+`bundle-littles/req_db/little-meals_reqs.db` — never edited directly.
+
+## Project-specific notes
+
+- No requirements exist yet — none are created until a milestone begins
+  implementation (see `milestones.md`), per the documentation policy.
+- `little-meals` is not yet wired into `bundle-littles/BUILD.bazel`'s
+  `setup_<project>_env` / `req_sync_all` genrules. That wiring, plus creating
+  `req_db/little-meals_reqs.db`, is a follow-up step outside this project's own
+  folder (see the bootstrap notes in the top-level task summary).
+- Requirement IDs will use the prefix `MEALS-` once created.
+- Test suite: `pytest` under `tests/`, once it exists, using the
+  `@track_requirement("MEALS-...")` decorator to report results automatically.
