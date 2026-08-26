@@ -10,11 +10,11 @@ milestone lands.
 |---|---|
 | **Web frontend** | The sole user interface (per `design.md`): recipe library browsing/editing, weekly plan review (like/dislike, servings adjustment), shopping list with checkboxes and cost entry, cook-along view. |
 | **Backend API** | HTTP API backing the frontend: recipe CRUD, preferences CRUD, meal-plan lifecycle, shopping-list generation, cost recording. |
-| **Recipe extraction service** | Wraps the local Ollama LLM. Given free-text recipe input (user-submitted or fetched from an online search result), returns structured output: estimated cooking time, classification (vegetarian/pescetarian/other), ingredient list, ordered steps. Used both for manual submissions and for suggestion generation. |
-| **Suggestion engine** | Builds the configured number of new AI-suggested recipes per meal plan: some by combining stored recipes, some via online search seeded by food preferences + library, each passed through the recipe extraction service. |
+| **Recipe extraction service** | Wraps the local Ollama LLM. Given free-text recipe input (user-submitted or fetched from an online search result), returns structured output: estimated cooking time, classification (vegetarian/pescetarian/other), nutrition/calorie estimate, ingredient list, ordered steps. Used both for manual submissions and for suggestion generation. |
+| **Suggestion engine** | Builds candidate recipes on demand: the configured number of new AI-suggested recipes for a fresh weekly plan (some by combining stored recipes, some via online search seeded by food preferences + library), plus on-demand reroll requests — replace every open slot in a draft plan, replace one slot with a single new suggestion, or replace one slot with a batch of 10 alternatives — each candidate passed through the recipe extraction service. Excludes disliked recipes from both the stored-recipe pool and the material it combines from. |
 | **Scheduler** | Triggers weekly meal-plan generation at the user-configured day/time. |
 | **Shopping list generator** | Merges ingredients across a finalized plan's recipes, scaling each recipe's quantities to its servings count, producing one deduplicated checklist. |
-| **Data store** | Persists recipes, preferences, meal plans, suggestions (with like/dislike state), and shopping lists. |
+| **Data store** | Persists recipes (including their liked/disliked preference state), household preferences, meal plans, suggestions, and shopping lists. Shared by every device in the household — see "Remote access" below — not partitioned per user. |
 
 ## Technical decisions
 
@@ -22,7 +22,7 @@ milestone lands.
 |---|---|---|
 | Local LLM runtime | [Ollama](https://ollama.com), called over its local HTTP API | Required by the feature spec; keeps recipe text and preferences off third-party LLM APIs. Specific model left open until Milestone 1, chosen for structured-output reliability at whatever hardware the project runs on. |
 | Backend language/framework | Python, FastAPI | Consistent with the rest of the `little-projects` ecosystem (Python + Bazel + wheel packaging, per the [build policy](../../docs/policies/build_policy.md)); FastAPI's typed request/response models are a natural fit for the structured recipe schema the LLM extraction step produces. |
-| Storage | SQLite, accessed via the backend only | Single-user, single-host scope (see `design.md` non-goals) — no need for a client/server database. Kept a plain file so backup is trivial. |
+| Storage | SQLite, accessed via the backend only | One shared household dataset, single host (see `design.md` non-goals — no per-user partitioning) — no need for a client/server database. Kept a plain file so backup is trivial. |
 | Frontend | Server-rendered pages progressively enhanced with a small amount of client-side JS, framework TBD at Milestone 1 (candidates: htmx, or a minimal React/Vite SPA) | Deferred until the API shape from Milestone 1 (recipe CRUD) exists; no UI framework decision should predate the API it renders. |
 | Online recipe search | Provider TBD at the milestone that implements AI suggestions | Needs to weigh available web-search APIs against cost/rate limits; deferred rather than picked speculatively. |
 | Weekly scheduling | In-process scheduler (e.g. APScheduler) triggered by the backend process | Single-user, single-host — no need for an external job queue/broker at this scale. |
