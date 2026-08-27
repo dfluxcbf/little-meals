@@ -14,7 +14,8 @@ milestone lands.
 | **Suggestion engine** | Builds candidate recipes on demand: the configured number of new AI-suggested recipes for a fresh weekly plan (some by combining stored recipes, some via online search seeded by food preferences + library), plus on-demand reroll requests — replace every open slot in a draft plan, replace one slot with a single new suggestion, or replace one slot with a batch of 10 alternatives — each candidate passed through the recipe extraction service. Excludes disliked recipes from both the stored-recipe pool and the material it combines from. |
 | **Scheduler** | Triggers weekly meal-plan generation at the user-configured day/time. |
 | **Shopping list generator** | Merges ingredients across a finalized plan's recipes, scaling each recipe's quantities to its servings count, producing one deduplicated checklist. |
-| **Data store** | Persists recipes (including their liked/disliked preference state), household preferences, meal plans, suggestions, and shopping lists. Shared by every device in the household — see "Remote access" below — not partitioned per user. |
+| **Recipe store** | The recipe library as a directory of Markdown files, one file per recipe (YAML frontmatter for structured fields — cook time, classification, nutrition, ingredients, liked/disliked state — plus a Markdown body for the ordered steps). Directly readable and editable by the user with any text editor; the backend treats this directory as the source of truth rather than caching it in a database. |
+| **Data store** | Persists everything that isn't a recipe: household preferences, meal plans, suggestions, and shopping lists (which reference recipes by filename/id in the recipe store). Shared by every device in the household — see "Remote access" below — not partitioned per user. |
 
 ## Technical decisions
 
@@ -22,7 +23,8 @@ milestone lands.
 |---|---|---|
 | Local LLM runtime | [Ollama](https://ollama.com), called over its local HTTP API | Required by the feature spec; keeps recipe text and preferences off third-party LLM APIs. Specific model left open until Milestone 1, chosen for structured-output reliability at whatever hardware the project runs on. |
 | Backend language/framework | Python, FastAPI | Consistent with the rest of the `little-projects` ecosystem (Python + Bazel + wheel packaging, per the [build policy](../../docs/policies/build_policy.md)); FastAPI's typed request/response models are a natural fit for the structured recipe schema the LLM extraction step produces. |
-| Storage | SQLite, accessed via the backend only | One shared household dataset, single host (see `design.md` non-goals — no per-user partitioning) — no need for a client/server database. Kept a plain file so backup is trivial. |
+| Recipe storage | Markdown files (YAML frontmatter + Markdown body), one per recipe, under a `recipes/` directory | Recipes are the artifact the user most wants to own, read, and edit directly — plain text keeps them portable, diffable, and version-controllable independent of the app, and lets the user hand-edit a recipe without going through the UI. Not a database, so no query/migration layer to keep in sync with a format the user can also touch by hand. |
+| Other storage | SQLite, accessed via the backend only | Preferences, meal plans, suggestions, and shopping lists are app-managed, not meant for direct user editing, and are naturally relational (plan → recipe references, generation timestamps). One shared household dataset, single host (see `design.md` non-goals — no per-user partitioning) — no need for a client/server database. Kept a plain file so backup is trivial. |
 | Frontend | Server-rendered pages progressively enhanced with a small amount of client-side JS, framework TBD at Milestone 1 (candidates: htmx, or a minimal React/Vite SPA) | Deferred until the API shape from Milestone 1 (recipe CRUD) exists; no UI framework decision should predate the API it renders. |
 | Online recipe search | Provider TBD at the milestone that implements AI suggestions | Needs to weigh available web-search APIs against cost/rate limits; deferred rather than picked speculatively. |
 | Weekly scheduling | In-process scheduler (e.g. APScheduler) triggered by the backend process | Single-user, single-host — no need for an external job queue/broker at this scale. |
@@ -82,6 +84,25 @@ Setup is host-machine configuration (installing/configuring `tailscaled` and
 `tailscale serve`), not application code — it doesn't produce `src/` changes, but
 is tracked as its own milestone (see `milestones.md`) since it has real setup
 steps, a definition of done, and should be documented as it's done.
+
+## Recipe storage format
+
+Each recipe is one Markdown file under a `recipes/` directory (path configurable),
+named for the recipe (e.g. `recipes/lemon-garlic-chicken.md`):
+
+- **YAML frontmatter** holds the structured fields the app needs to query, filter,
+  and combine recipes: title, estimated cook time, classification, nutrition
+  estimate, the ingredient list with quantities, and the liked/disliked preference
+  state.
+- **Markdown body** holds the ordered cooking steps as free text (e.g. a numbered
+  list), which cook-along mode walks through.
+
+The backend parses this directory as the source of truth — it does not maintain a
+separate cached copy. When the app changes a recipe (LLM extraction on submission,
+a like/dislike from suggestion review or post-cook feedback, a servings edit), it
+writes the change back to the file, not to a database row. The user is free to
+hand-edit any recipe file directly (e.g. to fix a step or tweak an ingredient); the
+app picks up the change the next time it reads that file.
 
 ## Build
 
