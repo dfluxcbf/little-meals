@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}{{ recipe.name }} - little-meals{% endblock %}
+{% block content %}
+<h1>{{ recipe.name }}</h1>
+<p>
+  {{ recipe.cook_time_minutes }} min &middot;
+  {{ recipe.classification.value }} &middot;
+  {{ recipe.nutrition.calories_per_serving }} kcal/serving &middot;
+  serves {{ recipe.servings }} &middot;
+  {{ recipe.preference.value }}
+</p>
+
+<h2>Ingredients</h2>
+<ul>
+  {% for ingredient in recipe.ingredients %}
+    <li>
+      {% if ingredient.quantity is not none %}{{ ingredient.quantity }} {% endif %}
+      {% if ingredient.unit %}{{ ingredient.unit }} {% endif %}
+      {{ ingredient.name }}
+      {% if ingredient.note %}({{ ingredient.note }}){% endif %}
+    </li>
+  {% endfor %}
+</ul>
+
+<h2>Steps</h2>
+<ol>
+  {% for step in recipe.steps %}
+    <li>{{ step }}</li>
+  {% endfor %}
+</ol>
+
+<form method="post" action="/recipes/{{ recipe.id }}/delete" onsubmit="return confirm('Delete this recipe?');">
+  <button type="submit">Delete recipe</button>
+</form>
+{% endblock %}

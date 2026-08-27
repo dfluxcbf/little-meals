@@ -1,0 +1,13 @@
+# Runtime
+fastapi
+uvicorn[standard]
+jinja2
+httpx
+pyyaml
+python-multipart
+pydantic
+
+# Test-only
+pytest
+pytest-cov
+coverage

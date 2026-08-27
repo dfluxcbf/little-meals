@@ -8,9 +8,10 @@ bumps are managed exclusively through **little-versions** (`lvx` /
 ## Project-specific notes
 
 - `.lvx/config.json` branch names: production = `master`, integration = `dev`.
-- Current version: see `VERSION` at the project root (`0.1.0` — pre-implementation
-  scaffold, no release cut yet).
-- No version hooks are registered yet (`version_hooks: []`), since no
-  version-bearing package metadata files (`BUILD.bazel`, `pyproject.toml`, etc.)
-  exist yet. The first one to be added, once Milestone 1 introduces packaging, will
-  need a corresponding hook script under `tools/`.
+- Current version: see `VERSION` at the project root.
+- Version hook: `tools/on_version_bump.py` (registered via `lvx config add-hook`).
+  It propagates a version bump into `pyproject.toml`'s `[project]` version,
+  `MODULE.bazel`'s `module(version=...)`, `src/little_meals/BUILD.bazel`'s
+  `py_wheel(version=...)`, and `src/little_meals/__init__.py`'s `__version__` —
+  raising loudly if any of those patterns can't be found, rather than silently
+  leaving a file out of sync.

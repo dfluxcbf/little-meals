@@ -21,11 +21,11 @@ milestone lands.
 
 | Decision | Choice | Rationale |
 |---|---|---|
-| Local LLM runtime | [Ollama](https://ollama.com), called over its local HTTP API | Required by the feature spec; keeps recipe text and preferences off third-party LLM APIs. Specific model left open until Milestone 1, chosen for structured-output reliability at whatever hardware the project runs on. |
+| Local LLM runtime | [Ollama](https://ollama.com), called over its local HTTP API | Required by the feature spec; keeps recipe text and preferences off third-party LLM APIs. Default model `qwen2.5-coder:14b` (overridable via `LITTLE_MEALS_OLLAMA_MODEL`) — chosen for structured/JSON-output reliability; not `llama3.1` since it isn't what's actually pulled on the reference dev machine. Called via `POST /api/generate` with `stream=false` and `format` set to the extraction JSON schema, falling back to plain `format="json"` mode if the server rejects the schema (older Ollama versions). |
 | Backend language/framework | Python, FastAPI | Consistent with the rest of the `little-projects` ecosystem (Python + Bazel + wheel packaging, per the [build policy](../../docs/policies/build_policy.md)); FastAPI's typed request/response models are a natural fit for the structured recipe schema the LLM extraction step produces. |
 | Recipe storage | Markdown files (YAML frontmatter + Markdown body), one per recipe, under a `recipes/` directory | Recipes are the artifact the user most wants to own, read, and edit directly — plain text keeps them portable, diffable, and version-controllable independent of the app, and lets the user hand-edit a recipe without going through the UI. Not a database, so no query/migration layer to keep in sync with a format the user can also touch by hand. |
 | Other storage | SQLite, accessed via the backend only | Preferences, meal plans, suggestions, and shopping lists are app-managed, not meant for direct user editing, and are naturally relational (plan → recipe references, generation timestamps). One shared household dataset, single host (see `design.md` non-goals — no per-user partitioning) — no need for a client/server database. Kept a plain file so backup is trivial. |
-| Frontend | Server-rendered pages progressively enhanced with a small amount of client-side JS, framework TBD at Milestone 1 (candidates: htmx, or a minimal React/Vite SPA) | Deferred until the API shape from Milestone 1 (recipe CRUD) exists; no UI framework decision should predate the API it renders. |
+| Frontend | Server-rendered Jinja2 templates progressively enhanced with vendored htmx (`src/little_meals/static/vendor/htmx.min.js`, committed — not CDN-linked) | Decided at Milestone 1, not a React/Vite SPA: htmx is one committed JS file, so the frontend adds no node/npm system dependency (which would otherwise become a new tier in the preflight check below); rendering stays server-side, so a phone on the tailnet gets a working page with no build step; and it reuses the exact same FastAPI route layer as the JSON API rather than a separate client build. |
 | Online recipe search | Provider TBD at the milestone that implements AI suggestions | Needs to weigh available web-search APIs against cost/rate limits; deferred rather than picked speculatively. |
 | Weekly scheduling | In-process scheduler (e.g. APScheduler) triggered by the backend process | Single-user, single-host — no need for an external job queue/broker at this scale. |
 | Remote access | [Tailscale](https://tailscale.com) private mesh network (WireGuard-based) | See "Remote access & network security" below. |
@@ -106,23 +106,72 @@ app picks up the change the next time it reads that file.
 
 ## Build
 
-Per the [build policy](../../docs/policies/build_policy.md), this project will be
-built and packaged with Bazel (`MODULE.bazel`/`BUILD.bazel` at the root, standard
-`//:wheel` / `//:install` / `//:test` targets). Those files are intentionally not
-created yet: they only make sense once Milestone 1 introduces real source under
-`src/`, `tests/` a Bazel target could point at. They land as part of Milestone 1's
-definition of done, not as part of this bootstrap.
+Per the [build policy](../../docs/policies/build_policy.md), this project is built
+and packaged with Bazel: hermetic `rules_python` 1.7.0 + a Python 3.12 toolchain,
+dependencies resolved via `pip.parse` off a fully-hashed `requirements_lock.txt`
+(regenerate with `bazel run //:requirements.update`). Canonical targets:
+
+| Command | Purpose |
+|---|---|
+| `bazel build //:all` | Build every artifact (currently just the wheel). |
+| `bazel build //:wheel` | Build the Python wheel. |
+| `bazel run //:preflight` | Run the system-dependency check on its own. |
+| `bazel run //:install` | Preflight-gated `pipx install` of the wheel. |
+| `bazel run //:serve` | Run the web app (`uvicorn`). |
+| `bazel test //...` | Run the unit test suite (hermetic, no network). |
+
+The non-Bazel path (`pyproject.toml`, `pip install .`) exists for local/editable
+development; Bazel is still the canonical build per the build policy.
 
 ## External dependencies
 
-- **Ollama**, running locally, reachable over its HTTP API. A host prerequisite —
-  see the build policy's "missing system dependencies" section once the preflight
-  check is implemented (Milestone 1).
+- **Ollama**, reachable over its HTTP API (`LITTLE_MEALS_OLLAMA_URL`, default
+  `http://127.0.0.1:11434`) — not necessarily on the same host as the backend
+  process, just reachable over the network (see "Local LLM runtime" above and the
+  preflight check below). A host prerequisite: not pip-installable, so it can't be
+  isolated by Bazel.
 - An online search mechanism for new-recipe suggestions (provider TBD, see table
-  above).
+  above) — not needed until Milestone 4.
+
+### Preflight dependency check
+
+`src/little_meals/preflight.py` implements the build policy's "missing system
+dependencies" requirements: tiered checks (core tools, then the local LLM
+runtime), every missing dependency **within** a tier reported together with a
+copy-pasteable install command, and evaluation stopping at the first tier with
+anything missing (so it never claims Ollama's daemon is unreachable before
+confirming the `ollama` binary itself is even installed). A soft, non-failing
+check additionally probes whether Ollama's daemon actually answers, since that's
+runtime state, not an install-time dependency. Exposed as `bazel run //:preflight`
+and `lmeals preflight`, and run automatically as the first step of `bazel run
+//:install`.
+
+## Module boundaries
+
+| Module | Responsibility |
+|---|---|
+| `config.py` | Runtime `Settings` (data dir, Ollama URL/model/timeout), all env-overridable. |
+| `models.py` | Pydantic `Recipe`/`Ingredient`/`Nutrition`, and the LLM-facing `ExtractedRecipe` subset. |
+| `store/` | The Markdown+YAML-frontmatter recipe store (see "Recipe storage format" above). |
+| `llm/` | The Ollama HTTP client, the extraction prompt, and the extraction service. |
+| `api/` | The FastAPI app factory, the JSON recipe-CRUD routes, and the server-rendered HTML routes. |
+| `preflight.py` | The system-dependency check described above. |
+| `cli.py` | `lmeals serve` / `lmeals preflight` / `lmeals --version`. |
 
 ## Project-specific notes (per project-structure policy)
 
 No additional top-level folders beyond the ecosystem standard (`docs/`, `src/`,
-`tests/`, `tools/`) exist yet. A `bin/`/`build/`/`output/` folder will be added if
-and when the project ships a prebuilt artifact.
+`tests/`, `tools/`) exist. A `bin/`/`build/`/`output/` folder will be added if and
+when the project ships a prebuilt artifact.
+
+The runtime recipe/data directory (`$LITTLE_MEALS_DATA_DIR`, default
+`~/.local/share/little-meals`) lives **outside** this repo — nothing under `src/`
+is ever written to at runtime, keeping the Bazel source tree clean.
+
+Per the [project structure policy](../../docs/policies/project_structure_policy.md#inter-project-independence-and-dependencies):
+`little-meals` depends on `little-requirements` only as an installed dev-time tool
+(the `lreq` CLI and its pytest plugin, consumed from its pipx-installed wheel),
+never as a source or build dependency — it's deliberately absent from
+`requirements.in`/`requirements_lock.txt` because it isn't published on PyPI, and
+pointing `pip.parse` at a local wheel path would hardcode a cross-repo path the
+build policy's portability rule forbids.

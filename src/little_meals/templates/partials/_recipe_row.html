@@ -1,0 +1,17 @@
+<tr id="recipe-row-{{ recipe.id }}">
+  <td><a href="/recipes/{{ recipe.id }}">{{ recipe.name }}</a></td>
+  <td>{{ recipe.cook_time_minutes }} min</td>
+  <td>{{ recipe.classification.value }}</td>
+  <td>{{ recipe.nutrition.calories_per_serving }} kcal</td>
+  <td>
+    <form hx-post="/recipes/{{ recipe.id }}/preference" hx-target="#recipe-row-{{ recipe.id }}" hx-swap="outerHTML">
+      {% if recipe.preference.value == "liked" %}
+        <input type="hidden" name="preference" value="disliked">
+        <button type="submit">Liked</button>
+      {% else %}
+        <input type="hidden" name="preference" value="liked">
+        <button type="submit">Disliked</button>
+      {% endif %}
+    </form>
+  </td>
+</tr>
