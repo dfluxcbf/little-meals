@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, time
 from enum import Enum
 from typing import Optional
 
@@ -16,6 +16,16 @@ class Classification(str, Enum):
 class Preference(str, Enum):
     LIKED = "liked"
     DISLIKED = "disliked"
+
+
+class DayOfWeek(str, Enum):
+    MONDAY = "monday"
+    TUESDAY = "tuesday"
+    WEDNESDAY = "wednesday"
+    THURSDAY = "thursday"
+    FRIDAY = "friday"
+    SATURDAY = "saturday"
+    SUNDAY = "sunday"
 
 
 class Ingredient(BaseModel):
@@ -104,3 +114,26 @@ class PreferenceUpdate(BaseModel):
 
 class ExtractRequest(BaseModel):
     text: str
+
+
+class HouseholdPreferences(BaseModel):
+    """Configuration shared by the whole household, not per person - see
+    design.md's "Household preferences" concept. A singleton, not a
+    collection: there is exactly one of these per installation."""
+
+    recipes_per_week: int = Field(default=5, ge=1)
+    recommendation_day: DayOfWeek = DayOfWeek.SUNDAY
+    recommendation_time: time = time(9, 0)
+    food_preferences: list[str] = Field(default_factory=list)
+    ai_suggestions_per_plan: int = Field(default=2, ge=0)
+    default_servings: str = "2 adults"
+    updated_at: Optional[datetime] = None
+
+
+class HouseholdPreferencesUpdate(BaseModel):
+    recipes_per_week: int = Field(ge=1)
+    recommendation_day: DayOfWeek
+    recommendation_time: time
+    food_preferences: list[str] = Field(default_factory=list)
+    ai_suggestions_per_plan: int = Field(ge=0)
+    default_servings: str

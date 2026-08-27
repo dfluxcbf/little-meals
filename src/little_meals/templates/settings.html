@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Settings - little-meals{% endblock %}
+{% block content %}
+<h1>Household settings</h1>
+<p>Shared by everyone in the household - not per person or device.</p>
+{% if error %}
+  <p class="error">Could not save settings: {{ error }}</p>
+{% endif %}
+{% if saved %}
+  <p class="success">Settings saved.</p>
+{% endif %}
+<form method="post" action="/settings">
+  <label for="recipes_per_week">Recipes per week</label>
+  <input type="number" id="recipes_per_week" name="recipes_per_week" min="1" value="{{ preferences.recipes_per_week }}" required>
+
+  <label for="recommendation_day">Day for weekly recommendations</label>
+  <select id="recommendation_day" name="recommendation_day">
+    {% for day in days %}
+      <option value="{{ day.value }}" {% if day == preferences.recommendation_day %}selected{% endif %}>{{ day.value|capitalize }}</option>
+    {% endfor %}
+  </select>
+
+  <label for="recommendation_time">Time for weekly recommendations</label>
+  <input type="time" id="recommendation_time" name="recommendation_time" value="{{ preferences.recommendation_time.strftime('%H:%M') }}" required>
+
+  <label for="food_preferences">Food preferences (comma-separated)</label>
+  <input type="text" id="food_preferences" name="food_preferences" value="{{ preferences.food_preferences|join(', ') }}" placeholder="e.g. vegetarian-friendly, quick-meals">
+
+  <label for="ai_suggestions_per_plan">New AI suggestions per plan</label>
+  <input type="number" id="ai_suggestions_per_plan" name="ai_suggestions_per_plan" min="0" value="{{ preferences.ai_suggestions_per_plan }}" required>
+
+  <label for="default_servings">Default servings per meal</label>
+  <input type="text" id="default_servings" name="default_servings" value="{{ preferences.default_servings }}" placeholder="e.g. 2 adults + 1 child" required>
+
+  <button type="submit">Save settings</button>
+</form>
+{% endblock %}

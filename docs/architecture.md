@@ -104,6 +104,21 @@ writes the change back to the file, not to a database row. The user is free to
 hand-edit any recipe file directly (e.g. to fix a step or tweak an ingredient); the
 app picks up the change the next time it reads that file.
 
+## Household preferences storage
+
+Household preferences (recipes-per-week count, recommendation day/time, food
+preferences, AI suggestions per plan, default servings — see `design.md`'s
+"Household preferences" concept) are a single row in SQLite (`household.db` under
+the data directory), per the "Other storage" decision above — app-managed
+configuration, not something the user is expected to hand-edit, and there is
+exactly one of it per installation, not a collection. `HouseholdPreferencesStore`
+(`store/household_store.py`) upserts that one row; reading before any write
+returns built-in defaults rather than a not-found error, since "unconfigured" is a
+normal, expected state, not an error condition. Exposed as a JSON API
+(`GET`/`PUT`/`DELETE` on `/api/household-preferences` — `DELETE` resets to
+defaults rather than leaving the household unconfigured) and a server-rendered
+`/settings` form, both in `api/`.
+
 ## Build
 
 Per the [build policy](../../docs/policies/build_policy.md), this project is built
@@ -151,10 +166,10 @@ and `lmeals preflight`, and run automatically as the first step of `bazel run
 | Module | Responsibility |
 |---|---|
 | `config.py` | Runtime `Settings` (data dir, Ollama URL/model/timeout), all env-overridable. |
-| `models.py` | Pydantic `Recipe`/`Ingredient`/`Nutrition`, and the LLM-facing `ExtractedRecipe` subset. |
-| `store/` | The Markdown+YAML-frontmatter recipe store (see "Recipe storage format" above). |
+| `models.py` | Pydantic `Recipe`/`Ingredient`/`Nutrition`, the LLM-facing `ExtractedRecipe` subset, and `HouseholdPreferences`. |
+| `store/` | The Markdown+YAML-frontmatter recipe store (see "Recipe storage format" above) and the SQLite-backed `HouseholdPreferencesStore` (see "Household preferences storage" above). |
 | `llm/` | The Ollama HTTP client, the extraction prompt, and the extraction service. |
-| `api/` | The FastAPI app factory, the JSON recipe-CRUD routes, and the server-rendered HTML routes. |
+| `api/` | The FastAPI app factory, the JSON recipe-CRUD and household-preferences routes, and the server-rendered HTML routes (recipe library + settings). |
 | `preflight.py` | The system-dependency check described above. |
 | `cli.py` | `lmeals serve` / `lmeals preflight` / `lmeals --version`. |
 

@@ -20,6 +20,11 @@ header {
   color: inherit;
 }
 
+header nav {
+  display: flex;
+  gap: 1rem;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;
@@ -36,6 +41,27 @@ textarea {
   font-family: inherit;
 }
 
+form label {
+  display: block;
+  margin-top: 0.75rem;
+  font-weight: 600;
+}
+
+form input, form select {
+  width: 100%;
+  font-family: inherit;
+  padding: 0.3rem;
+  box-sizing: border-box;
+}
+
+form button {
+  margin-top: 1rem;
+}
+
 .error {
   color: #b00020;
+}
+
+.success {
+  color: #146c2e;
 }
