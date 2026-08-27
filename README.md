@@ -1,7 +1,8 @@
 # little-meals
 
 Meal planning facilitator and recipe book. See [`docs/design.md`](docs/design.md)
-for purpose and concepts, [`docs/architecture.md`](docs/architecture.md) for
+for purpose and concepts, [`docs/ui_design.md`](docs/ui_design.md) for the
+visual design system, [`docs/architecture.md`](docs/architecture.md) for
 technical decisions, and [`docs/milestones.md`](docs/milestones.md) for the
 implementation roadmap.
 

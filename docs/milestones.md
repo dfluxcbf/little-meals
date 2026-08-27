@@ -8,15 +8,23 @@ automated tests written, and those tests passing. Requirement IDs are listed as
 "TBD" below because none are created until their milestone actually starts, per
 the documentation policy.
 
+All UI work from M9 onward — new screens and restyles alike — follows the
+design system in [`ui_design.md`](ui_design.md) (palette, typography, the
+cookbook/fridge/pinned-paper metaphors, and the shared mobile tab bar /
+desktop rail shell). A milestone whose objective mentions "per
+`ui_design.md`" is not done until its screens match that system, in addition
+to the usual functional definition of done.
+
 | ID | Objective | Requirements | Status |
 |---|---|---|---|
 | M0 | Project bootstrap: folder layout, `docs/`, `.lvx/config.json`, `VERSION`. No code. | — (no implementation, not requirement-tracked) | Done |
 | M1 | Recipe ingestion pipeline: Ollama-backed extraction service (cook time, classification, nutrition/calorie estimate, ingredients, steps from free-text input), recipe storage with a liked/disliked preference state, backend API for recipe CRUD, minimal recipe-library UI. First introduction of `src/`, `tests/`, and the project's Bazel build files. | REQ-000000001, REQ-000000002, REQ-000000003, REQ-000000004, REQ-000000005, REQ-000000006, REQ-000000007, REQ-000000008, REQ-000000009 | Done |
 | M2 | Household configuration (shared by every device, not per person): recipes-per-week count, day/time for weekly recommendations, food preferences, number of AI suggestions per plan, default servings per meal — CRUD API + settings UI. | REQ-000000010, REQ-000000011, REQ-000000012 | Done |
-| M3 | Weekly meal plan generation from stored recipes: scheduler trigger, selection engine that fills a plan from the existing library (excluding disliked recipes) up to the configured recipe count, plan review UI. | TBD | Not started |
-| M4 | AI-suggested recipes and reroll: combination-of-stored-recipes generation, online search-based generation (search provider decision made here), extraction via the Milestone 1 pipeline, like/dislike UI at suggestion-review time wired to promote liked suggestions into the recipe library (and mark disliked ones so they aren't resuggested), plus reroll actions — whole-plan reroll, single-meal reroll, and controlled reroll (10 alternatives for one meal). | TBD | Not started |
-| M5 | Shopping list generation: ingredient merge/dedup across a finalized plan, quantity scaling to each recipe's servings (including per-recipe override away from the default), checkbox UI, actual-cost entry. | TBD | Not started |
-| M6 | Guided cook-along mode: step-by-step walkthrough UI for a recipe's cooking steps, ending with a like/dislike prompt that updates the recipe's preference state based on how it actually turned out. | TBD | Not started |
+| M9 | Visual design system adoption: build the shared base template/CSS per `ui_design.md` (tokens, Fraunces + Inter, the mobile bottom-tab / desktop left-rail shell) and restyle M1's recipe library, recipe detail (including the fridge-door ingredient toggle), and add-recipe screens, plus M2's settings screen, to match. No new functionality — a visual retrofit of what M1/M2 already shipped. | TBD | Not started |
+| M3 | Weekly meal plan generation from stored recipes: scheduler trigger, selection engine that fills a plan from the existing library (excluding disliked recipes) up to the configured recipe count, plan review UI presented as the open-cookbook layout from `ui_design.md` — meals aren't assigned to days, the household picks and cooks them in any order, and can mark a meal cooked directly (the pot-stamp toggle) without going through cook-along. | TBD | Not started |
+| M4 | AI-suggested recipes and reroll: combination-of-stored-recipes generation, online search-based generation (search provider decision made here), extraction via the Milestone 1 pipeline, like/dislike UI at suggestion-review time wired to promote liked suggestions into the recipe library (and mark disliked ones so they aren't resuggested), plus reroll actions — whole-plan reroll, single-meal reroll, and controlled reroll (10 alternatives for one meal, presented as the single-select picker from `ui_design.md`). | TBD | Not started |
+| M5 | Shopping list generation: ingredient merge/dedup across a finalized plan, quantity scaling to each recipe's servings (including per-recipe override away from the default), checkbox UI styled as the pinned paper note from `ui_design.md`, actual-cost entry. | TBD | Not started |
+| M6 | Guided cook-along mode: step-by-step walkthrough UI for a recipe's cooking steps as the large single-step cards from `ui_design.md`, ending with a like/dislike prompt that updates the recipe's preference state based on how it actually turned out and sets the same cooked flag M3's pot-stamp toggle controls. | TBD | Not started |
 | M7 | Weekly scheduling end-to-end: the M3 scheduler actually firing at the user-configured day/time and notifying the user a new plan is ready. | TBD | Not started |
 | M8 | Remote access: Tailscale set up on the home server, tailnet ACLs restricting access to the two household members, `tailscale serve` (not `funnel`) exposing the app over HTTPS via MagicDNS, both phones enrolled in the tailnet. See `architecture.md`'s "Remote access & network security" section. | TBD | Not started |
 
@@ -24,6 +32,10 @@ the documentation policy.
 
 - M1 must land before M3–M6, since every later milestone operates on recipes the
   M1 pipeline produces.
+- M9 (visual design system) should land before M3, so M3–M6 build their screens
+  once against `ui_design.md` directly rather than shipping placeholder styling
+  and needing a second restyle pass later. It only depends on M1/M2 (the
+  screens it restyles), so it can start as soon as they're done.
 - M2 (preferences) must land before M3 (meal plan generation) and M4 (AI
   suggestions), since both consume preference configuration.
 - M7 depends on M2 (day/time configuration) and M3 (something to generate on

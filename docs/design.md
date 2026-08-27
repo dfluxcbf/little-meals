@@ -1,5 +1,10 @@
 # Design
 
+This document covers product purpose and concepts. For the visual design
+system (palette, typography, per-screen layout) see
+[`ui_design.md`](ui_design.md); for the implementation roadmap see
+[`milestones.md`](milestones.md).
+
 ## Purpose
 
 `little-meals` is a meal-planning facilitator and recipe book. It removes the
@@ -49,8 +54,8 @@ cook-along mode.
 | **Household preferences** | Configuration shared by the whole household (not per person): recipes-per-week count, day/time of week to receive recommendations, food preferences (used to steer suggestions), number of new AI suggestions per meal plan, and default servings per meal (e.g. "2 adults", "2 adults + 1 child"). |
 | **Suggestion** | A candidate recipe proposed by the system for a meal-plan slot — either a combination of ingredients/steps drawn from stored recipes, or found via an online search seeded by preferences and the existing library. The household can like it (it joins the Recipe library) or dislike it, either while reviewing the draft plan or after actually cooking and trying it. |
 | **Reroll** | A request for different suggestions than the ones currently on the table, at three granularities: reroll the *whole draft plan* (every non-finalized slot gets fresh suggestions), reroll a *single meal* (that slot gets one fresh replacement suggestion), or a *controlled reroll* of a single meal (that slot gets 10 alternative suggestions to choose from instead of one). Rerolling never changes recipes already liked/finalized into the plan. |
-| **Meal plan** | The set of recipes selected for a given week (a mix of existing recipes and newly liked suggestions), each with a servings count the user can override from the default. |
-| **Shopping list** | The ingredient list for an entire meal plan: same ingredients across recipes are merged, quantities scaled to each recipe's servings, presented with checkboxes. The user records the actual amount spent once shopping is done. |
+| **Meal plan** | The set of recipes selected for a given week (a mix of existing recipes and newly liked suggestions), each with a servings count the user can override from the default. Meals aren't assigned to specific days — the household picks from the week's set and cooks them in whatever order suits them. Each meal carries a cooked/not-cooked state: the household can mark a meal cooked directly from the plan (a stamp), or it's set automatically when a cook-along session for that meal finishes. |
+| **Shopping list** | The ingredient list for an entire meal plan: same ingredients across recipes are merged, quantities scaled to each recipe's servings, presented with checkboxes, in one flat list (no grocery-aisle categorization). The user records the actual amount spent once shopping is done. |
 | **Cook-along session** | A guided, step-by-step walkthrough of a single recipe's cooking steps, used while actually cooking; ends with the option to like/dislike the recipe based on how it actually turned out. |
 
 ## Data flow
@@ -100,10 +105,13 @@ flowchart TD
    count, and produces one checklist. The user checks items off while shopping and
    records what the trip cost.
 5. When the user is ready to cook a recipe from the plan (or any recipe in the
-   library), cook-along mode presents its steps one at a time, and afterwards lets
-   the user like or dislike the recipe based on how it actually turned out —
-   updating its preference state in the library the same way a suggestion-time
-   dislike would.
+   library) — in whatever order they like, since meals aren't scheduled to
+   specific days — cook-along mode presents its steps one at a time, and
+   afterwards lets the user like or dislike the recipe based on how it
+   actually turned out — updating its preference state in the library the
+   same way a suggestion-time dislike would, and marking the meal cooked in
+   the plan. The household can also mark a meal cooked directly from the plan
+   review screen without going through cook-along.
 
 ## Open questions
 
