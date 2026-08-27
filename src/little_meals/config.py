@@ -27,6 +27,10 @@ class Settings:
     def recipes_dir(self) -> Path:
         return self.data_dir / "recipes"
 
+    @property
+    def household_db_path(self) -> Path:
+        return self.data_dir / "household.db"
+
     @classmethod
     def from_env(cls) -> "Settings":
         return cls(

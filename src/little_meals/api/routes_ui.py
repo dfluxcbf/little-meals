@@ -1,18 +1,25 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, time, timezone
 
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from pydantic import ValidationError
 
 from little_meals.llm.extraction import ExtractionError, RecipeExtractionService
 from little_meals.llm.ollama_client import OllamaUnavailable
-from little_meals.models import Preference, Recipe
+from little_meals.models import DayOfWeek, HouseholdPreferencesUpdate, Preference, Recipe
+from little_meals.store.household_store import HouseholdPreferencesStore
 from little_meals.store.recipe_store import RecipeNotFound, RecipeStore
 
 
-def build_ui_router(store: RecipeStore, extractor: RecipeExtractionService, templates: Jinja2Templates) -> APIRouter:
+def build_ui_router(
+    store: RecipeStore,
+    extractor: RecipeExtractionService,
+    household_store: HouseholdPreferencesStore,
+    templates: Jinja2Templates,
+) -> APIRouter:
     router = APIRouter()
 
     @router.get("/", include_in_schema=False)
@@ -60,4 +67,48 @@ def build_ui_router(store: RecipeStore, extractor: RecipeExtractionService, temp
             pass
         return RedirectResponse(url="/recipes", status_code=303)
 
+    @router.get("/settings", response_class=HTMLResponse, include_in_schema=False)
+    def settings_form(request: Request) -> HTMLResponse:
+        preferences = household_store.get()
+        return templates.TemplateResponse(
+            request, "settings.html", {"preferences": preferences, "days": list(DayOfWeek), "error": None, "saved": False}
+        )
+
+    @router.post("/settings", response_class=HTMLResponse, include_in_schema=False)
+    def settings_submit(
+        request: Request,
+        recipes_per_week: int = Form(...),
+        recommendation_day: str = Form(...),
+        recommendation_time: str = Form(...),
+        food_preferences: str = Form(""),
+        ai_suggestions_per_plan: int = Form(...),
+        default_servings: str = Form(...),
+    ) -> HTMLResponse:
+        try:
+            update = HouseholdPreferencesUpdate(
+                recipes_per_week=recipes_per_week,
+                recommendation_day=DayOfWeek(recommendation_day),
+                recommendation_time=time.fromisoformat(recommendation_time),
+                food_preferences=_parse_food_preferences(food_preferences),
+                ai_suggestions_per_plan=ai_suggestions_per_plan,
+                default_servings=default_servings,
+            )
+        except (ValidationError, ValueError) as exc:
+            preferences = household_store.get()
+            return templates.TemplateResponse(
+                request,
+                "settings.html",
+                {"preferences": preferences, "days": list(DayOfWeek), "error": str(exc), "saved": False},
+                status_code=422,
+            )
+
+        preferences = household_store.put(update)
+        return templates.TemplateResponse(
+            request, "settings.html", {"preferences": preferences, "days": list(DayOfWeek), "error": None, "saved": True}
+        )
+
     return router
+
+
+def _parse_food_preferences(raw: str) -> list[str]:
+    return [item.strip() for item in raw.split(",") if item.strip()]

@@ -12,11 +12,13 @@ from fastapi.templating import Jinja2Templates
 
 from little_meals import __version__
 from little_meals.api.errors import ApiError
+from little_meals.api.routes_household import build_household_router
 from little_meals.api.routes_recipes import build_recipes_router
 from little_meals.api.routes_ui import build_ui_router
 from little_meals.config import Settings
 from little_meals.llm.extraction import RecipeExtractionService
 from little_meals.llm.ollama_client import OllamaClient
+from little_meals.store.household_store import HouseholdPreferencesStore
 from little_meals.store.recipe_store import RecipeStore
 
 logger = logging.getLogger(__name__)
@@ -26,9 +28,11 @@ def create_app(
     settings: Optional[Settings] = None,
     store: Optional[RecipeStore] = None,
     extractor: Optional[RecipeExtractionService] = None,
+    household_store: Optional[HouseholdPreferencesStore] = None,
 ) -> FastAPI:
     settings = settings or Settings.from_env()
     store = store or RecipeStore(settings.recipes_dir)
+    household_store = household_store or HouseholdPreferencesStore(settings.household_db_path)
     if extractor is None:
         client = OllamaClient(settings.ollama_base_url, settings.ollama_model, settings.ollama_timeout_s)
         extractor = RecipeExtractionService(client)
@@ -36,6 +40,7 @@ def create_app(
     app = FastAPI(title="little-meals", version=__version__)
     app.state.settings = settings
     app.state.store = store
+    app.state.household_store = household_store
 
     package_root = importlib.resources.files("little_meals")
     templates = Jinja2Templates(directory=str(package_root / "templates"))
@@ -67,6 +72,7 @@ def create_app(
         )
 
     app.include_router(build_recipes_router(store, extractor, settings))
-    app.include_router(build_ui_router(store, extractor, templates))
+    app.include_router(build_household_router(household_store))
+    app.include_router(build_ui_router(store, extractor, household_store, templates))
 
     return app
