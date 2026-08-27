@@ -3,7 +3,7 @@
 Each milestone is worked on its own `feature/<name>` branch (`lvx feature
 start`/`lvx feature finish`, see `version_policy.md`). A milestone's definition of
 done requires all of: docs updated, requirements created/updated in the
-requirements DB (`MEALS-...`, see `requirements_policy.md`), code implemented,
+requirements DB (`REQ-#########`, see `requirements_policy.md`), code implemented,
 automated tests written, and those tests passing. Requirement IDs are listed as
 "TBD" below because none are created until their milestone actually starts, per
 the documentation policy.
@@ -11,7 +11,7 @@ the documentation policy.
 | ID | Objective | Requirements | Status |
 |---|---|---|---|
 | M0 | Project bootstrap: folder layout, `docs/`, `.lvx/config.json`, `VERSION`. No code. | — (no implementation, not requirement-tracked) | Done |
-| M1 | Recipe ingestion pipeline: Ollama-backed extraction service (cook time, classification, nutrition/calorie estimate, ingredients, steps from free-text input), recipe storage with a liked/disliked preference state, backend API for recipe CRUD, minimal recipe-library UI. First introduction of `src/`, `tests/`, and the project's Bazel build files. | TBD | Not started |
+| M1 | Recipe ingestion pipeline: Ollama-backed extraction service (cook time, classification, nutrition/calorie estimate, ingredients, steps from free-text input), recipe storage with a liked/disliked preference state, backend API for recipe CRUD, minimal recipe-library UI. First introduction of `src/`, `tests/`, and the project's Bazel build files. | REQ-000000001, REQ-000000002, REQ-000000003, REQ-000000004, REQ-000000005, REQ-000000006, REQ-000000007, REQ-000000008, REQ-000000009 | Done |
 | M2 | Household configuration (shared by every device, not per person): recipes-per-week count, day/time for weekly recommendations, food preferences, number of AI suggestions per plan, default servings per meal — CRUD API + settings UI. | TBD | Not started |
 | M3 | Weekly meal plan generation from stored recipes: scheduler trigger, selection engine that fills a plan from the existing library (excluding disliked recipes) up to the configured recipe count, plan review UI. | TBD | Not started |
 | M4 | AI-suggested recipes and reroll: combination-of-stored-recipes generation, online search-based generation (search provider decision made here), extraction via the Milestone 1 pipeline, like/dislike UI at suggestion-review time wired to promote liked suggestions into the recipe library (and mark disliked ones so they aren't resuggested), plus reroll actions — whole-plan reroll, single-meal reroll, and controlled reroll (10 alternatives for one meal). | TBD | Not started |

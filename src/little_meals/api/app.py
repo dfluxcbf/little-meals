@@ -1,0 +1,72 @@
+from __future__ import annotations
+
+import importlib.resources
+import logging
+from typing import Optional
+
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+
+from little_meals import __version__
+from little_meals.api.errors import ApiError
+from little_meals.api.routes_recipes import build_recipes_router
+from little_meals.api.routes_ui import build_ui_router
+from little_meals.config import Settings
+from little_meals.llm.extraction import RecipeExtractionService
+from little_meals.llm.ollama_client import OllamaClient
+from little_meals.store.recipe_store import RecipeStore
+
+logger = logging.getLogger(__name__)
+
+
+def create_app(
+    settings: Optional[Settings] = None,
+    store: Optional[RecipeStore] = None,
+    extractor: Optional[RecipeExtractionService] = None,
+) -> FastAPI:
+    settings = settings or Settings.from_env()
+    store = store or RecipeStore(settings.recipes_dir)
+    if extractor is None:
+        client = OllamaClient(settings.ollama_base_url, settings.ollama_model, settings.ollama_timeout_s)
+        extractor = RecipeExtractionService(client)
+
+    app = FastAPI(title="little-meals", version=__version__)
+    app.state.settings = settings
+    app.state.store = store
+
+    package_root = importlib.resources.files("little_meals")
+    templates = Jinja2Templates(directory=str(package_root / "templates"))
+    # follow_symlink=True: Bazel runfiles trees are symlink forests, so the
+    # served directory's files are individually symlinked to targets outside
+    # it - Starlette's default symlink-containment check would 404 them.
+    app.mount("/static", StaticFiles(directory=str(package_root / "static"), follow_symlink=True), name="static")
+
+    @app.exception_handler(ApiError)
+    async def api_error_handler(_: Request, exc: ApiError) -> JSONResponse:
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"error": exc.message, "code": exc.code, "details": exc.details},
+        )
+
+    @app.exception_handler(RequestValidationError)
+    async def validation_error_handler(_: Request, exc: RequestValidationError) -> JSONResponse:
+        return JSONResponse(
+            status_code=400,
+            content={"error": "Validation error", "code": "VALIDATION_ERROR", "details": exc.errors()},
+        )
+
+    @app.exception_handler(Exception)
+    async def internal_error_handler(_: Request, exc: Exception) -> JSONResponse:
+        logger.exception("Unhandled server error", exc_info=exc)
+        return JSONResponse(
+            status_code=500,
+            content={"error": "Internal server error", "code": "INTERNAL_ERROR", "details": {}},
+        )
+
+    app.include_router(build_recipes_router(store, extractor, settings))
+    app.include_router(build_ui_router(store, extractor, templates))
+
+    return app

@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}New recipe - little-meals{% endblock %}
+{% block content %}
+<h1>New recipe</h1>
+{% if error %}
+  <p class="error">Could not extract a recipe: {{ error }}</p>
+{% endif %}
+<form method="post" action="/recipes">
+  <label for="text">Paste the recipe as free text</label>
+  <textarea id="text" name="text" rows="12" required></textarea>
+  <button type="submit">Extract &amp; save</button>
+</form>
+{% endblock %}
