@@ -23,7 +23,7 @@ from little_meals.config import Settings
 from little_meals.llm.extraction import RecipeExtractionService
 from little_meals.llm.ollama_client import OllamaClient
 from little_meals.planning.plan_builder import build_meal_specs
-from little_meals.planning.suggestion import NullSearchProvider, SearchProvider
+from little_meals.planning.suggestion import NullSearchProvider, SearchProvider, SpoonacularSearchProvider
 from little_meals.scheduler import WeeklyScheduler
 from little_meals.store.household_store import HouseholdPreferencesStore
 from little_meals.store.notification_store import NotificationStore
@@ -49,7 +49,15 @@ def create_app(
     store = store or RecipeStore(settings.recipes_dir)
     household_store = household_store or HouseholdPreferencesStore(settings.household_db_path)
     plan_store = plan_store or MealPlanStore(settings.plan_db_path)
-    search_provider = search_provider or NullSearchProvider()
+    if search_provider is None:
+        if settings.spoonacular_api_key:
+            search_provider = SpoonacularSearchProvider(
+                settings.spoonacular_api_key,
+                base_url=settings.spoonacular_base_url,
+                timeout_s=settings.spoonacular_timeout_s,
+            )
+        else:
+            search_provider = NullSearchProvider()
     shopping_list_store = shopping_list_store or ShoppingListStore(settings.shopping_list_db_path)
     notification_store = notification_store or NotificationStore(settings.notification_db_path)
     if extractor is None:
@@ -90,6 +98,7 @@ def create_app(
     app.state.plan_store = plan_store
     app.state.shopping_list_store = shopping_list_store
     app.state.notification_store = notification_store
+    app.state.search_provider = search_provider
     app.state.scheduler = background_scheduler
 
     package_root = importlib.resources.files("little_meals")

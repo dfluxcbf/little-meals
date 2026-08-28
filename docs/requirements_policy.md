@@ -56,6 +56,17 @@ test coverage are tracked exclusively through **little-requirements**
   the plan-review like/dislike/NEW-badge UI — tagged across
   `tests/test_suggestion.py`, `tests/test_plan_builder.py`, and the M4-scoped
   cases in `tests/test_api_plan.py`/`tests/test_plan_ui.py`.
+- The `spoonacular-search-provider` branch (still on `m4-ai-suggestions-and-reroll`,
+  since it's the real `SearchProvider` implementation that seam was built for)
+  added one more requirement, REQ-000000038, covering `SpoonacularSearchProvider`
+  and its `create_app` wiring — tagged in `tests/test_spoonacular_provider.py`
+  and `tests/test_search_provider_wiring.py`. `tests/test_spoonacular_provider_real.py`
+  hits the real Spoonacular API (marker `real_spoonacular`, excluded by
+  default like `real_ollama`) and needs `LITTLE_MEALS_SPOONACULAR_API_KEY`
+  set to run - the project owner ran this pass manually against a real key
+  (sourced via the `vault.py`/`LITTLE_MEALS_SPOONACULAR_KEY_FILE` flow) before
+  the branch was finished; it isn't run in CI/`bazel test //...` for the same
+  offline-by-default reason as `real_ollama`.
 - Milestone 5 (`m5-shopping-list` suite) created four requirements,
   REQ-000000029 through REQ-000000032, covering ingredient merge/dedup/scaling,
   the `ShoppingListStore`, the shopping-list JSON API, and the `/shopping` UI —
