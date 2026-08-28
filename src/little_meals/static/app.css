@@ -668,6 +668,98 @@ form button {
   padding: 6px 8px;
 }
 
+.plan-meal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10px;
+}
+
+.thumb-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  border: 1.5px solid var(--line);
+  background: var(--paper);
+  color: var(--ink-soft);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.thumb-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.thumb-liked {
+  border-color: var(--sage);
+  background: var(--sage-soft);
+  color: var(--sage);
+}
+
+.thumb-disliked {
+  border-color: var(--rose);
+  background: var(--rose-soft);
+  color: var(--rose);
+}
+
+.reroll-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.reroll-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  border: 1.5px solid var(--line);
+  background: var(--paper);
+  color: var(--ink-soft);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.reroll-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.badge-new {
+  background: oklch(84% 0.09 95);
+  color: oklch(35% 0.06 90);
+}
+
+.alternatives-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.alternative-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1.5px solid var(--line);
+  background: var(--paper);
+  cursor: pointer;
+}
+
+.alternative-option:hover {
+  border-color: var(--terracotta);
+}
+
+.alternative-option input[type="radio"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--terracotta);
+}
+
 .error {
   color: var(--rose);
   background: var(--rose-soft);

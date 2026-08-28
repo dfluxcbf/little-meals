@@ -52,6 +52,15 @@ test coverage are tracked exclusively through **little-requirements**
   `tests/test_api_plan.py`, `tests/test_plan_ui.py`) are written and passing but
   untagged — create their `REQ-#########` IDs via `lreq requirement create` next
   time it's reachable, then backfill the marker.
+- Milestone 4 (`m4-ai-suggestions-and-reroll` — `planning/suggestion.py`,
+  `planning/plan_builder.py`, the reroll/alternatives/choose endpoints in
+  `api/routes_plan.py`, and their UI counterparts — see `milestones.md`)
+  shipped for the same reason as Milestones 3 and 9: `lreq` unreachable in
+  the implementing environment. Its tests (`tests/test_suggestion.py`,
+  `tests/test_plan_builder.py`, plus the reroll/alternatives/choose cases
+  added to `tests/test_api_plan.py` and `tests/test_plan_ui.py`) are written
+  and passing but untagged — create their `REQ-#########` IDs via
+  `lreq requirement create` next time it's reachable, then backfill the marker.
 - Known issue: `lreq update` (what the Bazel genrule invokes) cannot run inside
   this submodule checkout — `little-requirements`' managed pre-commit-hook
   installer assumes `.git` is a directory, and a submodule's `.git` is a file.

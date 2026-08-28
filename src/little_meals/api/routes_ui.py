@@ -9,10 +9,11 @@ from pydantic import ValidationError
 
 from little_meals.llm.extraction import ExtractionError, RecipeExtractionService
 from little_meals.llm.ollama_client import OllamaUnavailable
-from little_meals.models import DayOfWeek, HouseholdPreferencesUpdate, Preference, Recipe
-from little_meals.planning.selection import select_recipes_for_plan
+from little_meals.models import DayOfWeek, HouseholdPreferencesUpdate, MealPlan, Preference, Recipe
+from little_meals.planning.plan_builder import build_weekly_plan, generate_single_replacement, list_controlled_reroll_candidates
+from little_meals.planning.suggestion import SearchProvider
 from little_meals.store.household_store import HouseholdPreferencesStore
-from little_meals.store.plan_store import MealPlanStore, PlanMealNotFound, PlanNotFound
+from little_meals.store.plan_store import MealPlanStore, MealSpec, PlanMealNotFound, PlanNotFound
 from little_meals.store.recipe_store import RecipeNotFound, RecipeStore
 
 
@@ -21,9 +22,16 @@ def build_ui_router(
     extractor: RecipeExtractionService,
     household_store: HouseholdPreferencesStore,
     plan_store: MealPlanStore,
+    search_provider: SearchProvider,
     templates: Jinja2Templates,
 ) -> APIRouter:
     router = APIRouter()
+
+    def _build_meals() -> list[MealSpec]:
+        preferences = household_store.get()
+        recipes = store.list()
+        generated = build_weekly_plan(recipes, preferences, store, extractor, search_provider)
+        return [MealSpec(g.recipe.id, g.servings, g.is_suggestion) for g in generated]
 
     def _render_plan(request: Request) -> HTMLResponse:
         plan = plan_store.get_current()
@@ -144,10 +152,14 @@ def build_ui_router(
 
     @router.post("/plan/generate", include_in_schema=False)
     def plan_generate() -> RedirectResponse:
-        preferences = household_store.get()
-        recipes = store.list()
-        selected = select_recipes_for_plan(recipes, preferences.recipes_per_week)
-        plan_store.create([(recipe.id, recipe.servings) for recipe in selected])
+        plan_store.create(_build_meals())
+        return RedirectResponse(url="/plan", status_code=303)
+
+    @router.post("/plan/reroll", include_in_schema=False)
+    def plan_reroll_whole() -> RedirectResponse:
+        plan = plan_store.get_current()
+        if plan is not None and not plan.finalized:
+            plan_store.replace_meals(plan.id, _build_meals())
         return RedirectResponse(url="/plan", status_code=303)
 
     @router.post("/plan/meals/{meal_id}/servings", response_class=HTMLResponse, include_in_schema=False)
@@ -172,6 +184,66 @@ def build_ui_router(
             return RedirectResponse(url="/plan", status_code=303)
         return _render_plan_meal(request, templates, plan, meal_id, store)
 
+    @router.post("/plan/meals/{meal_id}/preference", response_class=HTMLResponse, include_in_schema=False)
+    def plan_meal_preference(request: Request, meal_id: str, preference: str = Form(...)) -> HTMLResponse:
+        plan = plan_store.get_current()
+        if plan is None:
+            return RedirectResponse(url="/plan", status_code=303)
+        meal = next((m for m in plan.meals if m.id == meal_id), None)
+        if meal is None:
+            return RedirectResponse(url="/plan", status_code=303)
+        store.set_preference(meal.recipe_id, Preference(preference))
+        return _render_plan_meal(request, templates, plan, meal_id, store)
+
+    @router.post("/plan/meals/{meal_id}/reroll", response_class=HTMLResponse, include_in_schema=False)
+    def plan_meal_reroll(request: Request, meal_id: str) -> HTMLResponse:
+        plan = plan_store.get_current()
+        if plan is None or plan.finalized:
+            return RedirectResponse(url="/plan", status_code=303)
+        preferences = household_store.get()
+        recipes = store.list()
+        excluded = {meal.recipe_id for meal in plan.meals}
+        replacement = generate_single_replacement(excluded, recipes, store, extractor, search_provider, preferences)
+        if replacement is None:
+            return _render_plan(request)
+        try:
+            plan = plan_store.set_recipe(plan.id, meal_id, replacement.recipe.id, replacement.servings, replacement.is_suggestion)
+        except (PlanNotFound, PlanMealNotFound):
+            return RedirectResponse(url="/plan", status_code=303)
+        return _render_plan_meal(request, templates, plan, meal_id, store)
+
+    @router.get("/plan/meals/{meal_id}/alternatives", response_class=HTMLResponse, include_in_schema=False)
+    def plan_meal_alternatives(request: Request, meal_id: str) -> HTMLResponse:
+        plan = plan_store.get_current()
+        if plan is None:
+            return RedirectResponse(url="/plan", status_code=303)
+        meal = next((m for m in plan.meals if m.id == meal_id), None)
+        if meal is None:
+            return RedirectResponse(url="/plan", status_code=303)
+        excluded = {m.recipe_id for m in plan.meals}
+        candidates = list_controlled_reroll_candidates(excluded, store.list())
+        current_recipe = store.get(meal.recipe_id)
+        return templates.TemplateResponse(
+            request,
+            "reroll_picker.html",
+            {"meal_id": meal_id, "current_recipe": current_recipe, "candidates": candidates, "nav_active": "plan"},
+        )
+
+    @router.post("/plan/meals/{meal_id}/choose", include_in_schema=False)
+    def plan_meal_choose(meal_id: str, recipe_id: str = Form(...)) -> RedirectResponse:
+        plan = plan_store.get_current()
+        if plan is None or plan.finalized:
+            return RedirectResponse(url="/plan", status_code=303)
+        try:
+            recipe = store.get(recipe_id)
+        except RecipeNotFound:
+            return RedirectResponse(url="/plan", status_code=303)
+        try:
+            plan_store.set_recipe(plan.id, meal_id, recipe.id, recipe.servings, is_suggestion=False)
+        except (PlanNotFound, PlanMealNotFound):
+            pass
+        return RedirectResponse(url="/plan", status_code=303)
+
     @router.post("/plan/finalize", include_in_schema=False)
     def plan_finalize() -> RedirectResponse:
         plan = plan_store.get_current()
@@ -183,7 +255,7 @@ def build_ui_router(
 
 
 def _render_plan_meal(
-    request: Request, templates: Jinja2Templates, plan, meal_id: str, store: RecipeStore
+    request: Request, templates: Jinja2Templates, plan: MealPlan, meal_id: str, store: RecipeStore
 ) -> HTMLResponse:
     meal = next(m for m in plan.meals if m.id == meal_id)
     recipe = store.get(meal.recipe_id)

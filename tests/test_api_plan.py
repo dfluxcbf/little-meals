@@ -108,6 +108,160 @@ def test_update_cooked_unknown_meal_404(client: TestClient):
     assert response.status_code == 404
 
 
+def test_reroll_whole_plan_replaces_meals_but_keeps_plan_id(client: TestClient, sample_recipe):
+    created = client.post("/api/recipes", json=_recipe_create_payload(sample_recipe)).json()
+    plan = client.post("/api/plan/generate").json()
+
+    response = client.post(f"/api/plan/{plan['id']}/reroll")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["id"] == plan["id"]
+    assert body["meals"][0]["recipe_id"] == created["id"]
+
+
+def test_reroll_whole_plan_on_finalized_plan_409(client: TestClient):
+    plan = client.post("/api/plan/generate").json()
+    client.post(f"/api/plan/{plan['id']}/finalize")
+
+    response = client.post(f"/api/plan/{plan['id']}/reroll")
+    assert response.status_code == 409
+    assert response.json()["code"] == "PLAN_FINALIZED"
+
+
+def test_reroll_single_meal_swaps_in_an_unused_library_recipe(client: TestClient, sample_recipe):
+    created = client.post("/api/recipes", json=_recipe_create_payload(sample_recipe)).json()
+    other = {**_recipe_create_payload(sample_recipe), "name": "Other Dish"}
+    other_created = client.post("/api/recipes", json=other).json()
+    both_ids = {created["id"], other_created["id"]}
+
+    client.put(
+        "/api/household-preferences",
+        json={
+            "recipes_per_week": 1,
+            "recommendation_day": "sunday",
+            "recommendation_time": "09:00",
+            "food_preferences": [],
+            "ai_suggestions_per_plan": 0,
+            "default_servings": "2 adults",
+        },
+    )
+    plan = client.post("/api/plan/generate").json()
+    meal_id = plan["meals"][0]["id"]
+    original_recipe_id = plan["meals"][0]["recipe_id"]
+
+    response = client.post(f"/api/plan/{plan['id']}/meals/{meal_id}/reroll")
+    assert response.status_code == 200
+    new_recipe_id = response.json()["meals"][0]["recipe_id"]
+    assert new_recipe_id != original_recipe_id
+    assert new_recipe_id in both_ids
+
+
+def test_reroll_single_meal_422_when_nothing_available(client: TestClient, sample_recipe):
+    client.post("/api/recipes", json=_recipe_create_payload(sample_recipe))
+    client.put(
+        "/api/household-preferences",
+        json={
+            "recipes_per_week": 1,
+            "recommendation_day": "sunday",
+            "recommendation_time": "09:00",
+            "food_preferences": [],
+            "ai_suggestions_per_plan": 0,
+            "default_servings": "2 adults",
+        },
+    )
+    plan = client.post("/api/plan/generate").json()
+    meal_id = plan["meals"][0]["id"]
+
+    response = client.post(f"/api/plan/{plan['id']}/meals/{meal_id}/reroll")
+    assert response.status_code == 422
+    assert response.json()["code"] == "NO_REPLACEMENT_AVAILABLE"
+
+
+def test_reroll_single_meal_on_finalized_plan_409(client: TestClient, sample_recipe):
+    client.post("/api/recipes", json=_recipe_create_payload(sample_recipe))
+    plan = client.post("/api/plan/generate").json()
+    client.post(f"/api/plan/{plan['id']}/finalize")
+
+    response = client.post(f"/api/plan/{plan['id']}/meals/{plan['meals'][0]['id']}/reroll")
+    assert response.status_code == 409
+
+
+def test_controlled_reroll_alternatives_excludes_meals_already_in_plan(client: TestClient, sample_recipe):
+    created = client.post("/api/recipes", json=_recipe_create_payload(sample_recipe)).json()
+    other = {**_recipe_create_payload(sample_recipe), "name": "Other Dish"}
+    other_created = client.post("/api/recipes", json=other).json()
+    both_ids = {created["id"], other_created["id"]}
+    client.put(
+        "/api/household-preferences",
+        json={
+            "recipes_per_week": 1,
+            "recommendation_day": "sunday",
+            "recommendation_time": "09:00",
+            "food_preferences": [],
+            "ai_suggestions_per_plan": 0,
+            "default_servings": "2 adults",
+        },
+    )
+    plan = client.post("/api/plan/generate").json()
+    meal_id = plan["meals"][0]["id"]
+
+    response = client.get(f"/api/plan/{plan['id']}/meals/{meal_id}/alternatives")
+    assert response.status_code == 200
+    ids = [r["id"] for r in response.json()]
+    # Whichever of the two liked recipes ISN'T already in the plan (selection
+    # is randomized) should show up as the one available alternative.
+    assert ids == list(both_ids - {plan["meals"][0]["recipe_id"]})
+    assert plan["meals"][0]["recipe_id"] not in ids
+
+
+def test_controlled_reroll_alternatives_unknown_meal_404(client: TestClient):
+    plan = client.post("/api/plan/generate").json()
+    response = client.get(f"/api/plan/{plan['id']}/meals/does-not-exist/alternatives")
+    assert response.status_code == 404
+
+
+def test_choose_alternative_sets_the_recipe(client: TestClient, sample_recipe):
+    client.post("/api/recipes", json=_recipe_create_payload(sample_recipe))
+    other = {**_recipe_create_payload(sample_recipe), "name": "Other Dish"}
+    other_created = client.post("/api/recipes", json=other).json()
+    client.put(
+        "/api/household-preferences",
+        json={
+            "recipes_per_week": 1,
+            "recommendation_day": "sunday",
+            "recommendation_time": "09:00",
+            "food_preferences": [],
+            "ai_suggestions_per_plan": 0,
+            "default_servings": "2 adults",
+        },
+    )
+    plan = client.post("/api/plan/generate").json()
+    meal_id = plan["meals"][0]["id"]
+
+    response = client.post(f"/api/plan/{plan['id']}/meals/{meal_id}/choose", json={"recipe_id": other_created["id"]})
+    assert response.status_code == 200
+    assert response.json()["meals"][0]["recipe_id"] == other_created["id"]
+
+
+def test_choose_alternative_unknown_recipe_404(client: TestClient):
+    plan = client.post("/api/plan/generate").json()
+    response = client.post(
+        f"/api/plan/{plan['id']}/meals/does-not-exist/choose", json={"recipe_id": "does-not-exist"}
+    )
+    assert response.status_code == 404
+
+
+def test_choose_alternative_on_finalized_plan_409(client: TestClient, sample_recipe):
+    created = client.post("/api/recipes", json=_recipe_create_payload(sample_recipe)).json()
+    plan = client.post("/api/plan/generate").json()
+    client.post(f"/api/plan/{plan['id']}/finalize")
+
+    response = client.post(
+        f"/api/plan/{plan['id']}/meals/m1/choose", json={"recipe_id": created["id"]}
+    )
+    assert response.status_code == 409
+
+
 def _recipe_create_payload(recipe) -> dict:
     return {
         "name": recipe.name,
