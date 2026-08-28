@@ -35,6 +35,16 @@ test coverage are tracked exclusively through **little-requirements**
   `requirement` marker itself; the marker is valid either way, but only the plain
   `pytest` path (with `little_requirements` installed) reports results into the
   database.
+- Milestone 9 (`m9-visual-design-system`, a visual retrofit of M1/M2's screens
+  per `ui_design.md` — see `milestones.md`) shipped without new `REQ-#########`
+  IDs: neither the `lreq` CLI nor its MCP server was reachable in the
+  environment that implemented it, and per this policy IDs must come from
+  `lreq` itself, never be invented. Its tests are written and passing but not
+  tagged with `@pytest.mark.requirement(...)`. Run `lreq requirement create`
+  for each of M9's changes (base template/nav shell, recipe library card
+  grid, recipe detail's fridge-door toggle, settings' day-picker) next time
+  `lreq` is reachable, then backfill the marker onto the corresponding tests
+  in `tests/test_api_ui.py` and `tests/test_settings_ui.py`.
 - Known issue: `lreq update` (what the Bazel genrule invokes) cannot run inside
   this submodule checkout — `little-requirements`' managed pre-commit-hook
   installer assumes `.git` is a directory, and a submodule's `.git` is a file.

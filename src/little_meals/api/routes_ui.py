@@ -29,18 +29,20 @@ def build_ui_router(
     @router.get("/recipes", response_class=HTMLResponse, include_in_schema=False)
     def recipes_list(request: Request) -> HTMLResponse:
         recipes = store.list()
-        return templates.TemplateResponse(request, "recipes_list.html", {"recipes": recipes})
+        return templates.TemplateResponse(request, "recipes_list.html", {"recipes": recipes, "nav_active": "library"})
 
     @router.get("/recipes/new", response_class=HTMLResponse, include_in_schema=False)
     def recipe_new_form(request: Request) -> HTMLResponse:
-        return templates.TemplateResponse(request, "recipe_new.html", {"error": None})
+        return templates.TemplateResponse(request, "recipe_new.html", {"error": None, "nav_active": "library"})
 
     @router.post("/recipes", include_in_schema=False)
     def recipe_new_submit(request: Request, text: str = Form(...)):
         try:
             extracted = extractor.extract(text)
         except (OllamaUnavailable, ExtractionError) as exc:
-            return templates.TemplateResponse(request, "recipe_new.html", {"error": str(exc)}, status_code=422)
+            return templates.TemplateResponse(
+                request, "recipe_new.html", {"error": str(exc), "nav_active": "library"}, status_code=422
+            )
 
         recipe = Recipe.from_extracted(extracted, id="", source_text=text, now=datetime.now(timezone.utc))
         stored = store.create(recipe)
@@ -51,8 +53,10 @@ def build_ui_router(
         try:
             recipe = store.get(recipe_id)
         except RecipeNotFound:
-            return templates.TemplateResponse(request, "recipe_not_found.html", {"recipe_id": recipe_id}, status_code=404)
-        return templates.TemplateResponse(request, "recipe_detail.html", {"recipe": recipe})
+            return templates.TemplateResponse(
+                request, "recipe_not_found.html", {"recipe_id": recipe_id, "nav_active": "library"}, status_code=404
+            )
+        return templates.TemplateResponse(request, "recipe_detail.html", {"recipe": recipe, "nav_active": "library"})
 
     @router.post("/recipes/{recipe_id}/preference", response_class=HTMLResponse, include_in_schema=False)
     def recipe_preference_toggle(request: Request, recipe_id: str, preference: str = Form(...)) -> HTMLResponse:
@@ -71,7 +75,9 @@ def build_ui_router(
     def settings_form(request: Request) -> HTMLResponse:
         preferences = household_store.get()
         return templates.TemplateResponse(
-            request, "settings.html", {"preferences": preferences, "days": list(DayOfWeek), "error": None, "saved": False}
+            request,
+            "settings.html",
+            {"preferences": preferences, "days": list(DayOfWeek), "error": None, "saved": False, "nav_active": "settings"},
         )
 
     @router.post("/settings", response_class=HTMLResponse, include_in_schema=False)
@@ -98,13 +104,21 @@ def build_ui_router(
             return templates.TemplateResponse(
                 request,
                 "settings.html",
-                {"preferences": preferences, "days": list(DayOfWeek), "error": str(exc), "saved": False},
+                {
+                    "preferences": preferences,
+                    "days": list(DayOfWeek),
+                    "error": str(exc),
+                    "saved": False,
+                    "nav_active": "settings",
+                },
                 status_code=422,
             )
 
         preferences = household_store.put(update)
         return templates.TemplateResponse(
-            request, "settings.html", {"preferences": preferences, "days": list(DayOfWeek), "error": None, "saved": True}
+            request,
+            "settings.html",
+            {"preferences": preferences, "days": list(DayOfWeek), "error": None, "saved": True, "nav_active": "settings"},
         )
 
     return router

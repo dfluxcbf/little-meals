@@ -2,34 +2,45 @@
 {% block title %}{{ recipe.name }} - little-meals{% endblock %}
 {% block content %}
 <h1>{{ recipe.name }}</h1>
-<p>
-  {{ recipe.cook_time_minutes }} min &middot;
-  {{ recipe.classification.value }} &middot;
-  {{ recipe.nutrition.calories_per_serving }} kcal/serving &middot;
-  serves {{ recipe.servings }} &middot;
-  {{ recipe.preference.value }}
-</p>
-
-<h2>Ingredients</h2>
-<ul>
-  {% for ingredient in recipe.ingredients %}
-    <li>
-      {% if ingredient.quantity is not none %}{{ ingredient.quantity }} {% endif %}
-      {% if ingredient.unit %}{{ ingredient.unit }} {% endif %}
-      {{ ingredient.name }}
-      {% if ingredient.note %}({{ ingredient.note }}){% endif %}
-    </li>
-  {% endfor %}
-</ul>
+<div class="meta-row">
+  <span>{{ recipe.cook_time_minutes }} min</span>
+  <span>{{ recipe.nutrition.calories_per_serving }} kcal/serving</span>
+  <span>serves {{ recipe.servings }}</span>
+  <span class="badge badge-{{ recipe.classification.value }}">{{ recipe.classification.value|capitalize }}</span>
+  <span class="badge badge-{{ recipe.preference.value }}">{{ recipe.preference.value|capitalize }}</span>
+</div>
 
 <h2>Steps</h2>
-<ol>
+<ol class="steps-list">
   {% for step in recipe.steps %}
     <li>{{ step }}</li>
   {% endfor %}
 </ol>
 
-<form method="post" action="/recipes/{{ recipe.id }}/delete" onsubmit="return confirm('Delete this recipe?');">
-  <button type="submit">Delete recipe</button>
+<details class="fridge">
+  <summary>
+    <span>
+      Ingredients
+      <span class="fridge-hint">&mdash; open the fridge</span>
+    </span>
+    <svg class="chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg>
+  </summary>
+  <ul class="fridge-contents">
+    {% for ingredient in recipe.ingredients %}
+      <li>
+        <span>
+          {{ ingredient.name }}
+          {% if ingredient.note %}<span class="fridge-qty">({{ ingredient.note }})</span>{% endif %}
+        </span>
+        <span class="fridge-qty">
+          {% if ingredient.quantity is not none %}{{ ingredient.quantity }} {% endif %}{% if ingredient.unit %}{{ ingredient.unit }}{% endif %}
+        </span>
+      </li>
+    {% endfor %}
+  </ul>
+</details>
+
+<form method="post" action="/recipes/{{ recipe.id }}/delete" onsubmit="return confirm('Delete this recipe?');" style="margin-top: 24px;">
+  <button type="submit" class="btn btn-secondary">Delete recipe</button>
 </form>
 {% endblock %}

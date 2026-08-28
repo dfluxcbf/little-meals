@@ -49,7 +49,9 @@ def test_recipes_list_contains_stored_recipe_name(store, sample_recipe):
     assert sample_recipe.name in response.text
 
 
-def test_recipe_detail_renders_ingredients_and_steps_in_order(store, sample_recipe):
+def test_recipe_detail_renders_steps_then_ingredients_in_order(store, sample_recipe):
+    # Steps are shown first, with ingredients tucked behind the fridge-door
+    # toggle below them - see docs/ui_design.md's recipe detail screen.
     created = store.create(sample_recipe)
     ui = _make_client(store)
 
@@ -57,17 +59,30 @@ def test_recipe_detail_renders_ingredients_and_steps_in_order(store, sample_reci
     assert response.status_code == 200
     text = response.text
 
+    # Search from the previous match onward, not from the start of the page,
+    # since an ingredient name (e.g. "garlic") can also appear inside the
+    # recipe title higher up the page.
     last_index = -1
-    for ingredient in created.ingredients:
-        index = text.find(ingredient.name)
-        assert index != -1
-        last_index = index
-
     for step in created.steps:
-        index = text.find(step)
+        index = text.find(step, last_index + 1)
         assert index != -1
         assert index > last_index
         last_index = index
+
+    for ingredient in created.ingredients:
+        index = text.find(ingredient.name, last_index + 1)
+        assert index != -1
+        assert index > last_index
+        last_index = index
+
+
+def test_recipe_detail_ingredients_are_behind_a_fridge_toggle(store, sample_recipe):
+    created = store.create(sample_recipe)
+    ui = _make_client(store)
+
+    response = ui.get(f"/recipes/{created.id}")
+    assert response.status_code == 200
+    assert '<details class="fridge">' in response.text
 
 
 def test_recipe_detail_unknown_id_returns_404(store):
@@ -104,3 +119,37 @@ def test_static_htmx_is_served(store):
     ui = _make_client(store)
     response = ui.get("/static/vendor/htmx.min.js")
     assert response.status_code == 200
+
+
+def test_static_fonts_are_served_locally_not_from_a_cdn(store):
+    # docs/ui_design.md: fonts are vendored, no Google Fonts <link> in the
+    # real app - see static/vendor/README.md.
+    ui = _make_client(store)
+
+    css = ui.get("/static/fonts.css")
+    assert css.status_code == 200
+    assert "fonts.googleapis.com" not in css.text
+    assert "fonts.gstatic.com" not in css.text
+
+    assert ui.get("/static/vendor/fonts/fraunces-variable-latin.woff2").status_code == 200
+    assert ui.get("/static/vendor/fonts/inter-variable-latin.woff2").status_code == 200
+
+
+def test_recipes_list_card_has_stable_id_for_htmx_swap(store, sample_recipe):
+    created = store.create(sample_recipe)
+    ui = _make_client(store)
+
+    response = ui.get("/recipes")
+    assert response.status_code == 200
+    assert f'id="recipe-row-{created.id}"' in response.text
+
+
+def test_recipes_list_highlights_cookbook_tab(store):
+    ui = _make_client(store)
+    response = ui.get("/recipes")
+    assert 'class="tab tab-active"' in response.text
+
+
+def test_settings_highlights_settings_tab(client: TestClient):
+    response = client.get("/settings")
+    assert 'class="tab tab-active"' in response.text

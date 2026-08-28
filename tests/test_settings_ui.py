@@ -67,3 +67,14 @@ def test_settings_submit_with_invalid_day_shows_error(client: TestClient):
 def test_settings_nav_link_present(client: TestClient):
     response = client.get("/recipes")
     assert 'href="/settings"' in response.text
+
+
+def test_settings_day_picker_marks_current_day_checked(client: TestClient):
+    client.put("/api/household-preferences", json=VALID_UPDATE_PAYLOAD)
+
+    response = client.get("/settings")
+    text = response.text
+    assert 'id="day-wednesday"' in text
+    assert 'id="day-wednesday" name="recommendation_day" value="wednesday" checked' in text
+    # A different day's radio should not be marked checked.
+    assert 'id="day-monday" name="recommendation_day" value="monday" checked' not in text
