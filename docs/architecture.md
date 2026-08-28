@@ -11,8 +11,9 @@ milestone lands.
 | **Web frontend** | The sole user interface (per `design.md`): recipe library browsing/editing, weekly plan review (like/dislike, servings adjustment), shopping list with checkboxes and cost entry, cook-along view. |
 | **Backend API** | HTTP API backing the frontend: recipe CRUD, preferences CRUD, meal-plan lifecycle, shopping-list generation, cost recording. |
 | **Recipe extraction service** | Wraps the local Ollama LLM. Given free-text recipe input (user-submitted or fetched from an online search result), returns structured output: estimated cooking time, classification (vegetarian/pescetarian/other), nutrition/calorie estimate, ingredient list, ordered steps. Used both for manual submissions and for suggestion generation. |
-| **Suggestion engine** | Builds candidate recipes on demand: the configured number of new AI-suggested recipes for a fresh weekly plan (some by combining stored recipes, some via online search seeded by food preferences + library), plus on-demand reroll requests — replace every open slot in a draft plan, replace one slot with a single new suggestion, or replace one slot with a batch of 10 alternatives — each candidate passed through the recipe extraction service. Excludes disliked recipes from both the stored-recipe pool and the material it combines from. |
-| **Scheduler** | Triggers weekly meal-plan generation at the user-configured day/time. |
+| **Selection engine** (`planning/selection.py`, Milestone 3) | Fills a plan from the existing recipe library only: excludes disliked recipes, randomly samples up to the configured `recipes_per_week` count for variety week to week. A pure function over an in-memory recipe list - no I/O, no LLM call. |
+| **Suggestion engine** (Milestone 4, not yet implemented) | Extends the selection engine with AI-suggested recipes when the library alone doesn't fill every slot: the configured number of new suggestions per plan (some by combining stored recipes, some via online search seeded by food preferences + library), plus on-demand reroll requests — replace every open slot in a draft plan, replace one slot with a single new suggestion, or replace one slot with a batch of 10 alternatives — each candidate passed through the recipe extraction service. Excludes disliked recipes from both the stored-recipe pool and the material it combines from. |
+| **Scheduler** (Milestone 7, not yet implemented) | Triggers weekly meal-plan generation at the user-configured day/time. Milestone 3 exposes generation as an on-demand action (`POST /plan/generate`) rather than something that fires on its own; Milestone 7 wires that same call into a time-based trigger. |
 | **Shopping list generator** | Merges ingredients across a finalized plan's recipes, scaling each recipe's quantities to its servings count, producing one deduplicated checklist. |
 | **Recipe store** | The recipe library as a directory of Markdown files, one file per recipe (YAML frontmatter for structured fields — cook time, classification, nutrition, ingredients, liked/disliked state — plus a Markdown body for the ordered steps). Directly readable and editable by the user with any text editor; the backend treats this directory as the source of truth rather than caching it in a database. |
 | **Data store** | Persists everything that isn't a recipe: household preferences, meal plans, suggestions, and shopping lists (which reference recipes by filename/id in the recipe store). Shared by every device in the household — see "Remote access" below — not partitioned per user. |
@@ -167,10 +168,11 @@ and `lmeals preflight`, and run automatically as the first step of `bazel run
 | Module | Responsibility |
 |---|---|
 | `config.py` | Runtime `Settings` (data dir, Ollama URL/model/timeout), all env-overridable. |
-| `models.py` | Pydantic `Recipe`/`Ingredient`/`Nutrition`, the LLM-facing `ExtractedRecipe` subset, and `HouseholdPreferences`. |
-| `store/` | The Markdown+YAML-frontmatter recipe store (see "Recipe storage format" above) and the SQLite-backed `HouseholdPreferencesStore` (see "Household preferences storage" above). |
+| `models.py` | Pydantic `Recipe`/`Ingredient`/`Nutrition`, the LLM-facing `ExtractedRecipe` subset, `HouseholdPreferences`, and `MealPlan`/`PlanMeal`. |
+| `store/` | The Markdown+YAML-frontmatter recipe store (see "Recipe storage format" above), the SQLite-backed `HouseholdPreferencesStore` (see "Household preferences storage" above), and the SQLite-backed `MealPlanStore` (plans + their meals - app-managed, same rationale as household preferences). |
 | `llm/` | The Ollama HTTP client, the extraction prompt, and the extraction service. |
-| `api/` | The FastAPI app factory, the JSON recipe-CRUD and household-preferences routes, and the server-rendered HTML routes (recipe library + settings). |
+| `planning/` | The selection engine (`selection.py`, Milestone 3) - pure functions over recipes, no I/O. Milestone 4's suggestion engine (combination + online search) lands here too. |
+| `api/` | The FastAPI app factory, the JSON recipe-CRUD/household-preferences/meal-plan routes, and the server-rendered HTML routes (recipe library, settings, weekly plan). |
 | `preflight.py` | The system-dependency check described above. |
 | `cli.py` | `lmeals serve` / `lmeals preflight` / `lmeals --version`. |
 

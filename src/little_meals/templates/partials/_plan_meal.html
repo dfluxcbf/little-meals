@@ -1,0 +1,31 @@
+<div class="plan-meal" id="plan-meal-{{ meal.id }}">
+  <div class="plan-meal-top">
+    <h3><a href="/recipes/{{ recipe.id }}">{{ recipe.name }}</a></h3>
+    <form hx-post="/plan/meals/{{ meal.id }}/cooked" hx-target="#plan-meal-{{ meal.id }}" hx-swap="outerHTML">
+      <input type="hidden" name="cooked" value="{{ 'false' if meal.cooked else 'true' }}">
+      <button type="submit" class="pot-stamp {% if meal.cooked %}pot-stamp-active{% endif %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11h16v3a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5v-3Z"></path><path d="M2 11h20"></path></svg>
+        {{ "Cooked" if meal.cooked else "Mark cooked" }}
+      </button>
+    </form>
+  </div>
+  <div class="plan-meal-meta">
+    <span>{{ recipe.cook_time_minutes }} min</span>
+    <span>{{ recipe.nutrition.calories_per_serving }} kcal</span>
+    <span class="badge badge-{{ recipe.classification.value }}">{{ recipe.classification.value|capitalize }}</span>
+  </div>
+  <div class="servings-row">
+    <label for="servings-{{ meal.id }}">Servings</label>
+    <input
+      type="number"
+      id="servings-{{ meal.id }}"
+      name="servings"
+      min="1"
+      value="{{ meal.servings }}"
+      hx-post="/plan/meals/{{ meal.id }}/servings"
+      hx-trigger="change"
+      hx-target="#plan-meal-{{ meal.id }}"
+      hx-swap="outerHTML"
+    >
+  </div>
+</div>

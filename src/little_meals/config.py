@@ -31,6 +31,10 @@ class Settings:
     def household_db_path(self) -> Path:
         return self.data_dir / "household.db"
 
+    @property
+    def plan_db_path(self) -> Path:
+        return self.data_dir / "plan.db"
+
     @classmethod
     def from_env(cls) -> "Settings":
         return cls(

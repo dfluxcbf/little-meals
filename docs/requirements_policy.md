@@ -45,6 +45,13 @@ test coverage are tracked exclusively through **little-requirements**
   grid, recipe detail's fridge-door toggle, settings' day-picker) next time
   `lreq` is reachable, then backfill the marker onto the corresponding tests
   in `tests/test_api_ui.py` and `tests/test_settings_ui.py`.
+- Milestone 3 (`m3-weekly-plan-generation` — the selection engine, `MealPlanStore`,
+  the meal-plan JSON API, and the `/plan` review UI — see `milestones.md`) shipped
+  for the same reason as Milestone 9: `lreq` unreachable in the implementing
+  environment. Its tests (`tests/test_plan_store.py`, `tests/test_selection_engine.py`,
+  `tests/test_api_plan.py`, `tests/test_plan_ui.py`) are written and passing but
+  untagged — create their `REQ-#########` IDs via `lreq requirement create` next
+  time it's reachable, then backfill the marker.
 - Known issue: `lreq update` (what the Bazel genrule invokes) cannot run inside
   this submodule checkout — `little-requirements`' managed pre-commit-hook
   installer assumes `.git` is a directory, and a submodule's `.git` is a file.
