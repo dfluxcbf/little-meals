@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Shopping list - little-meals{% endblock %}
+{% block content %}
+<h1>Shopping list</h1>
+
+{% if plan is none %}
+  <p class="subtitle">No plan yet - <a href="/plan">generate this week's plan</a> first.</p>
+{% elif not plan.finalized %}
+  <p class="subtitle"><a href="/plan">Finalize this week's plan</a> to generate a shopping list for it.</p>
+{% elif shopping_list is none %}
+  <p class="subtitle">Ready when you are.</p>
+  <form method="post" action="/shopping/generate">
+    <button type="submit" class="btn btn-primary">Generate shopping list</button>
+  </form>
+{% else %}
+  {% set checked_count = shopping_list.items | selectattr("checked") | list | length %}
+  {% set total_count = shopping_list.items | length %}
+  <div class="shopping-note-wrap">
+    <div class="shopping-note">
+      <div class="magnet"></div>
+      {% if not shopping_list.items %}
+        <p>No ingredients to list - the recipes in this plan may have been removed since it was finalized.</p>
+      {% else %}
+        <div class="shopping-progress">
+          <div class="shopping-progress-track">
+            <div class="shopping-progress-fill" style="width: {{ (checked_count / total_count * 100) | round | int if total_count else 0 }}%;"></div>
+          </div>
+          <span class="shopping-progress-count">{{ checked_count }} of {{ total_count }}</span>
+        </div>
+        {% for item in shopping_list.items %}
+          {% include "partials/_shopping_item.html" %}
+        {% endfor %}
+      {% endif %}
+
+      <div class="shopping-cost-row">
+        <label for="actual_cost">Actual amount spent</label>
+        <form method="post" action="/shopping/cost" class="amount-input">
+          <span>$</span>
+          <input type="number" id="actual_cost" name="actual_cost" min="0" step="0.01" value="{{ shopping_list.actual_cost if shopping_list.actual_cost is not none else '' }}" placeholder="0.00">
+          <button type="submit" class="btn btn-primary">Save</button>
+        </form>
+      </div>
+    </div>
+  </div>
+{% endif %}
+{% endblock %}

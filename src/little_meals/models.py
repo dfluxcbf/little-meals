@@ -150,6 +150,34 @@ class CookedUpdate(BaseModel):
     cooked: bool
 
 
+class ShoppingListItem(BaseModel):
+    """One merged ingredient line - see planning/shopping_list.py for how
+    same-name-and-unit ingredients across a plan's recipes get combined into
+    one of these, quantities scaled to each recipe's servings."""
+
+    id: str
+    name: str
+    quantity: Optional[float] = None
+    unit: Optional[str] = None
+    checked: bool = False
+
+
+class ShoppingList(BaseModel):
+    id: str
+    plan_id: str
+    created_at: datetime
+    items: list[ShoppingListItem] = Field(default_factory=list)
+    actual_cost: Optional[float] = None
+
+
+class ItemCheckedUpdate(BaseModel):
+    checked: bool
+
+
+class ActualCostUpdate(BaseModel):
+    actual_cost: float = Field(ge=0)
+
+
 class HouseholdPreferences(BaseModel):
     """Configuration shared by the whole household, not per person - see
     design.md's "Household preferences" concept. A singleton, not a

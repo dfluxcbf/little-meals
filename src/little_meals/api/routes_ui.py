@@ -11,10 +11,12 @@ from little_meals.llm.extraction import ExtractionError, RecipeExtractionService
 from little_meals.llm.ollama_client import OllamaUnavailable
 from little_meals.models import DayOfWeek, HouseholdPreferencesUpdate, MealPlan, Preference, Recipe
 from little_meals.planning.plan_builder import build_weekly_plan, generate_single_replacement, list_controlled_reroll_candidates
+from little_meals.planning.shopping_list import build_shopping_list_items
 from little_meals.planning.suggestion import SearchProvider
 from little_meals.store.household_store import HouseholdPreferencesStore
 from little_meals.store.plan_store import MealPlanStore, MealSpec, PlanMealNotFound, PlanNotFound
 from little_meals.store.recipe_store import RecipeNotFound, RecipeStore
+from little_meals.store.shopping_list_store import ShoppingListItemNotFound, ShoppingListNotFound, ShoppingListStore
 
 
 def build_ui_router(
@@ -23,6 +25,7 @@ def build_ui_router(
     household_store: HouseholdPreferencesStore,
     plan_store: MealPlanStore,
     search_provider: SearchProvider,
+    shopping_list_store: ShoppingListStore,
     templates: Jinja2Templates,
 ) -> APIRouter:
     router = APIRouter()
@@ -250,6 +253,50 @@ def build_ui_router(
         if plan is not None:
             plan_store.finalize(plan.id)
         return RedirectResponse(url="/plan", status_code=303)
+
+    @router.get("/shopping", response_class=HTMLResponse, include_in_schema=False)
+    def shopping_view(request: Request) -> HTMLResponse:
+        plan = plan_store.get_current()
+        shopping_list = None
+        if plan is not None and plan.finalized:
+            shopping_list = shopping_list_store.get_for_plan(plan.id)
+        return templates.TemplateResponse(
+            request,
+            "shopping.html",
+            {"plan": plan, "shopping_list": shopping_list, "nav_active": "shopping"},
+        )
+
+    @router.post("/shopping/generate", include_in_schema=False)
+    def shopping_generate() -> RedirectResponse:
+        plan = plan_store.get_current()
+        if plan is not None and plan.finalized and shopping_list_store.get_for_plan(plan.id) is None:
+            items = build_shopping_list_items(plan, store)
+            shopping_list_store.create(plan.id, items)
+        return RedirectResponse(url="/shopping", status_code=303)
+
+    @router.post("/shopping/items/{item_id}/checked", response_class=HTMLResponse, include_in_schema=False)
+    def shopping_item_checked(request: Request, item_id: str, checked: str = Form(...)) -> HTMLResponse:
+        plan = plan_store.get_current()
+        if plan is None:
+            return RedirectResponse(url="/shopping", status_code=303)
+        shopping_list = shopping_list_store.get_for_plan(plan.id)
+        if shopping_list is None:
+            return RedirectResponse(url="/shopping", status_code=303)
+        try:
+            shopping_list = shopping_list_store.set_item_checked(shopping_list.id, item_id, checked == "true")
+        except (ShoppingListNotFound, ShoppingListItemNotFound):
+            return RedirectResponse(url="/shopping", status_code=303)
+        item = next(i for i in shopping_list.items if i.id == item_id)
+        return templates.TemplateResponse(request, "partials/_shopping_item.html", {"item": item})
+
+    @router.post("/shopping/cost", include_in_schema=False)
+    def shopping_cost(actual_cost: float = Form(...)) -> RedirectResponse:
+        plan = plan_store.get_current()
+        if plan is not None:
+            shopping_list = shopping_list_store.get_for_plan(plan.id)
+            if shopping_list is not None and actual_cost >= 0:
+                shopping_list_store.set_actual_cost(shopping_list.id, actual_cost)
+        return RedirectResponse(url="/shopping", status_code=303)
 
     return router
 
