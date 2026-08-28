@@ -17,7 +17,11 @@ test coverage are tracked exclusively through **little-requirements**
   REQ-000000039, was added later on the `recipe-extraction-quality` branch for
   the classification-reconciliation safety net (see `architecture.md`'s "Local
   LLM runtime" section) — tagged in `tests/test_extraction_service.py` and
-  exercised against the real model in `tests/test_ollama_client_real.py`.
+  exercised against the real model in `tests/test_ollama_client_real.py`. A
+  second `recipe-extraction-quality` round added REQ-000000040 for
+  `RecipeStore`'s LLM-backed file normalization (see `architecture.md`'s
+  "Recipe file normalization" row) — tagged in `tests/test_recipe_store.py`
+  and exercised against the real model in `tests/test_ollama_client_real.py`.
 - Milestone 2 (`m2-household-preferences` suite) created three requirements,
   REQ-000000010 through REQ-000000012, covering the household preferences store,
   its JSON API, and its settings UI — see `milestones.md` and the corresponding

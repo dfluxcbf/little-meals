@@ -24,7 +24,7 @@ def build_recipes_router(store: RecipeStore, extractor: RecipeExtractionService,
 
     @router.get("/recipes", response_model=list[Recipe])
     def list_recipes(preference: Optional[Preference] = Query(default=None)) -> list[Recipe]:
-        recipes = store.list()
+        recipes = store.list(extractor)
         if preference is not None:
             recipes = [recipe for recipe in recipes if recipe.preference == preference]
         return recipes

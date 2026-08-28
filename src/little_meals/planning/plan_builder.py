@@ -76,7 +76,7 @@ def build_meal_specs(
     there's exactly one place that reads preferences, lists recipes, and
     runs build_weekly_plan."""
     preferences = household_store.get()
-    recipes = recipe_store.list()
+    recipes = recipe_store.list(extractor)
     generated = build_weekly_plan(recipes, preferences, recipe_store, extractor, search_provider, rng=rng)
     return [MealSpec(g.recipe.id, g.servings, g.is_suggestion) for g in generated]
 

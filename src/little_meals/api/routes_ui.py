@@ -54,7 +54,7 @@ def build_ui_router(
 
     @router.get("/recipes", response_class=HTMLResponse, include_in_schema=False)
     def recipes_list(request: Request) -> HTMLResponse:
-        recipes = store.list()
+        recipes = store.list(extractor)
         return templates.TemplateResponse(
             request,
             "recipes_list.html",
@@ -256,7 +256,7 @@ def build_ui_router(
         if plan is None or plan.finalized:
             return RedirectResponse(url="/plan", status_code=303)
         preferences = household_store.get()
-        recipes = store.list()
+        recipes = store.list(extractor)
         excluded = {meal.recipe_id for meal in plan.meals}
         replacement = generate_single_replacement(excluded, recipes, store, extractor, search_provider, preferences)
         if replacement is None:
@@ -276,7 +276,7 @@ def build_ui_router(
         if meal is None:
             return RedirectResponse(url="/plan", status_code=303)
         excluded = {m.recipe_id for m in plan.meals}
-        candidates = list_controlled_reroll_candidates(excluded, store.list())
+        candidates = list_controlled_reroll_candidates(excluded, store.list(extractor))
         current_recipe = store.get(meal.recipe_id)
         return templates.TemplateResponse(
             request,
