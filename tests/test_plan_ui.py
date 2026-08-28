@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import pytest
 from fastapi.testclient import TestClient
 
 from little_meals.store.plan_store import MealSpec
@@ -20,17 +21,20 @@ def _create_recipe(client: TestClient, sample_recipe) -> dict:
     ).json()
 
 
+@pytest.mark.requirement("REQ-000000021")
 def test_plan_page_shows_generate_prompt_when_no_plan_exists(client: TestClient):
     response = client.get("/plan")
     assert response.status_code == 200
     assert "Generate this week's plan" in response.text
 
 
+@pytest.mark.requirement("REQ-000000021")
 def test_plan_page_highlights_this_week_tab(client: TestClient):
     response = client.get("/plan")
     assert 'class="tab tab-active"' in response.text
 
 
+@pytest.mark.requirement("REQ-000000021")
 def test_generate_then_view_shows_the_meal(client: TestClient, sample_recipe):
     _create_recipe(client, sample_recipe)
 
@@ -44,12 +48,14 @@ def test_generate_then_view_shows_the_meal(client: TestClient, sample_recipe):
     assert "Mark cooked" in response.text
 
 
+@pytest.mark.requirement("REQ-000000021")
 def test_generate_with_empty_library_shows_empty_state(client: TestClient):
     client.post("/plan/generate", follow_redirects=False)
     response = client.get("/plan")
     assert "No recipes in the cookbook yet" in response.text
 
 
+@pytest.mark.requirement("REQ-000000021")
 def test_servings_update_returns_fragment_not_full_page(client: TestClient, sample_recipe):
     _create_recipe(client, sample_recipe)
     client.post("/plan/generate", follow_redirects=False)
@@ -63,6 +69,7 @@ def test_servings_update_returns_fragment_not_full_page(client: TestClient, samp
     assert 'value="7"' in response.text
 
 
+@pytest.mark.requirement("REQ-000000021")
 def test_cooked_toggle_stamps_the_meal(client: TestClient, sample_recipe):
     _create_recipe(client, sample_recipe)
     client.post("/plan/generate", follow_redirects=False)
@@ -80,6 +87,7 @@ def test_cooked_toggle_stamps_the_meal(client: TestClient, sample_recipe):
     assert "pot-stamp-active" not in response.text
 
 
+@pytest.mark.requirement("REQ-000000021")
 def test_finalize_marks_plan_finalized_and_hides_the_button(client: TestClient, sample_recipe):
     _create_recipe(client, sample_recipe)
     client.post("/plan/generate", follow_redirects=False)
@@ -92,17 +100,20 @@ def test_finalize_marks_plan_finalized_and_hides_the_button(client: TestClient, 
     assert "Finalize plan" not in response.text
 
 
+@pytest.mark.requirement("REQ-000000021")
 def test_plan_nav_link_present_on_recipes_page(client: TestClient):
     response = client.get("/recipes")
     assert 'href="/plan"' in response.text
 
 
+@pytest.mark.requirement("REQ-000000021")
 def test_servings_update_redirects_when_no_current_plan(client: TestClient):
     response = client.post("/plan/meals/m1/servings", data={"servings": "3"}, follow_redirects=False)
     assert response.status_code == 303
     assert response.headers["location"] == "/plan"
 
 
+@pytest.mark.requirement("REQ-000000021")
 def test_servings_update_redirects_when_meal_not_in_current_plan(client: TestClient, sample_recipe):
     _create_recipe(client, sample_recipe)
     client.post("/plan/generate", follow_redirects=False)
@@ -112,12 +123,14 @@ def test_servings_update_redirects_when_meal_not_in_current_plan(client: TestCli
     assert response.headers["location"] == "/plan"
 
 
+@pytest.mark.requirement("REQ-000000021")
 def test_cooked_toggle_redirects_when_no_current_plan(client: TestClient):
     response = client.post("/plan/meals/m1/cooked", data={"cooked": "true"}, follow_redirects=False)
     assert response.status_code == 303
     assert response.headers["location"] == "/plan"
 
 
+@pytest.mark.requirement("REQ-000000021")
 def test_cooked_toggle_redirects_when_meal_not_in_current_plan(client: TestClient, sample_recipe):
     _create_recipe(client, sample_recipe)
     client.post("/plan/generate", follow_redirects=False)
@@ -127,6 +140,7 @@ def test_cooked_toggle_redirects_when_meal_not_in_current_plan(client: TestClien
     assert response.headers["location"] == "/plan"
 
 
+@pytest.mark.requirement("REQ-000000021")
 def test_finalize_with_no_current_plan_is_a_harmless_redirect(client: TestClient):
     response = client.post("/plan/finalize", follow_redirects=False)
     assert response.status_code == 303
@@ -146,6 +160,7 @@ def _set_preferences(client: TestClient, **overrides) -> None:
     client.put("/api/household-preferences", json=payload)
 
 
+@pytest.mark.requirement("REQ-000000028")
 def test_plan_preference_toggle_updates_the_recipe(client: TestClient, sample_recipe):
     _create_recipe(client, sample_recipe)
     client.post("/plan/generate", follow_redirects=False)
@@ -161,11 +176,13 @@ def test_plan_preference_toggle_updates_the_recipe(client: TestClient, sample_re
     assert recipe["preference"] == "disliked"
 
 
+@pytest.mark.requirement("REQ-000000028")
 def test_plan_preference_toggle_redirects_when_no_current_plan(client: TestClient):
     response = client.post("/plan/meals/m1/preference", data={"preference": "liked"}, follow_redirects=False)
     assert response.status_code == 303
 
 
+@pytest.mark.requirement("REQ-000000028")
 def test_plan_preference_toggle_redirects_when_meal_not_in_plan(client: TestClient, sample_recipe):
     _create_recipe(client, sample_recipe)
     client.post("/plan/generate", follow_redirects=False)
@@ -173,6 +190,7 @@ def test_plan_preference_toggle_redirects_when_meal_not_in_plan(client: TestClie
     assert response.status_code == 303
 
 
+@pytest.mark.requirement("REQ-000000025")
 def test_plan_reroll_whole_replaces_meals(client: TestClient, sample_recipe):
     created = _create_recipe(client, sample_recipe)
     _set_preferences(client)
@@ -185,11 +203,13 @@ def test_plan_reroll_whole_replaces_meals(client: TestClient, sample_recipe):
     assert plan["meals"][0]["recipe_id"] == created["id"]
 
 
+@pytest.mark.requirement("REQ-000000025")
 def test_plan_reroll_whole_is_a_no_op_when_no_current_plan(client: TestClient):
     response = client.post("/plan/reroll", follow_redirects=False)
     assert response.status_code == 303
 
 
+@pytest.mark.requirement("REQ-000000025")
 def test_plan_reroll_whole_is_a_no_op_when_finalized(client: TestClient, sample_recipe):
     _create_recipe(client, sample_recipe)
     client.post("/plan/generate", follow_redirects=False)
@@ -202,6 +222,7 @@ def test_plan_reroll_whole_is_a_no_op_when_finalized(client: TestClient, sample_
     assert after["meals"] == before["meals"]
 
 
+@pytest.mark.requirement("REQ-000000026")
 def test_plan_meal_reroll_swaps_the_recipe(client: TestClient, sample_recipe):
     _create_recipe(client, sample_recipe)
     other = {
@@ -228,11 +249,13 @@ def test_plan_meal_reroll_swaps_the_recipe(client: TestClient, sample_recipe):
     assert updated["meals"][0]["recipe_id"] != original_recipe_id
 
 
+@pytest.mark.requirement("REQ-000000026")
 def test_plan_meal_reroll_redirects_when_no_current_plan(client: TestClient):
     response = client.post("/plan/meals/m1/reroll", follow_redirects=False)
     assert response.status_code == 303
 
 
+@pytest.mark.requirement("REQ-000000026")
 def test_plan_meal_reroll_redirects_when_finalized(client: TestClient, sample_recipe):
     _create_recipe(client, sample_recipe)
     client.post("/plan/generate", follow_redirects=False)
@@ -243,6 +266,7 @@ def test_plan_meal_reroll_redirects_when_finalized(client: TestClient, sample_re
     assert response.status_code == 303
 
 
+@pytest.mark.requirement("REQ-000000026")
 def test_plan_meal_reroll_redirects_when_meal_not_in_plan(client: TestClient, sample_recipe):
     _create_recipe(client, sample_recipe)
     other = {
@@ -262,6 +286,7 @@ def test_plan_meal_reroll_redirects_when_meal_not_in_plan(client: TestClient, sa
     assert response.status_code == 303
 
 
+@pytest.mark.requirement("REQ-000000027")
 def test_plan_meal_choose_redirects_when_meal_not_in_plan(client: TestClient, sample_recipe):
     created = _create_recipe(client, sample_recipe)
     client.post("/plan/generate", follow_redirects=False)
@@ -272,6 +297,7 @@ def test_plan_meal_choose_redirects_when_meal_not_in_plan(client: TestClient, sa
     assert response.status_code == 303
 
 
+@pytest.mark.requirement("REQ-000000026")
 def test_plan_meal_reroll_with_nothing_available_rerenders_plan_page(client: TestClient, sample_recipe):
     _create_recipe(client, sample_recipe)
     _set_preferences(client)
@@ -283,6 +309,7 @@ def test_plan_meal_reroll_with_nothing_available_rerenders_plan_page(client: Tes
     assert "This week's plan" in response.text
 
 
+@pytest.mark.requirement("REQ-000000027")
 def test_plan_meal_alternatives_page_lists_unused_liked_recipes(client: TestClient, sample_recipe):
     _create_recipe(client, sample_recipe)
     other = {
@@ -305,11 +332,13 @@ def test_plan_meal_alternatives_page_lists_unused_liked_recipes(client: TestClie
     assert "Pick a replacement" in response.text
 
 
+@pytest.mark.requirement("REQ-000000027")
 def test_plan_meal_alternatives_redirects_when_no_current_plan(client: TestClient):
     response = client.get("/plan/meals/m1/alternatives", follow_redirects=False)
     assert response.status_code == 303
 
 
+@pytest.mark.requirement("REQ-000000027")
 def test_plan_meal_alternatives_redirects_when_meal_not_in_plan(client: TestClient, sample_recipe):
     _create_recipe(client, sample_recipe)
     client.post("/plan/generate", follow_redirects=False)
@@ -317,6 +346,7 @@ def test_plan_meal_alternatives_redirects_when_meal_not_in_plan(client: TestClie
     assert response.status_code == 303
 
 
+@pytest.mark.requirement("REQ-000000027")
 def test_plan_meal_choose_sets_the_recipe(client: TestClient, sample_recipe):
     _create_recipe(client, sample_recipe)
     other = {
@@ -341,11 +371,13 @@ def test_plan_meal_choose_sets_the_recipe(client: TestClient, sample_recipe):
     assert updated["meals"][0]["recipe_id"] == other_created["id"]
 
 
+@pytest.mark.requirement("REQ-000000027")
 def test_plan_meal_choose_redirects_when_no_current_plan(client: TestClient):
     response = client.post("/plan/meals/m1/choose", data={"recipe_id": "does-not-exist"}, follow_redirects=False)
     assert response.status_code == 303
 
 
+@pytest.mark.requirement("REQ-000000027")
 def test_plan_meal_choose_redirects_when_finalized(client: TestClient, sample_recipe):
     created = _create_recipe(client, sample_recipe)
     client.post("/plan/generate", follow_redirects=False)
@@ -358,6 +390,7 @@ def test_plan_meal_choose_redirects_when_finalized(client: TestClient, sample_re
     assert response.status_code == 303
 
 
+@pytest.mark.requirement("REQ-000000027")
 def test_plan_meal_choose_with_unknown_recipe_redirects(client: TestClient, sample_recipe):
     _create_recipe(client, sample_recipe)
     client.post("/plan/generate", follow_redirects=False)
@@ -369,6 +402,7 @@ def test_plan_meal_choose_with_unknown_recipe_redirects(client: TestClient, samp
     assert response.status_code == 303
 
 
+@pytest.mark.requirement("REQ-000000028")
 def test_new_suggestion_shows_new_badge(client: TestClient, sample_recipe, store, plan_store):
     created = store.create(sample_recipe)
     plan_store.create([MealSpec(created.id, created.servings, is_suggestion=True)])
@@ -379,6 +413,7 @@ def test_new_suggestion_shows_new_badge(client: TestClient, sample_recipe, store
     assert "badge-new" in response.text
 
 
+@pytest.mark.requirement("REQ-000000021")
 def test_plan_page_skips_meals_whose_recipe_was_since_deleted(client: TestClient, sample_recipe):
     created = _create_recipe(client, sample_recipe)
     client.post("/plan/generate", follow_redirects=False)

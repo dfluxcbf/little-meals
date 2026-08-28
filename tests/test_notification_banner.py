@@ -1,15 +1,19 @@
 from __future__ import annotations
 
+import pytest
+
 from fastapi.testclient import TestClient
 
 from little_meals.store.notification_store import NotificationStore
 
 
+@pytest.mark.requirement("REQ-000000036")
 def test_banner_hidden_by_default(client: TestClient):
     response = client.get("/recipes")
     assert "notification-banner" not in response.text
 
 
+@pytest.mark.requirement("REQ-000000036")
 def test_banner_shown_on_recipes_page_when_pending(client: TestClient, notification_store: NotificationStore):
     notification_store.mark_new_plan_ready()
 
@@ -19,6 +23,7 @@ def test_banner_shown_on_recipes_page_when_pending(client: TestClient, notificat
     assert '<a href="/plan" class="notification-banner">' in response.text
 
 
+@pytest.mark.requirement("REQ-000000036")
 def test_banner_not_shown_on_plan_page_itself(client: TestClient, notification_store: NotificationStore):
     # Viewing /plan is exactly what the banner points to, so it clears (see
     # test_viewing_plan_page_clears_the_notification below) before this same
@@ -29,6 +34,7 @@ def test_banner_not_shown_on_plan_page_itself(client: TestClient, notification_s
     assert "notification-banner" not in response.text
 
 
+@pytest.mark.requirement("REQ-000000036")
 def test_viewing_plan_page_clears_the_notification(client: TestClient, notification_store: NotificationStore):
     notification_store.mark_new_plan_ready()
     assert notification_store.is_pending() is True
@@ -38,6 +44,7 @@ def test_viewing_plan_page_clears_the_notification(client: TestClient, notificat
     assert notification_store.is_pending() is False
 
 
+@pytest.mark.requirement("REQ-000000036")
 def test_banner_gone_from_recipes_page_after_plan_viewed(client: TestClient, notification_store: NotificationStore):
     notification_store.mark_new_plan_ready()
     client.get("/plan")

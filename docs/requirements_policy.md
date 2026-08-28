@@ -35,55 +35,58 @@ test coverage are tracked exclusively through **little-requirements**
   `requirement` marker itself; the marker is valid either way, but only the plain
   `pytest` path (with `little_requirements` installed) reports results into the
   database.
-- Milestone 9 (`m9-visual-design-system`, a visual retrofit of M1/M2's screens
-  per `ui_design.md` — see `milestones.md`) shipped without new `REQ-#########`
-  IDs: neither the `lreq` CLI nor its MCP server was reachable in the
-  environment that implemented it, and per this policy IDs must come from
-  `lreq` itself, never be invented. Its tests are written and passing but not
-  tagged with `@pytest.mark.requirement(...)`. Run `lreq requirement create`
-  for each of M9's changes (base template/nav shell, recipe library card
-  grid, recipe detail's fridge-door toggle, settings' day-picker) next time
-  `lreq` is reachable, then backfill the marker onto the corresponding tests
+- Milestone 9 (`m9-visual-design-system` suite) created five requirements,
+  REQ-000000013 through REQ-000000017, covering the vendored fonts/design
+  tokens, the shared nav shell, the recipe library card-grid restyle, the
+  recipe detail fridge-door disclosure, and the settings day-picker — tagged
   in `tests/test_api_ui.py` and `tests/test_settings_ui.py`.
-- Milestone 3 (`m3-weekly-plan-generation` — the selection engine, `MealPlanStore`,
-  the meal-plan JSON API, and the `/plan` review UI — see `milestones.md`) shipped
-  for the same reason as Milestone 9: `lreq` unreachable in the implementing
-  environment. Its tests (`tests/test_plan_store.py`, `tests/test_selection_engine.py`,
-  `tests/test_api_plan.py`, `tests/test_plan_ui.py`) are written and passing but
-  untagged — create their `REQ-#########` IDs via `lreq requirement create` next
-  time it's reachable, then backfill the marker.
-- Milestone 4 (`m4-ai-suggestions-and-reroll` — `planning/suggestion.py`,
-  `planning/plan_builder.py`, the reroll/alternatives/choose endpoints in
-  `api/routes_plan.py`, and their UI counterparts — see `milestones.md`)
-  shipped for the same reason as Milestones 3 and 9: `lreq` unreachable in
-  the implementing environment. Its tests (`tests/test_suggestion.py`,
-  `tests/test_plan_builder.py`, plus the reroll/alternatives/choose cases
-  added to `tests/test_api_plan.py` and `tests/test_plan_ui.py`) are written
-  and passing but untagged — create their `REQ-#########` IDs via
-  `lreq requirement create` next time it's reachable, then backfill the marker.
-- Milestone 5 (`m5-shopping-list` — `planning/shopping_list.py`,
-  `ShoppingListStore`, `api/routes_shopping.py`, and the `/shopping` UI — see
-  `milestones.md`) shipped for the same reason as Milestones 3, 4, and 9:
-  `lreq` unreachable in the implementing environment. Its tests
-  (`tests/test_shopping_list_generation.py`, `tests/test_shopping_list_store.py`,
-  `tests/test_api_shopping.py`, `tests/test_shopping_ui.py`) are written and
-  passing but untagged — create their `REQ-#########` IDs via
-  `lreq requirement create` next time it's reachable, then backfill the marker.
-- Milestone 6 (`m6-cook-along` — `cook_step.html`/`cook_finish.html` and the
-  cook-along routes in `api/routes_ui.py` — see `milestones.md`) shipped for
-  the same reason as Milestones 3, 4, 5, and 9: `lreq` unreachable in the
-  implementing environment. Its tests (`tests/test_cook_along.py`) are
-  written and passing but untagged — create their `REQ-#########` IDs via
-  `lreq requirement create` next time it's reachable, then backfill the marker.
-- Milestone 7 (`m7-weekly-scheduling` — `scheduler.py`, `NotificationStore`,
-  and the `enable_scheduler`/lifespan wiring in `api/app.py` — see
-  `milestones.md`) shipped for the same reason as Milestones 3, 4, 5, 6, and
-  9: `lreq` unreachable in the implementing environment. Its tests
-  (`tests/test_scheduler.py`, `tests/test_notification_store.py`,
-  `tests/test_app_scheduler_wiring.py`, `tests/test_notification_banner.py`)
-  are written and passing but untagged — create their `REQ-#########` IDs
-  via `lreq requirement create` next time it's reachable, then backfill the
-  marker.
+- Milestone 3 (`m3-weekly-plan-generation` suite) created four requirements,
+  REQ-000000018 through REQ-000000021, covering the selection engine, the
+  `MealPlanStore`, the meal-plan JSON API, and the `/plan` review UI —
+  tagged across `tests/test_selection_engine.py`, `tests/test_plan_store.py`,
+  and the M3-scoped cases in `tests/test_api_plan.py`/`tests/test_plan_ui.py`.
+- Milestone 4 (`m4-ai-suggestions-and-reroll` suite) created seven
+  requirements, REQ-000000022 through REQ-000000028, covering combination
+  suggestion generation, the `SearchProvider` seam, weekly-plan AI-slot
+  reservation, whole-plan reroll, single-meal reroll, controlled reroll, and
+  the plan-review like/dislike/NEW-badge UI — tagged across
+  `tests/test_suggestion.py`, `tests/test_plan_builder.py`, and the M4-scoped
+  cases in `tests/test_api_plan.py`/`tests/test_plan_ui.py`.
+- Milestone 5 (`m5-shopping-list` suite) created four requirements,
+  REQ-000000029 through REQ-000000032, covering ingredient merge/dedup/scaling,
+  the `ShoppingListStore`, the shopping-list JSON API, and the `/shopping` UI —
+  tagged across `tests/test_shopping_list_generation.py`,
+  `tests/test_shopping_list_store.py`, `tests/test_api_shopping.py`, and
+  `tests/test_shopping_ui.py`.
+- Milestone 6 (`m6-cook-along` suite) created two requirements,
+  REQ-000000033 and REQ-000000034, covering the step-by-step walkthrough and
+  the post-cook feedback (preference + plan-cooked-flag) behavior — both
+  tagged in `tests/test_cook_along.py`.
+- Milestone 7 (`m7-weekly-scheduling` suite) created three requirements,
+  REQ-000000035 through REQ-000000037, covering the scheduler's polling/
+  trigger logic, the in-app notification, and the `enable_scheduler`/lifespan
+  wiring — tagged across `tests/test_scheduler.py`,
+  `tests/test_notification_store.py`, `tests/test_notification_banner.py`,
+  and `tests/test_app_scheduler_wiring.py`.
+- `lreq` was unreachable (neither the CLI nor its MCP server) in the session
+  that implemented Milestones 3-7 and 9, so those shipped with their tests
+  written but untagged; the note above reflects the actual backfill done in
+  a later session once `lreq` was confirmed working (see next bullet). If
+  this ever recurs, follow the same path: create each milestone's
+  requirements via `lreq requirement create`, tag the corresponding tests,
+  then run plain `pytest` to report results into the database.
+- `lreq` is installed via `pipx` but its shim (`~/.local/bin/lreq`) may not be
+  on `PATH` in every shell — add `~/.local/bin` to `PATH` if `command -v lreq`
+  comes up empty despite `pipx list` showing it installed. Separately, the
+  pytest reporting plugin needs the `little_requirements` *package* importable
+  from whatever Python environment runs `pytest` (the project's `.venv`, not
+  the pipx shim's isolated venv) — since it isn't on PyPI, install it from the
+  sibling checkout's built wheel: `pip install
+  ../little-requirements/dist/little_requirements-<version>-py3-none-any.whl`
+  (rebuild that wheel first if it's missing or stale). This is a dev-only
+  install into `.venv` (gitignored), never added to `requirements.in`/`pip.parse`,
+  consistent with the project-structure policy's "installed working version,
+  not a source dependency" rule.
 - Known issue: `lreq update` (what the Bazel genrule invokes) cannot run inside
   this submodule checkout — `little-requirements`' managed pre-commit-hook
   installer assumes `.git` is a directory, and a submodule's `.git` is a file.

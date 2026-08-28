@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import pytest
 from fastapi.testclient import TestClient
 
 from little_meals.store.plan_store import MealSpec
@@ -20,6 +21,7 @@ def _create_recipe(client: TestClient, sample_recipe) -> dict:
     ).json()
 
 
+@pytest.mark.requirement("REQ-000000033")
 def test_cook_start_redirects_to_step_1(client: TestClient, sample_recipe):
     created = _create_recipe(client, sample_recipe)
     response = client.get(f"/recipes/{created['id']}/cook", follow_redirects=False)
@@ -27,6 +29,7 @@ def test_cook_start_redirects_to_step_1(client: TestClient, sample_recipe):
     assert response.headers["location"] == f"/recipes/{created['id']}/cook/1"
 
 
+@pytest.mark.requirement("REQ-000000033")
 def test_cook_step_shows_the_right_step_text(client: TestClient, sample_recipe):
     created = _create_recipe(client, sample_recipe)
     response = client.get(f"/recipes/{created['id']}/cook/2")
@@ -35,6 +38,7 @@ def test_cook_step_shows_the_right_step_text(client: TestClient, sample_recipe):
     assert "Step 2 of 3" in response.text
 
 
+@pytest.mark.requirement("REQ-000000033")
 def test_cook_step_has_no_shell_nav(client: TestClient, sample_recipe):
     # Immersive mode - no bottom tab bar / top bar chrome.
     created = _create_recipe(client, sample_recipe)
@@ -42,11 +46,13 @@ def test_cook_step_has_no_shell_nav(client: TestClient, sample_recipe):
     assert 'class="tabbar"' not in response.text
 
 
+@pytest.mark.requirement("REQ-000000033")
 def test_cook_step_unknown_recipe_404(client: TestClient):
     response = client.get("/recipes/does-not-exist/cook/1")
     assert response.status_code == 404
 
 
+@pytest.mark.requirement("REQ-000000033")
 def test_cook_step_zero_or_negative_redirects_to_step_1(client: TestClient, sample_recipe):
     created = _create_recipe(client, sample_recipe)
     response = client.get(f"/recipes/{created['id']}/cook/0", follow_redirects=False)
@@ -58,6 +64,7 @@ def test_cook_step_zero_or_negative_redirects_to_step_1(client: TestClient, samp
     assert response.headers["location"] == f"/recipes/{created['id']}/cook/1"
 
 
+@pytest.mark.requirement("REQ-000000033")
 def test_cook_step_past_the_last_step_shows_finish_prompt(client: TestClient, sample_recipe):
     created = _create_recipe(client, sample_recipe)
     total_steps = len(sample_recipe.steps)
@@ -69,6 +76,7 @@ def test_cook_step_past_the_last_step_shows_finish_prompt(client: TestClient, sa
     assert "Not for us" in response.text
 
 
+@pytest.mark.requirement("REQ-000000033")
 def test_cook_step_last_step_shows_finish_cooking_label(client: TestClient, sample_recipe):
     created = _create_recipe(client, sample_recipe)
     total_steps = len(sample_recipe.steps)
@@ -77,6 +85,7 @@ def test_cook_step_last_step_shows_finish_cooking_label(client: TestClient, samp
     assert "Finish cooking" in response.text
 
 
+@pytest.mark.requirement("REQ-000000034")
 def test_cook_finish_sets_preference_liked(client: TestClient, sample_recipe):
     created = _create_recipe(client, sample_recipe)
 
@@ -89,6 +98,7 @@ def test_cook_finish_sets_preference_liked(client: TestClient, sample_recipe):
     assert recipe["preference"] == "liked"
 
 
+@pytest.mark.requirement("REQ-000000034")
 def test_cook_finish_sets_preference_disliked(client: TestClient, sample_recipe):
     created = _create_recipe(client, sample_recipe)
 
@@ -100,11 +110,13 @@ def test_cook_finish_sets_preference_disliked(client: TestClient, sample_recipe)
     assert recipe["preference"] == "disliked"
 
 
+@pytest.mark.requirement("REQ-000000034")
 def test_cook_finish_unknown_recipe_404(client: TestClient):
     response = client.post("/recipes/does-not-exist/cook/finish", data={"preference": "liked"})
     assert response.status_code == 404
 
 
+@pytest.mark.requirement("REQ-000000034")
 def test_cook_finish_marks_matching_plan_meal_cooked(client: TestClient, sample_recipe, store, plan_store):
     created = store.create(sample_recipe)
     plan = plan_store.create([MealSpec(created.id, created.servings)])
@@ -116,6 +128,7 @@ def test_cook_finish_marks_matching_plan_meal_cooked(client: TestClient, sample_
     assert updated.meals[0].cooked is True
 
 
+@pytest.mark.requirement("REQ-000000034")
 def test_cook_finish_is_a_no_op_on_plan_state_when_recipe_not_in_current_plan(
     client: TestClient, sample_recipe, store, plan_store
 ):
@@ -129,18 +142,21 @@ def test_cook_finish_is_a_no_op_on_plan_state_when_recipe_not_in_current_plan(
     assert updated.meals[0].cooked is False
 
 
+@pytest.mark.requirement("REQ-000000034")
 def test_cook_finish_with_no_current_plan_does_not_error(client: TestClient, sample_recipe):
     created = _create_recipe(client, sample_recipe)
     response = client.post(f"/recipes/{created['id']}/cook/finish", data={"preference": "liked"})
     assert response.status_code == 200
 
 
+@pytest.mark.requirement("REQ-000000033")
 def test_recipe_detail_has_cook_along_link(client: TestClient, sample_recipe):
     created = _create_recipe(client, sample_recipe)
     response = client.get(f"/recipes/{created['id']}")
     assert f'href="/recipes/{created["id"]}/cook"' in response.text
 
 
+@pytest.mark.requirement("REQ-000000033")
 def test_plan_meal_card_has_cook_along_link(client: TestClient, sample_recipe):
     _create_recipe(client, sample_recipe)
     client.post("/plan/generate", follow_redirects=False)

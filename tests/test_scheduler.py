@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from datetime import datetime, time, timedelta, timezone
 
 from little_meals.models import DayOfWeek, HouseholdPreferencesUpdate
@@ -9,6 +11,7 @@ from little_meals.store.notification_store import NotificationStore
 from little_meals.store.plan_store import MealPlanStore, MealSpec
 
 
+@pytest.mark.requirement("REQ-000000035")
 def test_last_scheduled_occurrence_same_day_before_time():
     # Wednesday 2026-01-07 08:00, scheduled for Wednesday 09:00 -> last
     # occurrence was the PREVIOUS Wednesday (a week ago), since today's
@@ -18,12 +21,14 @@ def test_last_scheduled_occurrence_same_day_before_time():
     assert result == datetime(2025, 12, 31, 9, 0, tzinfo=timezone.utc)
 
 
+@pytest.mark.requirement("REQ-000000035")
 def test_last_scheduled_occurrence_same_day_after_time():
     now = datetime(2026, 1, 7, 10, 0, tzinfo=timezone.utc)
     result = last_scheduled_occurrence(now, DayOfWeek.WEDNESDAY, time(9, 0))
     assert result == datetime(2026, 1, 7, 9, 0, tzinfo=timezone.utc)
 
 
+@pytest.mark.requirement("REQ-000000035")
 def test_last_scheduled_occurrence_earlier_in_the_week():
     # 2026-01-07 is a Wednesday; scheduled for Monday 09:00.
     now = datetime(2026, 1, 7, 10, 0, tzinfo=timezone.utc)
@@ -31,6 +36,7 @@ def test_last_scheduled_occurrence_earlier_in_the_week():
     assert result == datetime(2026, 1, 5, 9, 0, tzinfo=timezone.utc)
 
 
+@pytest.mark.requirement("REQ-000000035")
 def test_last_scheduled_occurrence_later_in_the_week_wraps_to_last_week():
     # Scheduled for Friday, but today is Wednesday - most recent Friday was
     # last week's.
@@ -46,6 +52,7 @@ def _stores(tmp_path):
     return household_store, plan_store, notification_store
 
 
+@pytest.mark.requirement("REQ-000000035")
 def test_generates_when_no_plan_exists_yet(tmp_path):
     household_store, plan_store, notification_store = _stores(tmp_path)
     calls = []
@@ -64,6 +71,7 @@ def test_generates_when_no_plan_exists_yet(tmp_path):
     assert notification_store.is_pending() is True
 
 
+@pytest.mark.requirement("REQ-000000035")
 def test_does_not_regenerate_when_current_plan_is_newer_than_the_scheduled_slot(tmp_path):
     household_store, plan_store, notification_store = _stores(tmp_path)
     # Default preferences: Sunday 09:00. A plan created "now" is newer than
@@ -85,6 +93,7 @@ def test_does_not_regenerate_when_current_plan_is_newer_than_the_scheduled_slot(
     assert notification_store.is_pending() is False
 
 
+@pytest.mark.requirement("REQ-000000035")
 def test_regenerates_when_current_plan_predates_the_latest_scheduled_slot(tmp_path):
     household_store, plan_store, notification_store = _stores(tmp_path)
 

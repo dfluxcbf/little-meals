@@ -5,10 +5,12 @@ import pytest
 from little_meals.store.plan_store import MealPlanStore, MealSpec, PlanMealNotFound, PlanNotFound
 
 
+@pytest.mark.requirement("REQ-000000019")
 def test_get_current_returns_none_when_no_plans_exist(plan_store: MealPlanStore):
     assert plan_store.get_current() is None
 
 
+@pytest.mark.requirement("REQ-000000019")
 def test_create_stores_meals_in_order_with_generated_ids(plan_store: MealPlanStore):
     plan = plan_store.create([MealSpec("recipe-a", 2), MealSpec("recipe-b", 4, is_suggestion=True)])
 
@@ -20,11 +22,13 @@ def test_create_stores_meals_in_order_with_generated_ids(plan_store: MealPlanSto
     assert all(meal.cooked is False for meal in plan.meals)
 
 
+@pytest.mark.requirement("REQ-000000019")
 def test_create_with_no_recipes_still_creates_an_empty_plan(plan_store: MealPlanStore):
     plan = plan_store.create([])
     assert plan.meals == []
 
 
+@pytest.mark.requirement("REQ-000000019")
 def test_get_current_returns_the_most_recently_created_plan(plan_store: MealPlanStore):
     plan_store.create([MealSpec("recipe-a", 2)])
     second = plan_store.create([MealSpec("recipe-b", 2)])
@@ -34,11 +38,13 @@ def test_get_current_returns_the_most_recently_created_plan(plan_store: MealPlan
     assert current.id == second.id
 
 
+@pytest.mark.requirement("REQ-000000019")
 def test_get_unknown_plan_raises(plan_store: MealPlanStore):
     with pytest.raises(PlanNotFound):
         plan_store.get("does-not-exist")
 
 
+@pytest.mark.requirement("REQ-000000019")
 def test_set_servings_updates_only_the_targeted_meal(plan_store: MealPlanStore):
     plan = plan_store.create([MealSpec("recipe-a", 2), MealSpec("recipe-b", 4)])
 
@@ -48,17 +54,20 @@ def test_set_servings_updates_only_the_targeted_meal(plan_store: MealPlanStore):
     assert updated.meals[1].servings == 4
 
 
+@pytest.mark.requirement("REQ-000000019")
 def test_set_servings_unknown_meal_raises(plan_store: MealPlanStore):
     plan = plan_store.create([MealSpec("recipe-a", 2)])
     with pytest.raises(PlanMealNotFound):
         plan_store.set_servings(plan.id, "does-not-exist", 3)
 
 
+@pytest.mark.requirement("REQ-000000019")
 def test_set_servings_unknown_plan_raises(plan_store: MealPlanStore):
     with pytest.raises(PlanNotFound):
         plan_store.set_servings("does-not-exist", "m1", 3)
 
 
+@pytest.mark.requirement("REQ-000000019")
 def test_set_cooked_toggles_only_the_targeted_meal(plan_store: MealPlanStore):
     plan = plan_store.create([MealSpec("recipe-a", 2), MealSpec("recipe-b", 4)])
 
@@ -68,6 +77,7 @@ def test_set_cooked_toggles_only_the_targeted_meal(plan_store: MealPlanStore):
     assert updated.meals[1].cooked is True
 
 
+@pytest.mark.requirement("REQ-000000019")
 def test_set_recipe_replaces_a_single_meal_and_resets_cooked(plan_store: MealPlanStore):
     plan = plan_store.create([MealSpec("recipe-a", 2)])
     plan_store.set_cooked(plan.id, "m1", True)
@@ -81,17 +91,20 @@ def test_set_recipe_replaces_a_single_meal_and_resets_cooked(plan_store: MealPla
     assert meal.cooked is False
 
 
+@pytest.mark.requirement("REQ-000000019")
 def test_set_recipe_unknown_meal_raises(plan_store: MealPlanStore):
     plan = plan_store.create([MealSpec("recipe-a", 2)])
     with pytest.raises(PlanMealNotFound):
         plan_store.set_recipe(plan.id, "does-not-exist", "recipe-z", 2)
 
 
+@pytest.mark.requirement("REQ-000000019")
 def test_set_recipe_unknown_plan_raises(plan_store: MealPlanStore):
     with pytest.raises(PlanNotFound):
         plan_store.set_recipe("does-not-exist", "m1", "recipe-z", 2)
 
 
+@pytest.mark.requirement("REQ-000000019")
 def test_replace_meals_swaps_the_whole_list_but_keeps_the_plan_id(plan_store: MealPlanStore):
     plan = plan_store.create([MealSpec("recipe-a", 2), MealSpec("recipe-b", 4)])
 
@@ -104,11 +117,13 @@ def test_replace_meals_swaps_the_whole_list_but_keeps_the_plan_id(plan_store: Me
     assert replaced.meals[0].id == "m1"
 
 
+@pytest.mark.requirement("REQ-000000019")
 def test_replace_meals_unknown_plan_raises(plan_store: MealPlanStore):
     with pytest.raises(PlanNotFound):
         plan_store.replace_meals("does-not-exist", [MealSpec("recipe-a", 2)])
 
 
+@pytest.mark.requirement("REQ-000000019")
 def test_finalize_marks_plan_finalized(plan_store: MealPlanStore):
     plan = plan_store.create([MealSpec("recipe-a", 2)])
     assert plan.finalized is False
@@ -119,6 +134,7 @@ def test_finalize_marks_plan_finalized(plan_store: MealPlanStore):
     assert plan_store.get(plan.id).finalized is True
 
 
+@pytest.mark.requirement("REQ-000000019")
 def test_finalize_unknown_plan_raises(plan_store: MealPlanStore):
     with pytest.raises(PlanNotFound):
         plan_store.finalize("does-not-exist")

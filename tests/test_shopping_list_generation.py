@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from datetime import datetime, timezone
 
 from little_meals.models import Classification, Ingredient, MealPlan, Nutrition, PlanMeal, Recipe
@@ -27,6 +29,7 @@ def _plan(meals: list[PlanMeal]) -> MealPlan:
     return MealPlan(id="p1", created_at=datetime(2026, 1, 1, tzinfo=timezone.utc), finalized=True, meals=meals)
 
 
+@pytest.mark.requirement("REQ-000000029")
 def test_scales_quantities_to_meal_servings(store: RecipeStore):
     recipe = store.create(_recipe("Soup", servings=2, ingredients=[Ingredient(name="Carrot", quantity=2, unit="pieces")]))
     plan = _plan([PlanMeal(id="m1", recipe_id=recipe.id, servings=4)])
@@ -39,6 +42,7 @@ def test_scales_quantities_to_meal_servings(store: RecipeStore):
     assert items[0].unit == "pieces"
 
 
+@pytest.mark.requirement("REQ-000000029")
 def test_merges_same_name_and_unit_across_meals(store: RecipeStore):
     a = store.create(_recipe("A", servings=2, ingredients=[Ingredient(name="Garlic", quantity=2, unit="cloves")]))
     b = store.create(_recipe("B", servings=2, ingredients=[Ingredient(name="garlic", quantity=3, unit="Cloves")]))
@@ -50,6 +54,7 @@ def test_merges_same_name_and_unit_across_meals(store: RecipeStore):
     assert items[0].quantity == 5.0
 
 
+@pytest.mark.requirement("REQ-000000029")
 def test_keeps_mismatched_units_as_separate_lines(store: RecipeStore):
     a = store.create(_recipe("A", servings=2, ingredients=[Ingredient(name="Flour", quantity=2, unit="cups")]))
     b = store.create(_recipe("B", servings=2, ingredients=[Ingredient(name="Flour", quantity=500, unit="g")]))
@@ -62,6 +67,7 @@ def test_keeps_mismatched_units_as_separate_lines(store: RecipeStore):
     assert units == {"cups", "g"}
 
 
+@pytest.mark.requirement("REQ-000000029")
 def test_ingredients_with_no_quantity_are_deduplicated_by_name(store: RecipeStore):
     a = store.create(_recipe("A", servings=2, ingredients=[Ingredient(name="Salt", quantity=None, unit=None)]))
     b = store.create(_recipe("B", servings=2, ingredients=[Ingredient(name="Salt", quantity=None, unit=None)]))
@@ -73,6 +79,7 @@ def test_ingredients_with_no_quantity_are_deduplicated_by_name(store: RecipeStor
     assert items[0].quantity is None
 
 
+@pytest.mark.requirement("REQ-000000029")
 def test_preserves_first_appearance_order(store: RecipeStore):
     recipe = store.create(
         _recipe(
@@ -91,6 +98,7 @@ def test_preserves_first_appearance_order(store: RecipeStore):
     assert [item.name for item in items] == ["Zucchini", "Apple"]
 
 
+@pytest.mark.requirement("REQ-000000029")
 def test_skips_meals_whose_recipe_was_deleted(store: RecipeStore):
     recipe = store.create(_recipe("Gone", servings=2, ingredients=[Ingredient(name="X", quantity=1, unit="g")]))
     store.delete(recipe.id)
@@ -101,6 +109,7 @@ def test_skips_meals_whose_recipe_was_deleted(store: RecipeStore):
     assert items == []
 
 
+@pytest.mark.requirement("REQ-000000029")
 def test_empty_plan_yields_empty_list(store: RecipeStore):
     plan = _plan([])
     assert build_shopping_list_items(plan, store) == []

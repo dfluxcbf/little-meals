@@ -4,12 +4,14 @@ import pytest
 from fastapi.testclient import TestClient
 
 
+@pytest.mark.requirement("REQ-000000020")
 def test_current_plan_404_when_none_generated(client: TestClient):
     response = client.get("/api/plan/current")
     assert response.status_code == 404
     assert response.json()["code"] == "NO_CURRENT_PLAN"
 
 
+@pytest.mark.requirement("REQ-000000020")
 def test_generate_creates_a_plan_from_liked_library_recipes(client: TestClient, sample_recipe):
     created = client.post("/api/recipes", json=_recipe_create_payload(sample_recipe)).json()
     client.put(
@@ -33,6 +35,7 @@ def test_generate_creates_a_plan_from_liked_library_recipes(client: TestClient, 
     assert body["meals"][0]["cooked"] is False
 
 
+@pytest.mark.requirement("REQ-000000020")
 def test_generate_excludes_disliked_recipes(client: TestClient, sample_recipe):
     created = client.post("/api/recipes", json=_recipe_create_payload(sample_recipe)).json()
     client.patch(f"/api/recipes/{created['id']}/preference", json={"preference": "disliked"})
@@ -42,6 +45,7 @@ def test_generate_excludes_disliked_recipes(client: TestClient, sample_recipe):
     assert response.json()["meals"] == []
 
 
+@pytest.mark.requirement("REQ-000000020")
 def test_current_plan_returns_the_generated_plan(client: TestClient):
     generated = client.post("/api/plan/generate").json()
 
@@ -50,6 +54,7 @@ def test_current_plan_returns_the_generated_plan(client: TestClient):
     assert response.json()["id"] == generated["id"]
 
 
+@pytest.mark.requirement("REQ-000000020")
 def test_update_servings(client: TestClient, sample_recipe):
     client.post("/api/recipes", json=_recipe_create_payload(sample_recipe))
     plan = client.post("/api/plan/generate").json()
@@ -60,12 +65,14 @@ def test_update_servings(client: TestClient, sample_recipe):
     assert response.json()["meals"][0]["servings"] == 6
 
 
+@pytest.mark.requirement("REQ-000000020")
 def test_update_servings_unknown_meal_404(client: TestClient):
     plan = client.post("/api/plan/generate").json()
     response = client.patch(f"/api/plan/{plan['id']}/meals/does-not-exist/servings", json={"servings": 6})
     assert response.status_code == 404
 
 
+@pytest.mark.requirement("REQ-000000020")
 def test_update_cooked(client: TestClient, sample_recipe):
     client.post("/api/recipes", json=_recipe_create_payload(sample_recipe))
     plan = client.post("/api/plan/generate").json()
@@ -76,6 +83,7 @@ def test_update_cooked(client: TestClient, sample_recipe):
     assert response.json()["meals"][0]["cooked"] is True
 
 
+@pytest.mark.requirement("REQ-000000020")
 def test_finalize_marks_plan_finalized(client: TestClient):
     plan = client.post("/api/plan/generate").json()
 
@@ -84,11 +92,13 @@ def test_finalize_marks_plan_finalized(client: TestClient):
     assert response.json()["finalized"] is True
 
 
+@pytest.mark.requirement("REQ-000000020")
 def test_finalize_unknown_plan_404(client: TestClient):
     response = client.post("/api/plan/does-not-exist/finalize")
     assert response.status_code == 404
 
 
+@pytest.mark.requirement("REQ-000000020")
 def test_get_plan_by_id(client: TestClient):
     plan = client.post("/api/plan/generate").json()
     response = client.get(f"/api/plan/{plan['id']}")
@@ -96,18 +106,21 @@ def test_get_plan_by_id(client: TestClient):
     assert response.json()["id"] == plan["id"]
 
 
+@pytest.mark.requirement("REQ-000000020")
 def test_get_plan_by_id_unknown_404(client: TestClient):
     response = client.get("/api/plan/does-not-exist")
     assert response.status_code == 404
     assert response.json()["code"] == "NOT_FOUND"
 
 
+@pytest.mark.requirement("REQ-000000020")
 def test_update_cooked_unknown_meal_404(client: TestClient):
     plan = client.post("/api/plan/generate").json()
     response = client.patch(f"/api/plan/{plan['id']}/meals/does-not-exist/cooked", json={"cooked": True})
     assert response.status_code == 404
 
 
+@pytest.mark.requirement("REQ-000000025")
 def test_reroll_whole_plan_replaces_meals_but_keeps_plan_id(client: TestClient, sample_recipe):
     created = client.post("/api/recipes", json=_recipe_create_payload(sample_recipe)).json()
     plan = client.post("/api/plan/generate").json()
@@ -119,6 +132,7 @@ def test_reroll_whole_plan_replaces_meals_but_keeps_plan_id(client: TestClient, 
     assert body["meals"][0]["recipe_id"] == created["id"]
 
 
+@pytest.mark.requirement("REQ-000000025")
 def test_reroll_whole_plan_on_finalized_plan_409(client: TestClient):
     plan = client.post("/api/plan/generate").json()
     client.post(f"/api/plan/{plan['id']}/finalize")
@@ -128,6 +142,7 @@ def test_reroll_whole_plan_on_finalized_plan_409(client: TestClient):
     assert response.json()["code"] == "PLAN_FINALIZED"
 
 
+@pytest.mark.requirement("REQ-000000026")
 def test_reroll_single_meal_swaps_in_an_unused_library_recipe(client: TestClient, sample_recipe):
     created = client.post("/api/recipes", json=_recipe_create_payload(sample_recipe)).json()
     other = {**_recipe_create_payload(sample_recipe), "name": "Other Dish"}
@@ -156,6 +171,7 @@ def test_reroll_single_meal_swaps_in_an_unused_library_recipe(client: TestClient
     assert new_recipe_id in both_ids
 
 
+@pytest.mark.requirement("REQ-000000026")
 def test_reroll_single_meal_422_when_nothing_available(client: TestClient, sample_recipe):
     client.post("/api/recipes", json=_recipe_create_payload(sample_recipe))
     client.put(
@@ -177,6 +193,7 @@ def test_reroll_single_meal_422_when_nothing_available(client: TestClient, sampl
     assert response.json()["code"] == "NO_REPLACEMENT_AVAILABLE"
 
 
+@pytest.mark.requirement("REQ-000000026")
 def test_reroll_single_meal_on_finalized_plan_409(client: TestClient, sample_recipe):
     client.post("/api/recipes", json=_recipe_create_payload(sample_recipe))
     plan = client.post("/api/plan/generate").json()
@@ -186,6 +203,7 @@ def test_reroll_single_meal_on_finalized_plan_409(client: TestClient, sample_rec
     assert response.status_code == 409
 
 
+@pytest.mark.requirement("REQ-000000027")
 def test_controlled_reroll_alternatives_excludes_meals_already_in_plan(client: TestClient, sample_recipe):
     created = client.post("/api/recipes", json=_recipe_create_payload(sample_recipe)).json()
     other = {**_recipe_create_payload(sample_recipe), "name": "Other Dish"}
@@ -214,12 +232,14 @@ def test_controlled_reroll_alternatives_excludes_meals_already_in_plan(client: T
     assert plan["meals"][0]["recipe_id"] not in ids
 
 
+@pytest.mark.requirement("REQ-000000027")
 def test_controlled_reroll_alternatives_unknown_meal_404(client: TestClient):
     plan = client.post("/api/plan/generate").json()
     response = client.get(f"/api/plan/{plan['id']}/meals/does-not-exist/alternatives")
     assert response.status_code == 404
 
 
+@pytest.mark.requirement("REQ-000000027")
 def test_choose_alternative_sets_the_recipe(client: TestClient, sample_recipe):
     client.post("/api/recipes", json=_recipe_create_payload(sample_recipe))
     other = {**_recipe_create_payload(sample_recipe), "name": "Other Dish"}
@@ -243,6 +263,7 @@ def test_choose_alternative_sets_the_recipe(client: TestClient, sample_recipe):
     assert response.json()["meals"][0]["recipe_id"] == other_created["id"]
 
 
+@pytest.mark.requirement("REQ-000000027")
 def test_choose_alternative_unknown_recipe_404(client: TestClient):
     plan = client.post("/api/plan/generate").json()
     response = client.post(
@@ -251,6 +272,7 @@ def test_choose_alternative_unknown_recipe_404(client: TestClient):
     assert response.status_code == 404
 
 
+@pytest.mark.requirement("REQ-000000027")
 def test_choose_alternative_on_finalized_plan_409(client: TestClient, sample_recipe):
     created = client.post("/api/recipes", json=_recipe_create_payload(sample_recipe)).json()
     plan = client.post("/api/plan/generate").json()
