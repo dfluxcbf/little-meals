@@ -12,6 +12,10 @@
   <p class="subtitle">Pick what you're making this week, in any order.</p>
   {% if plan.finalized %}
     <p class="badge badge-liked" style="margin-bottom: 16px;">Finalized</p>
+  {% else %}
+    <form method="post" action="/plan/reroll" style="margin-bottom: 16px;">
+      <button type="submit" class="btn btn-secondary">Reroll whole plan</button>
+    </form>
   {% endif %}
 
   {% if not meals %}

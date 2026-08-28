@@ -5,7 +5,7 @@ import sqlite3
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Iterator, Optional
+from typing import Iterator, NamedTuple, Optional
 
 from little_meals.models import MealPlan, PlanMeal
 
@@ -25,6 +25,16 @@ class PlanMealNotFound(PlanStoreError):
         super().__init__(f"Meal {meal_id} not found in plan {plan_id}")
         self.plan_id = plan_id
         self.meal_id = meal_id
+
+
+class MealSpec(NamedTuple):
+    """One meal's persisted fields, independent of its position/id - used
+    both to create a plan's initial meals and to replace them wholesale on a
+    whole-plan reroll."""
+
+    recipe_id: str
+    servings: int
+    is_suggestion: bool = False
 
 
 class MealPlanStore:
@@ -54,6 +64,7 @@ class MealPlanStore:
                     recipe_id TEXT NOT NULL,
                     servings INTEGER NOT NULL,
                     cooked INTEGER NOT NULL DEFAULT 0,
+                    is_suggestion INTEGER NOT NULL DEFAULT 0,
                     position INTEGER NOT NULL,
                     PRIMARY KEY (plan_id, meal_id)
                 )
@@ -69,10 +80,10 @@ class MealPlanStore:
         finally:
             conn.close()
 
-    def create(self, recipe_servings: list[tuple[str, int]]) -> MealPlan:
-        """Create a new plan from a list of (recipe_id, servings) pairs, in
-        the given order. `recipe_servings` may be empty (e.g. an empty
-        library) - the plan is still created, just with no meals yet."""
+    def create(self, meals: list[MealSpec]) -> MealPlan:
+        """Create a new plan from a list of meal specs, in the given order.
+        `meals` may be empty (e.g. an empty library) - the plan is still
+        created, just with no meals yet."""
         plan_id = uuid.uuid4().hex
         now = datetime.now(timezone.utc)
         with self._connection() as conn:
@@ -80,15 +91,28 @@ class MealPlanStore:
                 "INSERT INTO meal_plans (id, created_at, finalized) VALUES (?, ?, 0)",
                 (plan_id, now.isoformat()),
             )
-            for position, (recipe_id, servings) in enumerate(recipe_servings):
-                conn.execute(
-                    """
-                    INSERT INTO plan_meals (plan_id, meal_id, recipe_id, servings, cooked, position)
-                    VALUES (?, ?, ?, ?, 0, ?)
-                    """,
-                    (plan_id, f"m{position + 1}", recipe_id, servings, position),
-                )
+            self._insert_meals(conn, plan_id, meals)
         return self.get(plan_id)
+
+    def replace_meals(self, plan_id: str, meals: list[MealSpec]) -> MealPlan:
+        """Whole-plan reroll: discard this plan's current meals and insert a
+        fresh set, keeping the same plan id (and its finalized state)."""
+        with self._connection() as conn:
+            if conn.execute("SELECT 1 FROM meal_plans WHERE id = ?", (plan_id,)).fetchone() is None:
+                raise PlanNotFound(plan_id)
+            conn.execute("DELETE FROM plan_meals WHERE plan_id = ?", (plan_id,))
+            self._insert_meals(conn, plan_id, meals)
+        return self.get(plan_id)
+
+    def _insert_meals(self, conn: sqlite3.Connection, plan_id: str, meals: list[MealSpec]) -> None:
+        for position, meal in enumerate(meals):
+            conn.execute(
+                """
+                INSERT INTO plan_meals (plan_id, meal_id, recipe_id, servings, cooked, is_suggestion, position)
+                VALUES (?, ?, ?, ?, 0, ?, ?)
+                """,
+                (plan_id, f"m{position + 1}", meal.recipe_id, meal.servings, int(meal.is_suggestion), position),
+            )
 
     def get_current(self) -> Optional[MealPlan]:
         """The most recently created plan, or None if none exist yet."""
@@ -107,7 +131,7 @@ class MealPlanStore:
                 raise PlanNotFound(plan_id)
             meal_rows = conn.execute(
                 """
-                SELECT meal_id, recipe_id, servings, cooked FROM plan_meals
+                SELECT meal_id, recipe_id, servings, cooked, is_suggestion FROM plan_meals
                 WHERE plan_id = ? ORDER BY position ASC
                 """,
                 (plan_id,),
@@ -120,6 +144,24 @@ class MealPlanStore:
 
     def set_cooked(self, plan_id: str, meal_id: str, cooked: bool) -> MealPlan:
         self._update_meal(plan_id, meal_id, "cooked", int(cooked))
+        return self.get(plan_id)
+
+    def set_recipe(self, plan_id: str, meal_id: str, recipe_id: str, servings: int, is_suggestion: bool = False) -> MealPlan:
+        """Reroll one meal (single-meal or controlled reroll): swap in a
+        different recipe for an existing slot, resetting its cooked state
+        (it hasn't been cooked yet - it's a different dish now)."""
+        with self._connection() as conn:
+            cursor = conn.execute(
+                """
+                UPDATE plan_meals SET recipe_id = ?, servings = ?, is_suggestion = ?, cooked = 0
+                WHERE plan_id = ? AND meal_id = ?
+                """,
+                (recipe_id, servings, int(is_suggestion), plan_id, meal_id),
+            )
+            if cursor.rowcount == 0:
+                if conn.execute("SELECT 1 FROM meal_plans WHERE id = ?", (plan_id,)).fetchone() is None:
+                    raise PlanNotFound(plan_id)
+                raise PlanMealNotFound(plan_id, meal_id)
         return self.get(plan_id)
 
     def _update_meal(self, plan_id: str, meal_id: str, column: str, value) -> None:
@@ -144,7 +186,7 @@ class MealPlanStore:
 def _row_to_plan(plan_row: tuple, meal_rows: list[tuple]) -> MealPlan:
     plan_id, created_at, finalized = plan_row
     meals = [
-        PlanMeal(id=meal_id, recipe_id=recipe_id, servings=servings, cooked=bool(cooked))
-        for meal_id, recipe_id, servings, cooked in meal_rows
+        PlanMeal(id=meal_id, recipe_id=recipe_id, servings=servings, cooked=bool(cooked), is_suggestion=bool(is_suggestion))
+        for meal_id, recipe_id, servings, cooked, is_suggestion in meal_rows
     ]
     return MealPlan(id=plan_id, created_at=datetime.fromisoformat(created_at), finalized=bool(finalized), meals=meals)

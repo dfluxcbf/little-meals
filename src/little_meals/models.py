@@ -128,6 +128,11 @@ class PlanMeal(BaseModel):
     recipe_id: str
     servings: int = Field(ge=1)
     cooked: bool = False
+    is_suggestion: bool = False
+    """True if this slot was filled by the AI suggestion engine (Milestone 4)
+    rather than drawn from the existing library (Milestone 3) - drives the
+    "NEW" badge in the UI. Purely presentational: once created, a suggestion
+    is a normal Recipe like any other (see planning/suggestion.py)."""
 
 
 class MealPlan(BaseModel):

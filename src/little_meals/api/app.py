@@ -19,6 +19,7 @@ from little_meals.api.routes_ui import build_ui_router
 from little_meals.config import Settings
 from little_meals.llm.extraction import RecipeExtractionService
 from little_meals.llm.ollama_client import OllamaClient
+from little_meals.planning.suggestion import NullSearchProvider, SearchProvider
 from little_meals.store.household_store import HouseholdPreferencesStore
 from little_meals.store.plan_store import MealPlanStore
 from little_meals.store.recipe_store import RecipeStore
@@ -32,11 +33,13 @@ def create_app(
     extractor: Optional[RecipeExtractionService] = None,
     household_store: Optional[HouseholdPreferencesStore] = None,
     plan_store: Optional[MealPlanStore] = None,
+    search_provider: Optional[SearchProvider] = None,
 ) -> FastAPI:
     settings = settings or Settings.from_env()
     store = store or RecipeStore(settings.recipes_dir)
     household_store = household_store or HouseholdPreferencesStore(settings.household_db_path)
     plan_store = plan_store or MealPlanStore(settings.plan_db_path)
+    search_provider = search_provider or NullSearchProvider()
     if extractor is None:
         client = OllamaClient(settings.ollama_base_url, settings.ollama_model, settings.ollama_timeout_s)
         extractor = RecipeExtractionService(client)
@@ -78,7 +81,7 @@ def create_app(
 
     app.include_router(build_recipes_router(store, extractor, settings))
     app.include_router(build_household_router(household_store))
-    app.include_router(build_plan_router(plan_store, store, household_store))
-    app.include_router(build_ui_router(store, extractor, household_store, plan_store, templates))
+    app.include_router(build_plan_router(plan_store, store, household_store, extractor, search_provider))
+    app.include_router(build_ui_router(store, extractor, household_store, plan_store, search_provider, templates))
 
     return app
