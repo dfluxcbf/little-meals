@@ -15,6 +15,7 @@ filegroup(
         "static/**/*.css",
         "static/**/*.js",
         "static/**/*.md",
+        "static/**/*.woff2",
     ]),
 )
 

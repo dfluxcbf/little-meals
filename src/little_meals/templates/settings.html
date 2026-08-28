@@ -2,7 +2,7 @@
 {% block title %}Settings - little-meals{% endblock %}
 {% block content %}
 <h1>Household settings</h1>
-<p>Shared by everyone in the household - not per person or device.</p>
+<p class="subtitle">Shared by everyone in the household - not per person or device.</p>
 {% if error %}
   <p class="error">Could not save settings: {{ error }}</p>
 {% endif %}
@@ -10,28 +10,42 @@
   <p class="success">Settings saved.</p>
 {% endif %}
 <form method="post" action="/settings">
-  <label for="recipes_per_week">Recipes per week</label>
-  <input type="number" id="recipes_per_week" name="recipes_per_week" min="1" value="{{ preferences.recipes_per_week }}" required>
 
-  <label for="recommendation_day">Day for weekly recommendations</label>
-  <select id="recommendation_day" name="recommendation_day">
-    {% for day in days %}
-      <option value="{{ day.value }}" {% if day == preferences.recommendation_day %}selected{% endif %}>{{ day.value|capitalize }}</option>
-    {% endfor %}
-  </select>
+  <div class="settings-section">
+    <h2>Meal rhythm</h2>
+    <label for="recipes_per_week">Recipes per week</label>
+    <input type="number" id="recipes_per_week" name="recipes_per_week" min="1" value="{{ preferences.recipes_per_week }}" required>
 
-  <label for="recommendation_time">Time for weekly recommendations</label>
-  <input type="time" id="recommendation_time" name="recommendation_time" value="{{ preferences.recommendation_time.strftime('%H:%M') }}" required>
+    <label>Recommendation day</label>
+    <div class="day-picker">
+      {% for day in days %}
+        <input type="radio" class="day-radio" id="day-{{ day.value }}" name="recommendation_day" value="{{ day.value }}" {% if day == preferences.recommendation_day %}checked{% endif %}>
+        <label for="day-{{ day.value }}" class="day-pill">{{ day.value[:2]|capitalize }}</label>
+      {% endfor %}
+    </div>
 
-  <label for="food_preferences">Food preferences (comma-separated)</label>
-  <input type="text" id="food_preferences" name="food_preferences" value="{{ preferences.food_preferences|join(', ') }}" placeholder="e.g. vegetarian-friendly, quick-meals">
+    <label for="recommendation_time">Time</label>
+    <input type="time" id="recommendation_time" name="recommendation_time" value="{{ preferences.recommendation_time.strftime('%H:%M') }}" required>
+  </div>
 
-  <label for="ai_suggestions_per_plan">New AI suggestions per plan</label>
-  <input type="number" id="ai_suggestions_per_plan" name="ai_suggestions_per_plan" min="0" value="{{ preferences.ai_suggestions_per_plan }}" required>
+  <div class="settings-section">
+    <h2>Food preferences</h2>
+    <label for="food_preferences">Comma-separated</label>
+    <input type="text" id="food_preferences" name="food_preferences" value="{{ preferences.food_preferences|join(', ') }}" placeholder="e.g. vegetarian-friendly, quick-meals">
+  </div>
 
-  <label for="default_servings">Default servings per meal</label>
-  <input type="text" id="default_servings" name="default_servings" value="{{ preferences.default_servings }}" placeholder="e.g. 2 adults + 1 child" required>
+  <div class="settings-section">
+    <h2>AI suggestions</h2>
+    <label for="ai_suggestions_per_plan">New suggestions per plan</label>
+    <input type="number" id="ai_suggestions_per_plan" name="ai_suggestions_per_plan" min="0" value="{{ preferences.ai_suggestions_per_plan }}" required>
+  </div>
 
-  <button type="submit">Save settings</button>
+  <div class="settings-section">
+    <h2>Household size</h2>
+    <label for="default_servings">Default servings</label>
+    <input type="text" id="default_servings" name="default_servings" value="{{ preferences.default_servings }}" placeholder="e.g. 2 adults + 1 child" required>
+  </div>
+
+  <button type="submit" class="btn btn-primary">Save settings</button>
 </form>
 {% endblock %}

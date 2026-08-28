@@ -4,19 +4,35 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}little-meals{% endblock %}</title>
+  <link rel="stylesheet" href="/static/fonts.css">
   <link rel="stylesheet" href="/static/app.css">
   <script src="/static/vendor/htmx.min.js"></script>
 </head>
 <body>
-  <header>
-    <a href="/recipes" class="brand">little-meals</a>
-    <nav>
-      <a href="/recipes/new">+ New recipe</a>
-      <a href="/settings">Settings</a>
+  <div class="app-shell">
+    <header class="topbar">
+      <a href="/recipes" class="brand">little meals</a>
+      <a href="/recipes/new" class="btn btn-primary">+ New recipe</a>
+    </header>
+    <main class="content">
+      {% block content %}{% endblock %}
+    </main>
+    <nav class="tabbar" aria-label="Primary">
+      <a href="/recipes" class="tab {% if nav_active == 'library' %}tab-active{% endif %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M12 6c-1.5-1.2-3.6-1.8-6-1.8-.8 0-1.2.4-1.2 1.1v12.4c0 .7.5 1.1 1.2 1.1 2.4 0 4.5.6 6 1.8 1.5-1.2 3.6-1.8 6-1.8.7 0 1.2-.4 1.2-1.1V5.3c0-.7-.4-1.1-1.2-1.1-2.4 0-4.5.6-6 1.8Z"></path>
+          <path d="M12 6v13"></path>
+        </svg>
+        <span>Cookbook</span>
+      </a>
+      <a href="/settings" class="tab {% if nav_active == 'settings' %}tab-active{% endif %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M19.4 13.5a7.5 7.5 0 0 0 0-3l1.6-1.3-1.5-2.6-1.9.6a7.6 7.6 0 0 0-2.6-1.5l-.3-2h-3l-.3 2a7.6 7.6 0 0 0-2.6 1.5l-1.9-.6-1.5 2.6L6 10.5a7.5 7.5 0 0 0 0 3l-1.6 1.3 1.5 2.6 1.9-.6c.8.7 1.6 1.2 2.6 1.5l.3 2h3l.3-2c1-.3 1.8-.8 2.6-1.5l1.9.6 1.5-2.6Z"></path>
+        </svg>
+        <span>Settings</span>
+      </a>
     </nav>
-  </header>
-  <main>
-    {% block content %}{% endblock %}
-  </main>
+  </div>
 </body>
 </html>

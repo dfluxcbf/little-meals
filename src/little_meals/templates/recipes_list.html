@@ -1,19 +1,17 @@
 {% extends "base.html" %}
 {% block title %}Recipes - little-meals{% endblock %}
 {% block content %}
-<h1>Recipes</h1>
+<h1>Your cookbook</h1>
+{% if recipes %}
+  <p class="subtitle">{{ recipes|length }} recipe{{ "s" if recipes|length != 1 else "" }} saved for the household</p>
+{% endif %}
 {% if not recipes %}
   <p>No recipes yet. <a href="/recipes/new">Add your first one</a>.</p>
 {% else %}
-<table>
-  <thead>
-    <tr><th>Name</th><th>Cook time</th><th>Classification</th><th>Calories</th><th>Preference</th></tr>
-  </thead>
-  <tbody>
-    {% for recipe in recipes %}
-      {% include "partials/_recipe_row.html" %}
-    {% endfor %}
-  </tbody>
-</table>
+<div class="recipe-grid">
+  {% for recipe in recipes %}
+    {% include "partials/_recipe_row.html" %}
+  {% endfor %}
+</div>
 {% endif %}
 {% endblock %}

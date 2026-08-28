@@ -1,0 +1,19 @@
+/* Vendored fonts - see static/vendor/README.md. No third-party CDN calls at
+   runtime, consistent with the app's private-network posture (see
+   docs/ui_design.md's typography section and docs/architecture.md). */
+
+@font-face {
+  font-family: "Fraunces";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("/static/vendor/fonts/fraunces-variable-latin.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("/static/vendor/fonts/inter-variable-latin.woff2") format("woff2");
+}
