@@ -61,6 +61,14 @@ test coverage are tracked exclusively through **little-requirements**
   added to `tests/test_api_plan.py` and `tests/test_plan_ui.py`) are written
   and passing but untagged — create their `REQ-#########` IDs via
   `lreq requirement create` next time it's reachable, then backfill the marker.
+- Milestone 5 (`m5-shopping-list` — `planning/shopping_list.py`,
+  `ShoppingListStore`, `api/routes_shopping.py`, and the `/shopping` UI — see
+  `milestones.md`) shipped for the same reason as Milestones 3, 4, and 9:
+  `lreq` unreachable in the implementing environment. Its tests
+  (`tests/test_shopping_list_generation.py`, `tests/test_shopping_list_store.py`,
+  `tests/test_api_shopping.py`, `tests/test_shopping_ui.py`) are written and
+  passing but untagged — create their `REQ-#########` IDs via
+  `lreq requirement create` next time it's reachable, then backfill the marker.
 - Known issue: `lreq update` (what the Bazel genrule invokes) cannot run inside
   this submodule checkout — `little-requirements`' managed pre-commit-hook
   installer assumes `.git` is a directory, and a submodule's `.git` is a file.

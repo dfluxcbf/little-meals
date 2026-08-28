@@ -15,6 +15,7 @@ from little_meals.api.errors import ApiError
 from little_meals.api.routes_household import build_household_router
 from little_meals.api.routes_plan import build_plan_router
 from little_meals.api.routes_recipes import build_recipes_router
+from little_meals.api.routes_shopping import build_shopping_router
 from little_meals.api.routes_ui import build_ui_router
 from little_meals.config import Settings
 from little_meals.llm.extraction import RecipeExtractionService
@@ -23,6 +24,7 @@ from little_meals.planning.suggestion import NullSearchProvider, SearchProvider
 from little_meals.store.household_store import HouseholdPreferencesStore
 from little_meals.store.plan_store import MealPlanStore
 from little_meals.store.recipe_store import RecipeStore
+from little_meals.store.shopping_list_store import ShoppingListStore
 
 logger = logging.getLogger(__name__)
 
@@ -34,12 +36,14 @@ def create_app(
     household_store: Optional[HouseholdPreferencesStore] = None,
     plan_store: Optional[MealPlanStore] = None,
     search_provider: Optional[SearchProvider] = None,
+    shopping_list_store: Optional[ShoppingListStore] = None,
 ) -> FastAPI:
     settings = settings or Settings.from_env()
     store = store or RecipeStore(settings.recipes_dir)
     household_store = household_store or HouseholdPreferencesStore(settings.household_db_path)
     plan_store = plan_store or MealPlanStore(settings.plan_db_path)
     search_provider = search_provider or NullSearchProvider()
+    shopping_list_store = shopping_list_store or ShoppingListStore(settings.shopping_list_db_path)
     if extractor is None:
         client = OllamaClient(settings.ollama_base_url, settings.ollama_model, settings.ollama_timeout_s)
         extractor = RecipeExtractionService(client)
@@ -49,6 +53,7 @@ def create_app(
     app.state.store = store
     app.state.household_store = household_store
     app.state.plan_store = plan_store
+    app.state.shopping_list_store = shopping_list_store
 
     package_root = importlib.resources.files("little_meals")
     templates = Jinja2Templates(directory=str(package_root / "templates"))
@@ -82,6 +87,9 @@ def create_app(
     app.include_router(build_recipes_router(store, extractor, settings))
     app.include_router(build_household_router(household_store))
     app.include_router(build_plan_router(plan_store, store, household_store, extractor, search_provider))
-    app.include_router(build_ui_router(store, extractor, household_store, plan_store, search_provider, templates))
+    app.include_router(build_shopping_router(shopping_list_store, plan_store, store))
+    app.include_router(
+        build_ui_router(store, extractor, household_store, plan_store, search_provider, shopping_list_store, templates)
+    )
 
     return app

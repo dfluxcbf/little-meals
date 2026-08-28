@@ -16,6 +16,7 @@ from little_meals.models import Classification, Ingredient, Nutrition, Preferenc
 from little_meals.store.household_store import HouseholdPreferencesStore
 from little_meals.store.plan_store import MealPlanStore
 from little_meals.store.recipe_store import RecipeStore
+from little_meals.store.shopping_list_store import ShoppingListStore
 
 
 def pytest_configure(config: pytest.Config) -> None:
@@ -45,6 +46,11 @@ def household_store(tmp_path: Path) -> HouseholdPreferencesStore:
 @pytest.fixture
 def plan_store(tmp_path: Path) -> MealPlanStore:
     return MealPlanStore(tmp_path / "plan.db")
+
+
+@pytest.fixture
+def shopping_list_store(tmp_path: Path) -> ShoppingListStore:
+    return ShoppingListStore(tmp_path / "shopping_list.db")
 
 
 @pytest.fixture
@@ -81,7 +87,12 @@ def fake_ollama() -> Callable[[Callable[[httpx.Request], httpx.Response]], Ollam
 
 
 @pytest.fixture
-def client(store: RecipeStore, household_store: HouseholdPreferencesStore, plan_store: MealPlanStore) -> TestClient:
+def client(
+    store: RecipeStore,
+    household_store: HouseholdPreferencesStore,
+    plan_store: MealPlanStore,
+    shopping_list_store: ShoppingListStore,
+) -> TestClient:
     settings = Settings(data_dir=store._dir.parent)
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -90,6 +101,11 @@ def client(store: RecipeStore, household_store: HouseholdPreferencesStore, plan_
     ollama_client = OllamaClient(settings.ollama_base_url, settings.ollama_model, 5.0, client=httpx.Client(transport=httpx.MockTransport(handler)))
     extractor = RecipeExtractionService(ollama_client)
     app = create_app(
-        settings=settings, store=store, extractor=extractor, household_store=household_store, plan_store=plan_store
+        settings=settings,
+        store=store,
+        extractor=extractor,
+        household_store=household_store,
+        plan_store=plan_store,
+        shopping_list_store=shopping_list_store,
     )
     return TestClient(app)

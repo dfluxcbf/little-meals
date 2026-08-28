@@ -1,0 +1,18 @@
+<form
+  id="shopping-item-{{ item.id }}"
+  class="shopping-item {% if item.checked %}shopping-item-checked{% endif %}"
+  hx-post="/shopping/items/{{ item.id }}/checked"
+  hx-target="#shopping-item-{{ item.id }}"
+  hx-swap="outerHTML"
+>
+  <input type="hidden" name="checked" value="{{ 'false' if item.checked else 'true' }}">
+  <button type="submit" class="shopping-checkbox" aria-label="{{ 'Mark ' + item.name + ' unchecked' if item.checked else 'Mark ' + item.name + ' checked' }}">
+    {% if item.checked %}
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"></path></svg>
+    {% endif %}
+  </button>
+  <span class="shopping-item-name">{{ item.name }}</span>
+  <span class="shopping-item-qty">
+    {% if item.quantity is not none %}{{ item.quantity }} {% endif %}{% if item.unit %}{{ item.unit }}{% endif %}
+  </span>
+</form>
