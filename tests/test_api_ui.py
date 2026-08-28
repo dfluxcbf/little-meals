@@ -49,6 +49,7 @@ def test_recipes_list_contains_stored_recipe_name(store, sample_recipe):
     assert sample_recipe.name in response.text
 
 
+@pytest.mark.requirement("REQ-000000016")
 def test_recipe_detail_renders_steps_then_ingredients_in_order(store, sample_recipe):
     # Steps are shown first, with ingredients tucked behind the fridge-door
     # toggle below them - see docs/ui_design.md's recipe detail screen.
@@ -76,6 +77,7 @@ def test_recipe_detail_renders_steps_then_ingredients_in_order(store, sample_rec
         last_index = index
 
 
+@pytest.mark.requirement("REQ-000000016")
 def test_recipe_detail_ingredients_are_behind_a_fridge_toggle(store, sample_recipe):
     created = store.create(sample_recipe)
     ui = _make_client(store)
@@ -121,6 +123,7 @@ def test_static_htmx_is_served(store):
     assert response.status_code == 200
 
 
+@pytest.mark.requirement("REQ-000000013")
 def test_static_fonts_are_served_locally_not_from_a_cdn(store):
     # docs/ui_design.md: fonts are vendored, no Google Fonts <link> in the
     # real app - see static/vendor/README.md.
@@ -135,6 +138,7 @@ def test_static_fonts_are_served_locally_not_from_a_cdn(store):
     assert ui.get("/static/vendor/fonts/inter-variable-latin.woff2").status_code == 200
 
 
+@pytest.mark.requirement("REQ-000000015")
 def test_recipes_list_card_has_stable_id_for_htmx_swap(store, sample_recipe):
     created = store.create(sample_recipe)
     ui = _make_client(store)
@@ -144,12 +148,14 @@ def test_recipes_list_card_has_stable_id_for_htmx_swap(store, sample_recipe):
     assert f'id="recipe-row-{created.id}"' in response.text
 
 
+@pytest.mark.requirement("REQ-000000014")
 def test_recipes_list_highlights_cookbook_tab(store):
     ui = _make_client(store)
     response = ui.get("/recipes")
     assert 'class="tab tab-active"' in response.text
 
 
+@pytest.mark.requirement("REQ-000000014")
 def test_settings_highlights_settings_tab(client: TestClient):
     response = client.get("/settings")
     assert 'class="tab tab-active"' in response.text

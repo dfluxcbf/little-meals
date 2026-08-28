@@ -59,10 +59,12 @@ def _bad_handler(request: httpx.Request) -> httpx.Response:
     return httpx.Response(200, json={"response": json.dumps({"name": "incomplete"})})
 
 
+@pytest.mark.requirement("REQ-000000023")
 def test_null_search_provider_returns_no_results():
     assert NullSearchProvider().search("anything") == []
 
 
+@pytest.mark.requirement("REQ-000000022")
 def test_build_combination_text_includes_both_recipes():
     a = _recipe("Chicken Soup")
     b = _recipe("Veg Stir Fry")
@@ -74,11 +76,13 @@ def test_build_combination_text_includes_both_recipes():
     assert "Cook it." in text
 
 
+@pytest.mark.requirement("REQ-000000022")
 def test_generate_combination_suggestion_returns_none_with_fewer_than_two_liked():
     assert generate_combination_suggestion([_recipe("Only One")], _extractor(_ok_handler)) is None
     assert generate_combination_suggestion([], _extractor(_ok_handler)) is None
 
 
+@pytest.mark.requirement("REQ-000000022")
 def test_generate_combination_suggestion_returns_extracted_recipe():
     liked = [_recipe("A"), _recipe("B"), _recipe("C")]
 
@@ -88,6 +92,7 @@ def test_generate_combination_suggestion_returns_extracted_recipe():
     assert result.name == "Fusion Bowl"
 
 
+@pytest.mark.requirement("REQ-000000022")
 def test_generate_combination_suggestion_ignores_disliked_pool_input():
     # The function trusts its caller to pre-filter to liked recipes; passing
     # a disliked one through just means it's eligible to be picked - this
@@ -97,12 +102,14 @@ def test_generate_combination_suggestion_ignores_disliked_pool_input():
     assert result is not None
 
 
+@pytest.mark.requirement("REQ-000000022")
 def test_generate_combination_suggestion_returns_none_on_extraction_error():
     liked = [_recipe("A"), _recipe("B")]
     result = generate_combination_suggestion(liked, _extractor(_bad_handler), rng=random.Random(0))
     assert result is None
 
 
+@pytest.mark.requirement("REQ-000000023")
 def test_generate_search_suggestion_returns_none_with_no_results():
     result = generate_search_suggestion(NullSearchProvider(), "dinner", _extractor(_ok_handler))
     assert result is None
@@ -116,6 +123,7 @@ class _FakeSearchProvider:
         return self._results
 
 
+@pytest.mark.requirement("REQ-000000023")
 def test_generate_search_suggestion_uses_first_result():
     provider = _FakeSearchProvider(["a promising recipe blurb"])
     result = generate_search_suggestion(provider, "dinner", _extractor(_ok_handler))
@@ -123,6 +131,7 @@ def test_generate_search_suggestion_uses_first_result():
     assert result.name == "Fusion Bowl"
 
 
+@pytest.mark.requirement("REQ-000000023")
 def test_generate_search_suggestion_returns_none_on_extraction_error():
     provider = _FakeSearchProvider(["a promising recipe blurb"])
     result = generate_search_suggestion(provider, "dinner", _extractor(_bad_handler))
@@ -134,6 +143,7 @@ class _ExplodingSearchProvider:
         raise RuntimeError("provider is down")
 
 
+@pytest.mark.requirement("REQ-000000023")
 def test_generate_search_suggestion_returns_none_when_provider_raises():
     result = generate_search_suggestion(_ExplodingSearchProvider(), "dinner", _extractor(_ok_handler))
     assert result is None

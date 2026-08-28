@@ -5,6 +5,7 @@ import random
 from datetime import datetime, timezone
 
 import httpx
+import pytest
 
 from little_meals.llm.extraction import RecipeExtractionService
 from little_meals.llm.ollama_client import OllamaClient
@@ -51,6 +52,7 @@ def _ok_handler(request: httpx.Request) -> httpx.Response:
     return httpx.Response(200, json={"response": json.dumps(VALID_EXTRACTED)})
 
 
+@pytest.mark.requirement("REQ-000000024")
 def test_build_weekly_plan_fills_from_library_when_no_ai_suggestions_requested(store: RecipeStore):
     store.create(_recipe("A"))
     store.create(_recipe("B"))
@@ -64,6 +66,7 @@ def test_build_weekly_plan_fills_from_library_when_no_ai_suggestions_requested(s
     assert all(not g.is_suggestion for g in generated)
 
 
+@pytest.mark.requirement("REQ-000000024")
 def test_build_weekly_plan_reserves_slots_for_ai_suggestions(store: RecipeStore):
     for name in ["A", "B", "C", "D"]:
         store.create(_recipe(name))
@@ -83,6 +86,7 @@ def test_build_weekly_plan_reserves_slots_for_ai_suggestions(store: RecipeStore)
     assert store.get(suggestion_meals[0].recipe.id).preference == Preference.LIKED
 
 
+@pytest.mark.requirement("REQ-000000024")
 def test_build_weekly_plan_skips_a_suggestion_slot_when_fewer_than_two_liked_recipes(store: RecipeStore):
     store.create(_recipe("Solo"))
     preferences = HouseholdPreferences(recipes_per_week=3, ai_suggestions_per_plan=2)
@@ -96,6 +100,7 @@ def test_build_weekly_plan_skips_a_suggestion_slot_when_fewer_than_two_liked_rec
     assert generated[0].is_suggestion is False
 
 
+@pytest.mark.requirement("REQ-000000024")
 def test_build_weekly_plan_uses_search_provider_when_it_has_results(store: RecipeStore):
     store.create(_recipe("A"))
 
@@ -111,6 +116,7 @@ def test_build_weekly_plan_uses_search_provider_when_it_has_results(store: Recip
     assert suggestion_meals[0].recipe.name == "Fusion Bowl"
 
 
+@pytest.mark.requirement("REQ-000000026")
 def test_generate_single_replacement_prefers_unused_library_recipe(store: RecipeStore):
     store.create(_recipe("A"))
     store.create(_recipe("B"))
@@ -132,6 +138,7 @@ def test_generate_single_replacement_prefers_unused_library_recipe(store: Recipe
     assert replacement.is_suggestion is False
 
 
+@pytest.mark.requirement("REQ-000000026")
 def test_generate_single_replacement_falls_back_to_a_generated_suggestion(store: RecipeStore):
     store.create(_recipe("A"))
     store.create(_recipe("B"))
@@ -155,6 +162,7 @@ def test_generate_single_replacement_falls_back_to_a_generated_suggestion(store:
     assert replacement.recipe.name == "Fusion Bowl"
 
 
+@pytest.mark.requirement("REQ-000000026")
 def test_generate_single_replacement_returns_none_when_nothing_available(store: RecipeStore):
     store.create(_recipe("Solo"))
     recipes = store.list()
@@ -173,6 +181,7 @@ def test_generate_single_replacement_returns_none_when_nothing_available(store: 
     assert replacement is None
 
 
+@pytest.mark.requirement("REQ-000000027")
 def test_list_controlled_reroll_candidates_excludes_used_and_disliked(store: RecipeStore):
     store.create(_recipe("A"))
     store.create(_recipe("B"))
@@ -185,6 +194,7 @@ def test_list_controlled_reroll_candidates_excludes_used_and_disliked(store: Rec
     assert {c.name for c in candidates} == {"B"}
 
 
+@pytest.mark.requirement("REQ-000000027")
 def test_list_controlled_reroll_candidates_caps_at_limit():
     recipes = [_recipe(f"R{i}") for i in range(15)]
 

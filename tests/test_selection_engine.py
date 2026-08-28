@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 import random
 from datetime import datetime, timezone
 
@@ -24,6 +26,7 @@ def _recipe(name: str, preference: Preference = Preference.LIKED) -> Recipe:
     )
 
 
+@pytest.mark.requirement("REQ-000000018")
 def test_excludes_disliked_recipes():
     recipes = [_recipe("Liked One"), _recipe("Disliked One", Preference.DISLIKED)]
 
@@ -32,6 +35,7 @@ def test_excludes_disliked_recipes():
     assert [r.name for r in selected] == ["Liked One"]
 
 
+@pytest.mark.requirement("REQ-000000018")
 def test_caps_at_recipes_per_week():
     recipes = [_recipe(f"Recipe {i}") for i in range(10)]
 
@@ -42,6 +46,7 @@ def test_caps_at_recipes_per_week():
     assert set(r.id for r in selected) <= set(r.id for r in recipes)
 
 
+@pytest.mark.requirement("REQ-000000018")
 def test_returns_all_liked_recipes_when_fewer_than_recipes_per_week():
     recipes = [_recipe("Only One")]
 
@@ -50,15 +55,18 @@ def test_returns_all_liked_recipes_when_fewer_than_recipes_per_week():
     assert [r.name for r in selected] == ["Only One"]
 
 
+@pytest.mark.requirement("REQ-000000018")
 def test_empty_library_yields_empty_plan():
     assert select_recipes_for_plan([], recipes_per_week=5) == []
 
 
+@pytest.mark.requirement("REQ-000000018")
 def test_negative_recipes_per_week_is_treated_as_zero():
     recipes = [_recipe("A"), _recipe("B")]
     assert select_recipes_for_plan(recipes, recipes_per_week=-1) == []
 
 
+@pytest.mark.requirement("REQ-000000018")
 def test_selection_is_randomized_across_calls_with_different_rngs():
     recipes = [_recipe(f"Recipe {i}") for i in range(20)]
 

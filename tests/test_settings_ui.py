@@ -69,6 +69,7 @@ def test_settings_nav_link_present(client: TestClient):
     assert 'href="/settings"' in response.text
 
 
+@pytest.mark.requirement("REQ-000000017")
 def test_settings_day_picker_marks_current_day_checked(client: TestClient):
     client.put("/api/household-preferences", json=VALID_UPDATE_PAYLOAD)
 
