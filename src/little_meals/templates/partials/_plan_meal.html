@@ -16,6 +16,7 @@
     <span>{{ recipe.cook_time_minutes }} min</span>
     <span>{{ recipe.nutrition.calories_per_serving }} kcal</span>
     <span class="badge badge-{{ recipe.classification.value }}">{{ recipe.classification.value|capitalize }}</span>
+    <a href="/recipes/{{ recipe.id }}/cook" style="margin-left: auto; font-size: 12px; font-weight: 600;">Cook along &rarr;</a>
   </div>
   <div class="servings-row">
     <label for="servings-{{ meal.id }}">Servings</label>
