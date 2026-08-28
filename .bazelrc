@@ -1,0 +1,4 @@
+# Common Bazel flags for little-meals.
+common --enable_bzlmod
+build --disk_cache=~/.cache/bazel/little-meals
+test --test_output=errors

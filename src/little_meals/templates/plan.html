@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}This week - little-meals{% endblock %}
+{% block content %}
+<h1>This week's plan</h1>
+
+{% if plan is none %}
+  <p class="subtitle">No plan yet - the household picks meals from the cookbook whenever suits them, no day-to-day schedule.</p>
+  <form method="post" action="/plan/generate">
+    <button type="submit" class="btn btn-primary">Generate this week's plan</button>
+  </form>
+{% else %}
+  <p class="subtitle">Pick what you're making this week, in any order.</p>
+  {% if plan.finalized %}
+    <p class="badge badge-liked" style="margin-bottom: 16px;">Finalized</p>
+  {% else %}
+    <form method="post" action="/plan/reroll" style="margin-bottom: 16px;">
+      <button type="submit" class="btn btn-secondary">Reroll whole plan</button>
+    </form>
+  {% endif %}
+
+  {% if not meals %}
+    <p>No recipes in the cookbook yet to fill a plan. <a href="/recipes/new">Add one</a>, then generate again.</p>
+  {% else %}
+    <div class="cookbook">
+      {% for item in meals %}
+        {% set meal = item.meal %}
+        {% set recipe = item.recipe %}
+        {% include "partials/_plan_meal.html" %}
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  {% if not plan.finalized and meals %}
+    <form method="post" action="/plan/finalize">
+      <button type="submit" class="btn btn-primary">Finalize plan</button>
+    </form>
+  {% endif %}
+{% endif %}
+{% endblock %}

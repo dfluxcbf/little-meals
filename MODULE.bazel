@@ -1,0 +1,26 @@
+module(
+    name = "little_meals",
+    version = "0.1.12",
+)
+
+# ---------------------------------------------------------------------------
+# rules_python — hermetic Python toolchain + pip dependency resolution
+# ---------------------------------------------------------------------------
+bazel_dep(name = "rules_python", version = "1.7.0")
+
+python = use_extension("@rules_python//python/extensions:python.bzl", "python")
+python.toolchain(
+    python_version = "3.12",
+    is_default = True,
+)
+
+# Runtime deps (fastapi/uvicorn/jinja2/httpx/pyyaml/python-multipart/pydantic)
+# AND test deps (pytest/pytest-cov/coverage) come from one hub, resolved from
+# requirements_lock.txt. Regenerate with: bazel run //:requirements.update
+pip = use_extension("@rules_python//python/extensions:pip.bzl", "pip")
+pip.parse(
+    hub_name = "pip",
+    python_version = "3.12",
+    requirements_lock = "//:requirements_lock.txt",
+)
+use_repo(pip, "pip")

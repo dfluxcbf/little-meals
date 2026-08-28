@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ recipe.name }} - Step {{ step_number }} - little-meals</title>
+  <link rel="stylesheet" href="/static/fonts.css">
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <div class="cook-shell">
+    <div class="cook-header">
+      <a href="/recipes/{{ recipe.id }}" class="cook-close" aria-label="Close cook-along">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+      </a>
+      <span class="cook-title">{{ recipe.name }}</span>
+      <span class="cook-step-label">Step {{ step_number }} of {{ total_steps }}</span>
+    </div>
+
+    <div class="cook-progress">
+      {% for i in range(1, total_steps + 1) %}
+        <div class="cook-progress-dot {% if i <= step_number %}cook-progress-dot-active{% endif %}"></div>
+      {% endfor %}
+    </div>
+
+    <div class="cook-step-body">
+      <div class="cook-step-number">{{ step_number }}</div>
+      <p class="cook-step-text">{{ step_text }}</p>
+    </div>
+
+    <div class="cook-nav">
+      {% if step_number > 1 %}
+        <a href="/recipes/{{ recipe.id }}/cook/{{ step_number - 1 }}" class="btn btn-secondary cook-prev" aria-label="Previous step">&larr;</a>
+      {% else %}
+        <span class="btn btn-secondary cook-prev cook-prev-disabled" aria-hidden="true">&larr;</span>
+      {% endif %}
+      <a href="/recipes/{{ recipe.id }}/cook/{{ step_number + 1 }}" class="btn btn-primary cook-next">
+        {{ "Finish cooking" if step_number == total_steps else "Next step" }}
+      </a>
+    </div>
+  </div>
+</body>
+</html>

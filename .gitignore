@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+.venv/
+bazel-*
+.lvx/states.json
+.lvx/state.json
+.reqs/
+.report/
+.coverage
+.pytest_cache/
+dist/
+*.egg-info/
+MODULE.bazel.lock

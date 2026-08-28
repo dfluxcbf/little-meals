@@ -1,0 +1,84 @@
+load("@rules_python//python:defs.bzl", "py_test")
+
+py_test(
+    name = "unit_tests",
+    srcs = ["_pytest_main.py", "conftest.py"] + glob(
+        ["test_*.py"],
+        exclude = ["test_ollama_client_real.py", "test_spoonacular_provider_real.py"],
+    ),
+    main = "_pytest_main.py",
+    deps = [
+        "//src/little_meals:lib",
+        "@pip//pytest",
+        "@pip//pytest_cov",
+        "@pip//coverage",
+        "@pip//fastapi",
+        "@pip//httpx",
+        "@pip//jinja2",
+        "@pip//pyyaml",
+        "@pip//pydantic",
+        "@pip//uvicorn",
+        "@pip//apscheduler",
+    ],
+    data = ["//src/little_meals:package_data"],
+    python_version = "PY3",
+    visibility = ["//visibility:public"],
+)
+
+# Hits a real local Ollama daemon instead of a mock - needs `ollama serve`
+# up with a model pulled, so it's excluded from `bazel test //...` (build
+# policy: the standard test target must work offline), same reasoning as
+# the root //:requirements target. Run explicitly:
+#   bazel test //tests:real_ollama_tests --test_output=all
+py_test(
+    name = "real_ollama_tests",
+    srcs = ["_pytest_main.py", "conftest.py", "test_ollama_client_real.py"],
+    main = "_pytest_main.py",
+    args = ["-m", "real_ollama"],
+    deps = [
+        "//src/little_meals:lib",
+        "@pip//pytest",
+        "@pip//pytest_cov",
+        "@pip//coverage",
+        "@pip//fastapi",
+        "@pip//httpx",
+        "@pip//jinja2",
+        "@pip//pyyaml",
+        "@pip//pydantic",
+        "@pip//uvicorn",
+        "@pip//apscheduler",
+    ],
+    data = ["//src/little_meals:package_data"],
+    python_version = "PY3",
+    tags = ["manual"],
+    visibility = ["//visibility:public"],
+)
+
+# Hits the real Spoonacular API instead of a mock - needs
+# LITTLE_MEALS_SPOONACULAR_API_KEY set, so it's excluded from
+# `bazel test //...` (build policy: the standard test target must work
+# offline), same reasoning as real_ollama_tests above. Run explicitly:
+#   bazel test //tests:real_spoonacular_tests --test_output=all --test_env=LITTLE_MEALS_SPOONACULAR_API_KEY
+py_test(
+    name = "real_spoonacular_tests",
+    srcs = ["_pytest_main.py", "conftest.py", "test_spoonacular_provider_real.py"],
+    main = "_pytest_main.py",
+    args = ["-m", "real_spoonacular"],
+    deps = [
+        "//src/little_meals:lib",
+        "@pip//pytest",
+        "@pip//pytest_cov",
+        "@pip//coverage",
+        "@pip//fastapi",
+        "@pip//httpx",
+        "@pip//jinja2",
+        "@pip//pyyaml",
+        "@pip//pydantic",
+        "@pip//uvicorn",
+        "@pip//apscheduler",
+    ],
+    data = ["//src/little_meals:package_data"],
+    python_version = "PY3",
+    tags = ["manual"],
+    visibility = ["//visibility:public"],
+)

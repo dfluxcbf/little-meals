@@ -1,0 +1,77 @@
+load("@rules_python//python:defs.bzl", "py_library")
+load("@rules_python//python:packaging.bzl", "py_wheel")
+
+package(default_visibility = ["//visibility:public"])
+
+# Jinja2 templates + static assets. These MUST be a filegroup, not py_library
+# `data`: py_wheel packages ctx.files.deps == DefaultInfo.files, and a
+# py_library's data goes into runfiles only, so data files would silently be
+# left out of the wheel. A filegroup's DefaultInfo.files IS its srcs, so
+# listing it in py_wheel.deps ships them.
+filegroup(
+    name = "package_data",
+    srcs = glob([
+        "templates/**/*.html",
+        "static/**/*.css",
+        "static/**/*.js",
+        "static/**/*.md",
+        "static/**/*.woff2",
+    ]),
+)
+
+py_library(
+    name = "lib",
+    srcs = glob(["**/*.py"], exclude = ["**/__pycache__/**"]),
+    # data -> runfiles, so `bazel run //:serve` and `bazel test //...` can
+    # read the templates/static files off disk at runtime.
+    data = [":package_data"],
+    imports = [".."],  # puts src/ on sys.path -> `import little_meals`
+    deps = [
+        "@pip//fastapi",
+        "@pip//jinja2",
+        "@pip//httpx",
+        "@pip//pyyaml",
+        "@pip//pydantic",
+        "@pip//python_multipart",
+        "@pip//apscheduler",
+    ],
+)
+
+py_wheel(
+    name = "wheel",
+    distribution = "little_meals",
+    version = "0.1.12",  # kept in sync by tools/on_version_bump.py
+    python_tag = "py3",
+    abi = "none",
+    platform = "any",
+    python_requires = ">=3.10",
+    summary = "Meal planning facilitator and recipe book.",
+    classifiers = [
+        "Programming Language :: Python :: 3",
+        "Operating System :: OS Independent",
+        "Development Status :: 3 - Alpha",
+    ],
+    requires = [
+        "fastapi>=0.110",
+        "uvicorn[standard]>=0.30",
+        "jinja2>=3.1",
+        "httpx>=0.27",
+        "pyyaml>=6.0",
+        "python-multipart>=0.0.9",
+        "pydantic>=2.5",
+        "apscheduler>=3.10,<4.0",
+    ],
+    entry_points = {
+        "console_scripts": [
+            "little-meals = little_meals.cli:main",
+            "lmeals = little_meals.cli:main",
+        ],
+    },
+    strip_path_prefixes = ["src/"],
+    # Both the library AND the data filegroup, so templates/static ship
+    # inside the wheel as little_meals/templates/... and little_meals/static/...
+    deps = [
+        ":lib",
+        ":package_data",
+    ],
+)

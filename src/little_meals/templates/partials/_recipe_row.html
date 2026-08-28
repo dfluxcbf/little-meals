@@ -1,0 +1,26 @@
+<div class="recipe-card" id="recipe-row-{{ recipe.id }}">
+  <div class="recipe-card-spine badge-{{ recipe.classification.value }}"></div>
+  <div class="recipe-card-body">
+    <div class="recipe-card-top">
+      <h3><a href="/recipes/{{ recipe.id }}">{{ recipe.name }}</a></h3>
+      <form hx-post="/recipes/{{ recipe.id }}/preference" hx-target="#recipe-row-{{ recipe.id }}" hx-swap="outerHTML">
+        {% if recipe.preference.value == "liked" %}
+          <input type="hidden" name="preference" value="disliked">
+          <button type="submit" class="heart-btn heart-liked" aria-label="Liked - click to remove from favorites">
+            <svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20.5s-7.5-4.6-10-9.3C.5 7.7 2.3 4.5 5.6 4c2-.3 3.9.6 5 2.2C11.7 4.6 13.6 3.7 15.6 4c3.3.5 5.1 3.7 3.6 7.2-2.5 4.7-10 9.3-10 9.3Z"></path></svg>
+          </button>
+        {% else %}
+          <input type="hidden" name="preference" value="liked">
+          <button type="submit" class="heart-btn" aria-label="Not liked - click to like">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20.5s-7.5-4.6-10-9.3C.5 7.7 2.3 4.5 5.6 4c2-.3 3.9.6 5 2.2C11.7 4.6 13.6 3.7 15.6 4c3.3.5 5.1 3.7 3.6 7.2-2.5 4.7-10 9.3-10 9.3Z"></path></svg>
+          </button>
+        {% endif %}
+      </form>
+    </div>
+    <div class="recipe-card-meta">
+      <span>{{ recipe.cook_time_minutes }} min</span>
+      <span>{{ recipe.nutrition.calories_per_serving }} kcal</span>
+    </div>
+    <span class="badge badge-{{ recipe.classification.value }}">{{ recipe.classification.value|capitalize }}</span>
+  </div>
+</div>

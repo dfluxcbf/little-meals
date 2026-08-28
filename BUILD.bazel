@@ -1,0 +1,85 @@
+load("@rules_python//python:defs.bzl", "py_binary")
+load("@rules_python//python:pip.bzl", "compile_pip_requirements")
+
+# ---------------------------------------------------------------------------
+# Root BUILD — canonical targets per docs/policies/build_policy.md
+#
+#   bazel build //:all                 → every artifact
+#   bazel build //:wheel                → the Python wheel
+#   bazel run   //:preflight            → system-dependency check (ollama, pipx, ...)
+#   bazel run   //:install              → preflight, then pipx-install the wheel
+#   bazel run   //:serve                → run the web app (uvicorn)
+#   bazel test  //...                   → unit tests
+#   bazel run   //:requirements.update  → regenerate requirements_lock.txt
+# ---------------------------------------------------------------------------
+
+exports_files(["VERSION", "requirements.in", "requirements_lock.txt"])
+
+# Regenerate the pinned lock:  bazel run //:requirements.update
+# Verify it is current:        bazel test //:requirements_test
+# Tagged manual so this network-requiring check does not run under
+# `bazel test //...` (build policy: the standard test target must work offline).
+compile_pip_requirements(
+    name = "requirements",
+    src = "requirements.in",
+    requirements_txt = "requirements_lock.txt",
+    tags = ["manual"],
+)
+
+alias(
+    name = "wheel",
+    actual = "//src/little_meals:wheel",
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "all",
+    srcs = [":wheel"],
+    visibility = ["//visibility:public"],
+)
+
+# A plain alias() is not expanded by `bazel test`'s test-target pattern
+# matching, so this is a test_suite (same reason as little-versions).
+test_suite(
+    name = "test",
+    tests = ["//tests:unit_tests"],
+    visibility = ["//visibility:public"],
+)
+
+# Preflight: verify unisolatable system dependencies before any real work.
+py_binary(
+    name = "preflight",
+    srcs = ["tools/preflight_main.py"],
+    main = "tools/preflight_main.py",
+    deps = ["//src/little_meals:lib"],
+    visibility = ["//visibility:public"],
+)
+
+# Install: runs the preflight check first, then pipx-installs the wheel.
+# pipx (not `pip install --user`) per the build policy's dependency isolation.
+py_binary(
+    name = "install",
+    srcs = ["tools/install_wheel.py"],
+    main = "tools/install_wheel.py",
+    data = ["//src/little_meals:wheel"],
+    deps = ["//src/little_meals:lib"],
+    visibility = ["//visibility:public"],
+)
+
+py_binary(
+    name = "serve",
+    srcs = ["tools/serve_main.py"],
+    main = "tools/serve_main.py",
+    deps = [
+        "//src/little_meals:lib",
+        "@pip//fastapi",
+        "@pip//uvicorn",
+        "@pip//jinja2",
+        "@pip//httpx",
+        "@pip//pyyaml",
+        "@pip//python_multipart",
+        "@pip//pydantic",
+        "@pip//apscheduler",
+    ],
+    visibility = ["//visibility:public"],
+)
