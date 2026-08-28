@@ -123,6 +123,23 @@ class RecipeStore:
             raise RecipeNotFound(recipe_id)
         path.unlink()
 
+    def count(self) -> int:
+        """Number of recipe files in the directory, without parsing them -
+        used by `lmeals import-spoonacular --reset` to report how many
+        recipes a reset will delete before asking for confirmation."""
+        self._dir.mkdir(parents=True, exist_ok=True)
+        return len(list(self._dir.glob("*.md")))
+
+    def delete_all(self) -> int:
+        """Deletes every recipe file in the directory, including ones that
+        fail to parse - used by `lmeals import-spoonacular --reset` to fully
+        clear the library before a fresh import. Returns the number removed."""
+        self._dir.mkdir(parents=True, exist_ok=True)
+        paths = list(self._dir.glob("*.md"))
+        for path in paths:
+            path.unlink()
+        return len(paths)
+
     def _path_for(self, recipe_id: str) -> Path:
         return self._dir / f"{recipe_id}.md"
 

@@ -129,6 +129,85 @@ def test_search_propagates_connect_error():
         provider.search("anything")
 
 
+BULK_INFO_RESPONSE = [
+    {
+        "id": 1,
+        "title": "Bulk Bowl One",
+        "instructions": "Chop it. Cook it.",
+        "extendedIngredients": [{"original": "1 cup rice"}],
+    },
+    {
+        "id": 2,
+        "title": "Bulk Bowl Two",
+        "instructions": "Slice it. Bake it.",
+        "extendedIngredients": [{"original": "2 eggs"}],
+    },
+]
+
+
+@pytest.mark.requirement("REQ-000000041")
+def test_search_many_fetches_and_formats_results_in_two_calls():
+    calls = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request.url.path)
+        if request.url.path == "/recipes/complexSearch":
+            assert request.url.params["number"] == "2"
+            assert request.url.params["query"] == "vegetarian"
+            return httpx.Response(200, json={"results": [{"id": 1}, {"id": 2}]})
+        if request.url.path == "/recipes/informationBulk":
+            assert request.url.params["ids"] == "1,2"
+            return httpx.Response(200, json=BULK_INFO_RESPONSE)
+        raise AssertionError(f"unexpected request: {request.url}")
+
+    provider = _provider_with(handler)
+    texts = provider.search_many("vegetarian", 2)
+
+    assert calls == ["/recipes/complexSearch", "/recipes/informationBulk"]
+    assert len(texts) == 2
+    assert "Bulk Bowl One" in texts[0]
+    assert "1 cup rice" in texts[0]
+    assert "Bulk Bowl Two" in texts[1]
+    assert "2 eggs" in texts[1]
+
+
+@pytest.mark.requirement("REQ-000000041")
+def test_search_many_omits_query_param_when_none():
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/recipes/complexSearch":
+            assert "query" not in request.url.params
+            return httpx.Response(200, json={"results": []})
+        raise AssertionError(f"unexpected request: {request.url}")
+
+    provider = _provider_with(handler)
+    assert provider.search_many(None, 3) == []
+
+
+@pytest.mark.requirement("REQ-000000041")
+def test_search_many_returns_empty_list_when_no_results():
+    calls = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request.url.path)
+        return httpx.Response(200, json={"results": []})
+
+    provider = _provider_with(handler)
+    texts = provider.search_many("anything", 5)
+
+    assert texts == []
+    assert calls == ["/recipes/complexSearch"]
+
+
+@pytest.mark.requirement("REQ-000000041")
+def test_search_many_returns_empty_list_for_non_positive_count():
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise AssertionError("no HTTP call should be made for count <= 0")
+
+    provider = _provider_with(handler)
+    assert provider.search_many("anything", 0) == []
+    assert provider.search_many("anything", -1) == []
+
+
 @pytest.mark.requirement("REQ-000000038")
 def test_close_closes_only_an_owned_client():
     transport = httpx.MockTransport(lambda request: httpx.Response(200, json={"results": []}))
