@@ -14,12 +14,15 @@ Run explicitly with:
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from little_meals.config import Settings
 from little_meals.llm.extraction import RecipeExtractionService
 from little_meals.llm.ollama_client import OllamaClient
 from little_meals.models import ExtractedRecipe
+from little_meals.store.recipe_store import RecipeStore
 
 pytestmark = pytest.mark.real_ollama
 
@@ -94,3 +97,36 @@ def test_real_ollama_classification_matches_expected(real_client: OllamaClient, 
     service = RecipeExtractionService(real_client)
     result = service.extract(text)
     assert result.classification.value == expected
+
+
+@pytest.mark.requirement("REQ-000000040")
+def test_real_ollama_normalizes_a_hand_dropped_in_recipe_file(real_client: OllamaClient, tmp_path: Path):
+    """Regression coverage for RecipeStore's LLM-backed normalization
+    (store/recipe_store.py): a recipe file that doesn't match the app's
+    Markdown+YAML-frontmatter schema - e.g. pasted in by hand from a
+    website, with no frontmatter at all - must still come back from
+    `list()` as a usable Recipe against the real model, not just the
+    mocked one in tests/test_recipe_store.py."""
+    recipes_dir = tmp_path / "recipes"
+    recipes_dir.mkdir()
+    (recipes_dir / "pasted-in.md").write_text(
+        "# Grandma's Carrot Roast\n\n"
+        "Ingredients: 4 carrots, 2 tbsp olive oil, salt, pepper.\n\n"
+        "Chop the carrots into chunks, toss with oil salt and pepper, "
+        "roast at 200C for 25 minutes until tender.\n",
+        encoding="utf-8",
+    )
+
+    store = RecipeStore(recipes_dir)
+    extractor = RecipeExtractionService(real_client)
+    recipes = store.list(extractor)
+
+    assert len(recipes) == 1
+    normalized = recipes[0]
+    assert normalized.name
+    assert len(normalized.ingredients) >= 1
+    assert len(normalized.steps) >= 1
+
+    # Rewritten to canonical frontmatter - a second read needs no extractor.
+    reread = store.get("pasted-in")
+    assert reread.name == normalized.name

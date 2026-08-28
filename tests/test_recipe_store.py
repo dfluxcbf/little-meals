@@ -1,11 +1,31 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
+import httpx
 import pytest
 
+from little_meals.llm.extraction import RecipeExtractionService
+from little_meals.llm.ollama_client import OllamaClient
 from little_meals.models import Preference, Recipe
 from little_meals.store.recipe_store import RecipeNotFound, RecipeStore
+
+_NORMALIZED_PAYLOAD = {
+    "name": "Rescued Recipe",
+    "cook_time_minutes": 25,
+    "classification": "vegetarian",
+    "nutrition": {"calories_per_serving": 300},
+    "servings": 3,
+    "ingredients": [{"name": "carrot", "quantity": 2, "unit": "pieces"}],
+    "steps": ["Chop the carrots.", "Roast until tender."],
+}
+
+
+def _extractor_with(handler) -> RecipeExtractionService:
+    transport = httpx.MockTransport(handler)
+    client = OllamaClient("http://ollama.test", "test-model", timeout_s=5.0, client=httpx.Client(transport=transport))
+    return RecipeExtractionService(client)
 
 
 @pytest.mark.requirement("REQ-000000001")
@@ -109,3 +129,82 @@ def test_write_leaves_no_tmp_file_behind(store: RecipeStore, sample_recipe: Reci
     store.create(sample_recipe)
     tmp_files = list(tmp_recipes_dir.glob("*.tmp"))
     assert tmp_files == []
+
+
+@pytest.mark.requirement("REQ-000000040")
+def test_list_normalizes_an_unparseable_file_via_extractor(
+    store: RecipeStore, sample_recipe: Recipe, tmp_recipes_dir: Path
+):
+    store.create(sample_recipe)
+    foreign_path = tmp_recipes_dir / "pasted-in.md"
+    foreign_path.write_text("# Grandma's Carrot Roast\n\n2 carrots, chopped. Roast until tender.\n", encoding="utf-8")
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"response": json.dumps(_NORMALIZED_PAYLOAD)})
+
+    recipes = store.list(_extractor_with(handler))
+
+    names = {r.name for r in recipes}
+    assert names == {sample_recipe.name, "Rescued Recipe"}
+
+
+@pytest.mark.requirement("REQ-000000040")
+def test_normalized_file_is_rewritten_so_later_reads_need_no_extractor(
+    store: RecipeStore, tmp_recipes_dir: Path
+):
+    tmp_recipes_dir.mkdir(parents=True, exist_ok=True)
+    foreign_path = tmp_recipes_dir / "pasted-in.md"
+    foreign_path.write_text("# Grandma's Carrot Roast\n\n2 carrots, chopped. Roast until tender.\n", encoding="utf-8")
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"response": json.dumps(_NORMALIZED_PAYLOAD)})
+
+    store.list(_extractor_with(handler))
+
+    # No extractor this time - the file must now parse as canonical frontmatter.
+    reread = store.get("pasted-in")
+    assert reread.name == "Rescued Recipe"
+    assert reread.ingredients[0].name == "carrot"
+
+
+@pytest.mark.requirement("REQ-000000040")
+def test_list_without_extractor_still_skips_corrupt_files(
+    store: RecipeStore, sample_recipe: Recipe, tmp_recipes_dir: Path
+):
+    store.create(sample_recipe)
+    corrupt_path = tmp_recipes_dir / "corrupt.md"
+    corrupt_path.write_text("---\nnot: closed\n", encoding="utf-8")
+
+    recipes = store.list(None)
+    assert len(recipes) == 1
+    assert recipes[0].name == sample_recipe.name
+
+
+@pytest.mark.requirement("REQ-000000040")
+def test_list_falls_back_to_skipping_when_normalization_also_fails(
+    store: RecipeStore, sample_recipe: Recipe, tmp_recipes_dir: Path
+):
+    store.create(sample_recipe)
+    corrupt_path = tmp_recipes_dir / "corrupt.md"
+    corrupt_path.write_text("---\nnot: closed\n", encoding="utf-8")
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"response": "not valid json"})
+
+    recipes = store.list(_extractor_with(handler))
+    assert len(recipes) == 1
+    assert recipes[0].name == sample_recipe.name
+
+
+@pytest.mark.requirement("REQ-000000040")
+def test_normalize_skips_an_empty_file_without_calling_the_extractor(
+    store: RecipeStore, tmp_recipes_dir: Path
+):
+    tmp_recipes_dir.mkdir(parents=True, exist_ok=True)
+    (tmp_recipes_dir / "empty.md").write_text("   \n", encoding="utf-8")
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise AssertionError("extractor should not be called for an empty file")
+
+    recipes = store.list(_extractor_with(handler))
+    assert recipes == []

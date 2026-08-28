@@ -58,7 +58,7 @@ def build_plan_router(
         plan = _fetch(plan_id)
         _require_draft(plan)
         preferences = household_store.get()
-        recipes = recipe_store.list()
+        recipes = recipe_store.list(extractor)
         excluded = {meal.recipe_id for meal in plan.meals}
         replacement = generate_single_replacement(excluded, recipes, recipe_store, extractor, search_provider, preferences)
         if replacement is None:
@@ -74,7 +74,7 @@ def build_plan_router(
         if not any(meal.id == meal_id for meal in plan.meals):
             raise ApiError(404, "NOT_FOUND", f"Meal {meal_id} not found in plan {plan_id}")
         excluded = {meal.recipe_id for meal in plan.meals}
-        recipes = recipe_store.list()
+        recipes = recipe_store.list(extractor)
         return list_controlled_reroll_candidates(excluded, recipes)
 
     @router.post("/{plan_id}/meals/{meal_id}/choose", response_model=MealPlan)

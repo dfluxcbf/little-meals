@@ -5,9 +5,12 @@ import os
 import re
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Optional
 
 import yaml
 
+from little_meals.llm.extraction import ExtractionError, RecipeExtractionService
+from little_meals.llm.ollama_client import OllamaUnavailable
 from little_meals.models import Preference, Recipe
 from little_meals.store.frontmatter import FrontmatterError, render, slugify, split
 
@@ -36,15 +39,46 @@ class RecipeStore:
     def __init__(self, recipes_dir: Path):
         self._dir = Path(recipes_dir)
 
-    def list(self) -> list[Recipe]:
+    def list(self, extractor: Optional[RecipeExtractionService] = None) -> list[Recipe]:
+        """List every recipe in the directory.
+
+        A file that doesn't parse as a valid recipe (missing/broken
+        frontmatter, a hand-dropped-in foreign format, a field of the wrong
+        shape) is normalized through `extractor` when one is given: its raw
+        text is run through the same LLM extraction pipeline a manual
+        submission uses, and the result is rewritten to the file in
+        canonical frontmatter form, so every later read - with or without an
+        extractor - hits the fast path. Only if that also fails (or no
+        extractor was given) is the file skipped, same as before.
+        """
         self._dir.mkdir(parents=True, exist_ok=True)
         recipes: list[Recipe] = []
         for path in sorted(self._dir.glob("*.md")):
             try:
                 recipes.append(self._read(path))
+                continue
             except (FrontmatterError, ValueError, KeyError, TypeError) as exc:
-                logger.warning("Skipping unparseable recipe file %s: %s", path, exc)
+                read_exc = exc
+            normalized = self._normalize(path, extractor) if extractor is not None else None
+            if normalized is not None:
+                recipes.append(normalized)
+            else:
+                logger.warning("Skipping unparseable recipe file %s: %s", path, read_exc)
         return recipes
+
+    def _normalize(self, path: Path, extractor: RecipeExtractionService) -> Optional[Recipe]:
+        raw_text = path.read_text(encoding="utf-8")
+        if not raw_text.strip():
+            return None
+        try:
+            extracted = extractor.extract(raw_text)
+        except (ExtractionError, OllamaUnavailable) as exc:
+            logger.warning("Could not normalize recipe file %s via LLM extraction: %s", path, exc)
+            return None
+        recipe = Recipe.from_extracted(extracted, id=path.stem, source_text=raw_text, now=datetime.now(timezone.utc))
+        self._write(recipe)
+        logger.info("Normalized recipe file %s via LLM extraction", path)
+        return recipe
 
     def get(self, recipe_id: str) -> Recipe:
         path = self._path_for(recipe_id)
