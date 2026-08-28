@@ -6,10 +6,10 @@ from pydantic import BaseModel
 from little_meals.api.errors import ApiError
 from little_meals.llm.extraction import RecipeExtractionService
 from little_meals.models import CookedUpdate, MealPlan, Recipe, ServingsUpdate
-from little_meals.planning.plan_builder import build_weekly_plan, generate_single_replacement, list_controlled_reroll_candidates
+from little_meals.planning.plan_builder import build_meal_specs, generate_single_replacement, list_controlled_reroll_candidates
 from little_meals.planning.suggestion import SearchProvider
 from little_meals.store.household_store import HouseholdPreferencesStore
-from little_meals.store.plan_store import MealPlanStore, MealSpec, PlanMealNotFound, PlanNotFound
+from little_meals.store.plan_store import MealPlanStore, PlanMealNotFound, PlanNotFound
 from little_meals.store.recipe_store import RecipeNotFound, RecipeStore
 
 
@@ -36,12 +36,6 @@ def build_plan_router(
         if plan.finalized:
             raise ApiError(409, "PLAN_FINALIZED", "This plan is finalized and can no longer be rerolled")
 
-    def _build() -> list[MealSpec]:
-        preferences = household_store.get()
-        recipes = recipe_store.list()
-        generated = build_weekly_plan(recipes, preferences, recipe_store, extractor, search_provider)
-        return [MealSpec(g.recipe.id, g.servings, g.is_suggestion) for g in generated]
-
     @router.get("/current", response_model=MealPlan)
     def get_current() -> MealPlan:
         plan = store.get_current()
@@ -51,13 +45,13 @@ def build_plan_router(
 
     @router.post("/generate", response_model=MealPlan, status_code=201)
     def generate() -> MealPlan:
-        return store.create(_build())
+        return store.create(build_meal_specs(recipe_store, household_store, extractor, search_provider))
 
     @router.post("/{plan_id}/reroll", response_model=MealPlan)
     def reroll_whole_plan(plan_id: str) -> MealPlan:
         plan = _fetch(plan_id)
         _require_draft(plan)
-        return store.replace_meals(plan_id, _build())
+        return store.replace_meals(plan_id, build_meal_specs(recipe_store, household_store, extractor, search_provider))
 
     @router.post("/{plan_id}/meals/{meal_id}/reroll", response_model=MealPlan)
     def reroll_single_meal(plan_id: str, meal_id: str) -> MealPlan:

@@ -33,6 +33,7 @@ py_library(
         "@pip//pyyaml",
         "@pip//pydantic",
         "@pip//python_multipart",
+        "@pip//apscheduler",
     ],
 )
 
@@ -58,6 +59,7 @@ py_wheel(
         "pyyaml>=6.0",
         "python-multipart>=0.0.9",
         "pydantic>=2.5",
+        "apscheduler>=3.10,<4.0",
     ],
     entry_points = {
         "console_scripts": [

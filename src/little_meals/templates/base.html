@@ -10,6 +10,12 @@
 </head>
 <body>
   <div class="app-shell">
+    {% if notification_pending %}
+    <a href="/plan" class="notification-banner">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11h16v3a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5v-3Z"></path><path d="M2 11h20"></path></svg>
+      Your new weekly plan is ready
+    </a>
+    {% endif %}
     <header class="topbar">
       <a href="/recipes" class="brand">little meals</a>
       <a href="/recipes/new" class="btn btn-primary">+ New recipe</a>

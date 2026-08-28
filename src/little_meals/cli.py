@@ -22,7 +22,7 @@ def _cmd_serve(args: argparse.Namespace) -> int:
             ollama_timeout_s=settings.ollama_timeout_s,
         )
 
-    app = create_app(settings)
+    app = create_app(settings, enable_scheduler=True)
     uvicorn.run(app, host=args.host, port=args.port, reload=args.reload, log_level="info")
     return 0
 

@@ -39,6 +39,10 @@ class Settings:
     def shopping_list_db_path(self) -> Path:
         return self.data_dir / "shopping_list.db"
 
+    @property
+    def notification_db_path(self) -> Path:
+        return self.data_dir / "notification.db"
+
     @classmethod
     def from_env(cls) -> "Settings":
         return cls(

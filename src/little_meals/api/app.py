@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import importlib.resources
 import logging
-from typing import Optional
+from contextlib import asynccontextmanager
+from datetime import datetime
+from typing import AsyncIterator, Optional
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -20,8 +22,11 @@ from little_meals.api.routes_ui import build_ui_router
 from little_meals.config import Settings
 from little_meals.llm.extraction import RecipeExtractionService
 from little_meals.llm.ollama_client import OllamaClient
+from little_meals.planning.plan_builder import build_meal_specs
 from little_meals.planning.suggestion import NullSearchProvider, SearchProvider
+from little_meals.scheduler import WeeklyScheduler
 from little_meals.store.household_store import HouseholdPreferencesStore
+from little_meals.store.notification_store import NotificationStore
 from little_meals.store.plan_store import MealPlanStore
 from little_meals.store.recipe_store import RecipeStore
 from little_meals.store.shopping_list_store import ShoppingListStore
@@ -37,6 +42,8 @@ def create_app(
     plan_store: Optional[MealPlanStore] = None,
     search_provider: Optional[SearchProvider] = None,
     shopping_list_store: Optional[ShoppingListStore] = None,
+    notification_store: Optional[NotificationStore] = None,
+    enable_scheduler: bool = False,
 ) -> FastAPI:
     settings = settings or Settings.from_env()
     store = store or RecipeStore(settings.recipes_dir)
@@ -44,16 +51,46 @@ def create_app(
     plan_store = plan_store or MealPlanStore(settings.plan_db_path)
     search_provider = search_provider or NullSearchProvider()
     shopping_list_store = shopping_list_store or ShoppingListStore(settings.shopping_list_db_path)
+    notification_store = notification_store or NotificationStore(settings.notification_db_path)
     if extractor is None:
         client = OllamaClient(settings.ollama_base_url, settings.ollama_model, settings.ollama_timeout_s)
         extractor = RecipeExtractionService(client)
 
-    app = FastAPI(title="little-meals", version=__version__)
+    background_scheduler = None
+    if enable_scheduler:
+        from apscheduler.schedulers.background import BackgroundScheduler
+
+        weekly_scheduler = WeeklyScheduler(
+            household_store,
+            plan_store,
+            notification_store,
+            generate_fn=lambda: plan_store.create(build_meal_specs(store, household_store, extractor, search_provider)),
+        )
+        background_scheduler = BackgroundScheduler()
+        background_scheduler.add_job(
+            weekly_scheduler.check_and_maybe_generate,
+            "interval",
+            seconds=60,
+            id="weekly-plan-check",
+            next_run_time=datetime.now(),
+        )
+
+    @asynccontextmanager
+    async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+        if background_scheduler is not None:
+            background_scheduler.start()
+        yield
+        if background_scheduler is not None:
+            background_scheduler.shutdown(wait=False)
+
+    app = FastAPI(title="little-meals", version=__version__, lifespan=lifespan)
     app.state.settings = settings
     app.state.store = store
     app.state.household_store = household_store
     app.state.plan_store = plan_store
     app.state.shopping_list_store = shopping_list_store
+    app.state.notification_store = notification_store
+    app.state.scheduler = background_scheduler
 
     package_root = importlib.resources.files("little_meals")
     templates = Jinja2Templates(directory=str(package_root / "templates"))
@@ -89,7 +126,9 @@ def create_app(
     app.include_router(build_plan_router(plan_store, store, household_store, extractor, search_provider))
     app.include_router(build_shopping_router(shopping_list_store, plan_store, store))
     app.include_router(
-        build_ui_router(store, extractor, household_store, plan_store, search_provider, shopping_list_store, templates)
+        build_ui_router(
+            store, extractor, household_store, plan_store, search_provider, shopping_list_store, notification_store, templates
+        )
     )
 
     return app

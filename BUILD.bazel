@@ -79,6 +79,7 @@ py_binary(
         "@pip//pyyaml",
         "@pip//python_multipart",
         "@pip//pydantic",
+        "@pip//apscheduler",
     ],
     visibility = ["//visibility:public"],
 )
