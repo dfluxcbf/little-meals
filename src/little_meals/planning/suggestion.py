@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import logging
 import random
+import re
 from typing import Optional, Protocol
+
+import httpx
 
 from little_meals.llm.extraction import ExtractionError, RecipeExtractionService
 from little_meals.llm.ollama_client import OllamaUnavailable
@@ -28,6 +31,87 @@ class NullSearchProvider:
 
     def search(self, query: str) -> list[str]:
         return []
+
+
+class SpoonacularSearchProvider:
+    """Searches Spoonacular's recipe database (see architecture.md's "Online
+    recipe search" decision - chosen for its household-scale free tier and
+    because it returns real structured recipes rather than raw web-search
+    snippets that would need scraping).
+
+    Deliberately does NOT use Spoonacular's own classification/nutrition
+    data - a hit's ingredients and steps are reformatted as free text and
+    handed to the same extraction service every other suggestion source
+    uses, so classification/nutrition estimation stays consistent (and
+    LLM-derived) regardless of where a suggestion came from.
+
+    Only returns the single best match (Milestone 4's generate_search_suggestion
+    only ever looks at the first result anyway), so each call to `search` is
+    two HTTP requests: complexSearch to find a candidate, then
+    /recipes/{id}/information for its actual ingredients/instructions.
+    """
+
+    def __init__(
+        self,
+        api_key: str,
+        base_url: str = "https://api.spoonacular.com",
+        timeout_s: float = 15.0,
+        client: Optional[httpx.Client] = None,
+    ):
+        self._api_key = api_key
+        self._base_url = base_url.rstrip("/")
+        self._owns_client = client is None
+        self._client = client or httpx.Client(timeout=timeout_s)
+
+    def search(self, query: str) -> list[str]:
+        search_response = self._client.get(
+            f"{self._base_url}/recipes/complexSearch",
+            params={"query": query, "number": 1, "apiKey": self._api_key},
+        )
+        search_response.raise_for_status()
+        results = search_response.json().get("results", [])
+        if not results:
+            return []
+
+        recipe_id = results[0]["id"]
+        info_response = self._client.get(
+            f"{self._base_url}/recipes/{recipe_id}/information",
+            params={"apiKey": self._api_key},
+        )
+        info_response.raise_for_status()
+        return [_format_spoonacular_recipe(info_response.json())]
+
+    def close(self) -> None:
+        if self._owns_client:
+            self._client.close()
+
+
+_HTML_TAG_RE = re.compile(r"<[^>]+>")
+
+
+def _format_spoonacular_recipe(info: dict) -> str:
+    title = info.get("title") or "A recipe"
+    ingredients = ", ".join(
+        ingredient.get("original") or ingredient.get("name", "")
+        for ingredient in info.get("extendedIngredients", [])
+        if ingredient.get("original") or ingredient.get("name")
+    )
+
+    # Spoonacular's `instructions` field is free text but sometimes carries
+    # HTML markup (e.g. "<ol><li>...</li></ol>") - strip tags rather than
+    # rendering them into the extraction prompt as literal text.
+    instructions = _HTML_TAG_RE.sub(" ", info.get("instructions") or "").strip()
+    if not instructions:
+        # Some recipes only populate the structured step-by-step field.
+        steps = [
+            step["step"]
+            for block in info.get("analyzedInstructions", [])
+            for step in block.get("steps", [])
+            if step.get("step")
+        ]
+        instructions = " ".join(steps)
+
+    return f"{title}\n\nIngredients: {ingredients}\n\nInstructions: {instructions}"
 
 
 def build_combination_text(recipe_a: Recipe, recipe_b: Recipe) -> str:
