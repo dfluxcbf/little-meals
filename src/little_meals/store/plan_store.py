@@ -70,6 +70,9 @@ class MealPlanStore:
                 )
                 """
             )
+            existing_columns = {row[1] for row in conn.execute("PRAGMA table_info(plan_meals)")}
+            if "is_suggestion" not in existing_columns:
+                conn.execute("ALTER TABLE plan_meals ADD COLUMN is_suggestion INTEGER NOT NULL DEFAULT 0")
 
     @contextlib.contextmanager
     def _connection(self) -> Iterator[sqlite3.Connection]:

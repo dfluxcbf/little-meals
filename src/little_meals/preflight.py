@@ -1,11 +1,34 @@
 from __future__ import annotations
 
 import shutil
+import subprocess
 import sys
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Callable, Optional
 
 from little_meals.config import Settings
+
+
+def is_wsl() -> bool:
+    """Detect WSL, where ollama typically runs on the Windows host and isn't on the WSL PATH."""
+    try:
+        return "microsoft" in Path("/proc/version").read_text().lower()
+    except OSError:
+        return False
+
+
+def ollama_reachable_via_curl(base_url: str, timeout_s: float = 3.0) -> bool:
+    """Check the Ollama HTTP API with curl, since httpx isn't guaranteed to be installed yet."""
+    try:
+        result = subprocess.run(
+            ["curl", "-fsS", "--max-time", str(timeout_s), f"{base_url.rstrip('/')}/api/tags"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        return result.returncode == 0
+    except OSError:
+        return False
 
 
 @dataclass(frozen=True)
@@ -55,19 +78,38 @@ class PreflightResult:
         return not self.missing
 
 
+WSL_OLLAMA_INSTALL_HINT = (
+    "on WSL, ollama usually runs on the Windows host rather than inside WSL, so it won't be on "
+    "the WSL PATH - install/start it on Windows, then verify from WSL with: "
+    "curl http://127.0.0.1:11434/api/tags"
+)
+
+
 def check(
     which: Callable[[str], Optional[str]] = shutil.which,
     probe_ollama: Optional[Callable[[], bool]] = None,
     settings: Optional[Settings] = None,
+    is_wsl: Callable[[], bool] = is_wsl,
+    ollama_reachable: Optional[Callable[[], bool]] = None,
 ) -> PreflightResult:
+    settings = settings or Settings.from_env()
+    wsl = is_wsl()
+    if ollama_reachable is None:
+        ollama_reachable = lambda: ollama_reachable_via_curl(settings.ollama_base_url)  # noqa: E731
+
     for tier_name, deps in TIERS:
-        missing = [dep for dep in deps if which(dep.command) is None]
+        missing = []
+        for dep in deps:
+            if dep.command == "ollama" and wsl:
+                if not ollama_reachable():
+                    missing.append(SystemDependency(dep.command, dep.purpose, WSL_OLLAMA_INSTALL_HINT))
+            elif which(dep.command) is None:
+                missing.append(dep)
         if missing:
             return PreflightResult(missing=missing, stopped_at_tier=tier_name)
 
     warnings: list[str] = []
     if probe_ollama is None:
-        settings = settings or Settings.from_env()
 
         def probe_ollama() -> bool:
             # Imported lazily so httpx is not required for the hard checks.
@@ -83,7 +125,7 @@ def check(
         warnings.append(
             "ollama is installed but its API did not respond at the configured URL. "
             "Start it with `ollama serve`, and make sure the model is pulled: "
-            f"`ollama pull {(settings or Settings.from_env()).ollama_model}`."
+            f"`ollama pull {settings.ollama_model}`."
         )
 
     return PreflightResult(missing=[], stopped_at_tier=None, warnings=warnings)

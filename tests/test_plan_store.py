@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import sqlite3
+from pathlib import Path
+
 import pytest
 
 from little_meals.store.plan_store import MealPlanStore, MealSpec, PlanMealNotFound, PlanNotFound
@@ -138,3 +141,45 @@ def test_finalize_marks_plan_finalized(plan_store: MealPlanStore):
 def test_finalize_unknown_plan_raises(plan_store: MealPlanStore):
     with pytest.raises(PlanNotFound):
         plan_store.finalize("does-not-exist")
+
+
+@pytest.mark.requirement("REQ-000000019")
+def test_opening_a_pre_is_suggestion_db_adds_the_missing_column(tmp_path: Path):
+    """Regression test: databases created before the m4 `is_suggestion`
+
+    column was added must be migrated in place on open, not crash.
+    """
+    db_path = tmp_path / "plans.db"
+    conn = sqlite3.connect(db_path)
+    conn.execute(
+        """
+        CREATE TABLE meal_plans (
+            id TEXT PRIMARY KEY,
+            created_at TEXT NOT NULL,
+            finalized INTEGER NOT NULL DEFAULT 0
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE plan_meals (
+            plan_id TEXT NOT NULL REFERENCES meal_plans(id),
+            meal_id TEXT NOT NULL,
+            recipe_id TEXT NOT NULL,
+            servings INTEGER NOT NULL,
+            cooked INTEGER NOT NULL DEFAULT 0,
+            position INTEGER NOT NULL,
+            PRIMARY KEY (plan_id, meal_id)
+        )
+        """
+    )
+    conn.execute("INSERT INTO meal_plans VALUES ('p1', '2026-08-01T00:00:00+00:00', 0)")
+    conn.execute("INSERT INTO plan_meals VALUES ('p1', 'm1', 'recipe-a', 2, 0, 0)")
+    conn.commit()
+    conn.close()
+
+    store = MealPlanStore(db_path)
+    plan = store.get_current()
+
+    assert plan is not None
+    assert plan.meals[0].is_suggestion is False

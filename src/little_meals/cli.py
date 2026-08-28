@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import argparse
+import getpass
 import sys
+from dataclasses import replace
 from typing import Optional, Sequence
 
 from little_meals import __version__
@@ -15,12 +17,21 @@ def _cmd_serve(args: argparse.Namespace) -> int:
 
     settings = Settings.from_env()
     if args.data_dir:
-        settings = Settings(
-            data_dir=args.data_dir,
-            ollama_base_url=settings.ollama_base_url,
-            ollama_model=settings.ollama_model,
-            ollama_timeout_s=settings.ollama_timeout_s,
-        )
+        settings = replace(settings, data_dir=args.data_dir)
+
+    if settings.spoonacular_key_file:
+        from little_meals.vault import VaultError, decrypt_key_file
+
+        passphrase = getpass.getpass("Spoonacular vault passphrase: ")
+        try:
+            api_key = decrypt_key_file(settings.spoonacular_key_file, passphrase)
+        except VaultError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 1
+        finally:
+            del passphrase
+        settings = replace(settings, spoonacular_api_key=api_key)
+        del api_key
 
     app = create_app(settings, enable_scheduler=True)
     uvicorn.run(app, host=args.host, port=args.port, reload=args.reload, log_level="info")
