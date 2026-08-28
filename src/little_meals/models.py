@@ -116,6 +116,35 @@ class ExtractRequest(BaseModel):
     text: str
 
 
+class PlanMeal(BaseModel):
+    """One meal in a MealPlan - a reference to a library Recipe plus the
+    per-plan state that doesn't belong on the Recipe itself: how many
+    servings to make this week (starts at the recipe's own `servings`,
+    overridable), and whether the household has cooked it yet. Meals in a
+    plan aren't bound to specific days (see design.md's "Meal plan"
+    concept) - `id` is just a stable per-plan handle, not a day slot."""
+
+    id: str
+    recipe_id: str
+    servings: int = Field(ge=1)
+    cooked: bool = False
+
+
+class MealPlan(BaseModel):
+    id: str
+    created_at: datetime
+    finalized: bool = False
+    meals: list[PlanMeal] = Field(default_factory=list)
+
+
+class ServingsUpdate(BaseModel):
+    servings: int = Field(ge=1)
+
+
+class CookedUpdate(BaseModel):
+    cooked: bool
+
+
 class HouseholdPreferences(BaseModel):
     """Configuration shared by the whole household, not per person - see
     design.md's "Household preferences" concept. A singleton, not a

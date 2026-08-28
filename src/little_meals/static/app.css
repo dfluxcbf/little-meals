@@ -566,6 +566,108 @@ form button {
   outline-offset: 2px;
 }
 
+/* ---------------------------------------------------------- weekly plan */
+
+.cookbook {
+  position: relative;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 22px 22px 10px 10px;
+  box-shadow: 0 8px 24px oklch(30% 0.02 50 / 0.12);
+  overflow: hidden;
+  padding: 18px 18px 18px 30px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.cookbook::before {
+  content: "";
+  position: absolute;
+  left: 20px;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: oklch(85% 0.02 60);
+}
+
+.plan-meal {
+  border-bottom: 1px dashed var(--line);
+  padding-bottom: 14px;
+}
+
+.plan-meal:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.plan-meal-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.plan-meal-top h3 {
+  margin: 0;
+  font-size: 16.5px;
+}
+
+.plan-meal-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--ink-soft);
+  margin: 6px 0 10px;
+}
+
+.pot-stamp {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  background: var(--paper);
+  color: var(--ink-soft);
+  border: 1.5px dashed var(--line);
+}
+
+.pot-stamp svg {
+  width: 12px;
+  height: 12px;
+}
+
+.pot-stamp-active {
+  background: var(--terracotta-soft);
+  color: var(--terracotta);
+  border-color: var(--terracotta);
+  transform: rotate(-6deg);
+}
+
+.servings-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.servings-row label {
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+.servings-row input[type="number"] {
+  width: 72px;
+  padding: 6px 8px;
+}
+
 .error {
   color: var(--rose);
   background: var(--rose-soft);
