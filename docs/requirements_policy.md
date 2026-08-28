@@ -106,6 +106,16 @@ test coverage are tracked exclusively through **little-requirements**
   install into `.venv` (gitignored), never added to `requirements.in`/`pip.parse`,
   consistent with the project-structure policy's "installed working version,
   not a source dependency" rule.
+- The `spoonacular-bulk-import` branch added one more requirement,
+  REQ-000000041, linked to the same `m4-ai-suggestions-and-reroll` suite as
+  REQ-000000038 since it extends `SpoonacularSearchProvider` — covering the
+  new `lmeals import-spoonacular` CLI command, `SpoonacularSearchProvider.
+  search_many` (bulk `complexSearch` + `informationBulk`), and
+  `planning/spoonacular_import.py`'s orchestration — tagged in
+  `tests/test_spoonacular_provider.py` and `tests/test_spoonacular_import.py`.
+  A follow-up on the same branch added REQ-000000042 for the `--reset` flag
+  (`RecipeStore.count`/`delete_all`, plus the CLI's confirm-before-delete
+  prompt) — tagged in `tests/test_recipe_store.py` and `tests/test_cli.py`.
 - Known issue: `lreq update` (what the Bazel genrule invokes) cannot run inside
   this submodule checkout — `little-requirements`' managed pre-commit-hook
   installer assumes `.git` is a directory, and a submodule's `.git` is a file.

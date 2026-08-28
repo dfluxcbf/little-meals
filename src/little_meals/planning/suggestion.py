@@ -79,7 +79,38 @@ class SpoonacularSearchProvider:
             params={"apiKey": self._api_key},
         )
         info_response.raise_for_status()
-        return [_format_spoonacular_recipe(info_response.json())]
+        return [format_spoonacular_recipe(info_response.json())]
+
+    def search_many(self, query: Optional[str], count: int) -> list[str]:
+        """Fetches up to `count` recipes in bulk - used by the standalone
+        Spoonacular import command (planning/spoonacular_import.py) rather
+        than the one-result-at-a-time `search` above.
+
+        Deliberately two HTTP calls total, regardless of `count`: one
+        complexSearch for candidate ids, one informationBulk for all of
+        their full ingredients/instructions - N `/recipes/{id}/information`
+        calls would burn through the free tier's daily quota far faster for
+        no benefit (see architecture.md's "Online recipe search" row).
+        """
+        if count <= 0:
+            return []
+
+        params: dict[str, object] = {"number": count, "apiKey": self._api_key}
+        if query:
+            params["query"] = query
+        search_response = self._client.get(f"{self._base_url}/recipes/complexSearch", params=params)
+        search_response.raise_for_status()
+        results = search_response.json().get("results", [])
+        if not results:
+            return []
+
+        ids = ",".join(str(result["id"]) for result in results)
+        bulk_response = self._client.get(
+            f"{self._base_url}/recipes/informationBulk",
+            params={"ids": ids, "apiKey": self._api_key},
+        )
+        bulk_response.raise_for_status()
+        return [format_spoonacular_recipe(info) for info in bulk_response.json()]
 
     def close(self) -> None:
         if self._owns_client:
@@ -89,7 +120,7 @@ class SpoonacularSearchProvider:
 _HTML_TAG_RE = re.compile(r"<[^>]+>")
 
 
-def _format_spoonacular_recipe(info: dict) -> str:
+def format_spoonacular_recipe(info: dict) -> str:
     title = info.get("title") or "A recipe"
     ingredients = ", ".join(
         ingredient.get("original") or ingredient.get("name", "")

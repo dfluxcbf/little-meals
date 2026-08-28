@@ -20,6 +20,15 @@ bazel run //:install     # preflight-gated pipx install of the CLI
 lmeals serve              # or: bazel run //:serve
 ```
 
+`lmeals import-spoonacular [--count N]` bulk-imports recipes straight into the
+library from Spoonacular, sized to N (or the household's `recipes_per_week`
+setting if `--count` is omitted) and matching its configured food preferences
+- see `docs/architecture.md`'s "Online recipe search" row. Needs the same
+Spoonacular API key configuration as the AI-suggestion search source below.
+Add `--reset` to delete every existing recipe first (prompts for
+confirmation with the count to be deleted, unless `--yes` is also passed) -
+useful for replacing a library wholesale rather than adding to it.
+
 Runtime configuration is via environment variables:
 
 | Variable | Default | Purpose |
