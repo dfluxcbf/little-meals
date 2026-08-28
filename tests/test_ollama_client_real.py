@@ -54,3 +54,43 @@ def test_real_ollama_extracts_a_recipe_matching_the_schema(real_client: OllamaCl
     assert result.nutrition.calories_per_serving >= 0
     assert len(result.ingredients) >= 1
     assert len(result.steps) >= 1
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        pytest.param(
+            "Lemon Garlic Chicken: season 4 boneless chicken thighs, sear in olive "
+            "oil 4 minutes per side, deglaze with lemon juice and stock, simmer 12 "
+            "minutes, finish with butter and parsley.",
+            "other",
+            id="chicken-thighs",
+        ),
+        pytest.param(
+            "Baked Salmon: place 2 salmon fillets on a tray with sliced lemon and "
+            "olive oil, season, and bake at 200C for 15 minutes.",
+            "pescetarian",
+            id="salmon-only",
+        ),
+        pytest.param(
+            "Tuna Sandwich: mix a can of drained tuna with mayonnaise and spread "
+            "on two slices of bread.",
+            "pescetarian",
+            id="tuna-sandwich",
+        ),
+        pytest.param(
+            "Veggie Stir Fry: stir fry chopped broccoli, sliced carrots, and bell "
+            "pepper in sesame oil, toss with soy sauce.",
+            "vegetarian",
+            id="veggie-stir-fry",
+        ),
+    ],
+)
+def test_real_ollama_classification_matches_expected(real_client: OllamaClient, text: str, expected: str):
+    """Regression coverage for a real, reproducible confusion this model has
+    (see llm/prompts.py and llm/extraction.py's classification reconciliation):
+    a plain fish-only dish like "baked salmon" used to come back "other" even
+    when the prompt named that exact dish as a pescetarian example."""
+    service = RecipeExtractionService(real_client)
+    result = service.extract(text)
+    assert result.classification.value == expected
