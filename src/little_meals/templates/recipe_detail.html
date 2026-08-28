@@ -10,6 +10,8 @@
   <span class="badge badge-{{ recipe.preference.value }}">{{ recipe.preference.value|capitalize }}</span>
 </div>
 
+<a href="/recipes/{{ recipe.id }}/cook" class="btn btn-primary" style="margin-bottom: 8px;">Cook along</a>
+
 <h2>Steps</h2>
 <ol class="steps-list">
   {% for step in recipe.steps %}

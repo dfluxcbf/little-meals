@@ -86,6 +86,55 @@ def build_ui_router(
             )
         return templates.TemplateResponse(request, "recipe_detail.html", {"recipe": recipe, "nav_active": "library"})
 
+    @router.get("/recipes/{recipe_id}/cook", include_in_schema=False)
+    def cook_start(recipe_id: str) -> RedirectResponse:
+        return RedirectResponse(url=f"/recipes/{recipe_id}/cook/1", status_code=303)
+
+    @router.get("/recipes/{recipe_id}/cook/{step_number}", response_class=HTMLResponse, include_in_schema=False)
+    def cook_step(request: Request, recipe_id: str, step_number: int) -> HTMLResponse:
+        try:
+            recipe = store.get(recipe_id)
+        except RecipeNotFound:
+            return templates.TemplateResponse(
+                request, "recipe_not_found.html", {"recipe_id": recipe_id, "nav_active": "library"}, status_code=404
+            )
+
+        total_steps = len(recipe.steps)
+        if step_number < 1:
+            return RedirectResponse(url=f"/recipes/{recipe_id}/cook/1", status_code=303)
+        if step_number > total_steps:
+            # Ran past the last step (or there were no steps to begin with) -
+            # the guided walkthrough is done, prompt for post-cook feedback.
+            return templates.TemplateResponse(request, "cook_finish.html", {"recipe": recipe, "feedback": None})
+
+        return templates.TemplateResponse(
+            request,
+            "cook_step.html",
+            {
+                "recipe": recipe,
+                "step_number": step_number,
+                "total_steps": total_steps,
+                "step_text": recipe.steps[step_number - 1],
+            },
+        )
+
+    @router.post("/recipes/{recipe_id}/cook/finish", response_class=HTMLResponse, include_in_schema=False)
+    def cook_finish(request: Request, recipe_id: str, preference: str = Form(...)) -> HTMLResponse:
+        try:
+            recipe = store.set_preference(recipe_id, Preference(preference))
+        except RecipeNotFound:
+            return templates.TemplateResponse(
+                request, "recipe_not_found.html", {"recipe_id": recipe_id, "nav_active": "library"}, status_code=404
+            )
+
+        plan = plan_store.get_current()
+        if plan is not None:
+            meal = next((m for m in plan.meals if m.recipe_id == recipe_id), None)
+            if meal is not None and not meal.cooked:
+                plan_store.set_cooked(plan.id, meal.id, True)
+
+        return templates.TemplateResponse(request, "cook_finish.html", {"recipe": recipe, "feedback": preference})
+
     @router.post("/recipes/{recipe_id}/preference", response_class=HTMLResponse, include_in_schema=False)
     def recipe_preference_toggle(request: Request, recipe_id: str, preference: str = Form(...)) -> HTMLResponse:
         recipe = store.set_preference(recipe_id, Preference(preference))
