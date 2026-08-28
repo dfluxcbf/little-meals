@@ -84,6 +84,29 @@ h2 {
   flex-direction: column;
 }
 
+.notification-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: var(--terracotta-soft);
+  color: var(--terracotta);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.notification-banner svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+@media (min-width: 900px) {
+  .notification-banner {
+    margin-left: var(--rail-width);
+  }
+}
+
 header.topbar {
   position: sticky;
   top: 0;
@@ -156,9 +179,11 @@ nav.tabbar {
 }
 
 @media (min-width: 900px) {
-  .app-shell {
-    flex-direction: row;
-  }
+  /* .app-shell stays a column: nav.tabbar is position:fixed either way (out
+     of flow, positioned against the viewport, not this flex parent), so
+     header.topbar and main.content - the two children actually still in
+     flow - need to stay stacked vertically here too. A row here would put
+     them side by side instead of full-width-minus-rail, one above the other. */
 
   nav.tabbar {
     position: fixed;

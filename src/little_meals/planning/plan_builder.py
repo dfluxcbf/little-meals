@@ -9,6 +9,8 @@ from little_meals.llm.extraction import RecipeExtractionService
 from little_meals.models import HouseholdPreferences, Preference, Recipe
 from little_meals.planning.selection import select_recipes_for_plan
 from little_meals.planning.suggestion import SearchProvider, generate_combination_suggestion, generate_search_suggestion
+from little_meals.store.household_store import HouseholdPreferencesStore
+from little_meals.store.plan_store import MealSpec
 from little_meals.store.recipe_store import RecipeStore
 
 
@@ -59,6 +61,24 @@ def build_weekly_plan(
             meals.append(generated)
 
     return meals
+
+
+def build_meal_specs(
+    recipe_store: RecipeStore,
+    household_store: HouseholdPreferencesStore,
+    extractor: RecipeExtractionService,
+    search_provider: SearchProvider,
+    rng: Optional[random.Random] = None,
+) -> list[MealSpec]:
+    """The shared "build a fresh plan's worth of meals" call every
+    generation path uses - initial generation (`POST /plan/generate`), a
+    whole-plan reroll, and Milestone 7's scheduled weekly generation - so
+    there's exactly one place that reads preferences, lists recipes, and
+    runs build_weekly_plan."""
+    preferences = household_store.get()
+    recipes = recipe_store.list()
+    generated = build_weekly_plan(recipes, preferences, recipe_store, extractor, search_provider, rng=rng)
+    return [MealSpec(g.recipe.id, g.servings, g.is_suggestion) for g in generated]
 
 
 def generate_single_replacement(

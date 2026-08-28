@@ -14,6 +14,7 @@ from little_meals.llm.extraction import RecipeExtractionService
 from little_meals.llm.ollama_client import OllamaClient
 from little_meals.models import Classification, Ingredient, Nutrition, Preference, Recipe
 from little_meals.store.household_store import HouseholdPreferencesStore
+from little_meals.store.notification_store import NotificationStore
 from little_meals.store.plan_store import MealPlanStore
 from little_meals.store.recipe_store import RecipeStore
 from little_meals.store.shopping_list_store import ShoppingListStore
@@ -51,6 +52,11 @@ def plan_store(tmp_path: Path) -> MealPlanStore:
 @pytest.fixture
 def shopping_list_store(tmp_path: Path) -> ShoppingListStore:
     return ShoppingListStore(tmp_path / "shopping_list.db")
+
+
+@pytest.fixture
+def notification_store(tmp_path: Path) -> NotificationStore:
+    return NotificationStore(tmp_path / "notification.db")
 
 
 @pytest.fixture
@@ -92,6 +98,7 @@ def client(
     household_store: HouseholdPreferencesStore,
     plan_store: MealPlanStore,
     shopping_list_store: ShoppingListStore,
+    notification_store: NotificationStore,
 ) -> TestClient:
     settings = Settings(data_dir=store._dir.parent)
 
@@ -107,5 +114,6 @@ def client(
         household_store=household_store,
         plan_store=plan_store,
         shopping_list_store=shopping_list_store,
+        notification_store=notification_store,
     )
     return TestClient(app)

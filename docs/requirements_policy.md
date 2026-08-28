@@ -75,6 +75,15 @@ test coverage are tracked exclusively through **little-requirements**
   implementing environment. Its tests (`tests/test_cook_along.py`) are
   written and passing but untagged — create their `REQ-#########` IDs via
   `lreq requirement create` next time it's reachable, then backfill the marker.
+- Milestone 7 (`m7-weekly-scheduling` — `scheduler.py`, `NotificationStore`,
+  and the `enable_scheduler`/lifespan wiring in `api/app.py` — see
+  `milestones.md`) shipped for the same reason as Milestones 3, 4, 5, 6, and
+  9: `lreq` unreachable in the implementing environment. Its tests
+  (`tests/test_scheduler.py`, `tests/test_notification_store.py`,
+  `tests/test_app_scheduler_wiring.py`, `tests/test_notification_banner.py`)
+  are written and passing but untagged — create their `REQ-#########` IDs
+  via `lreq requirement create` next time it's reachable, then backfill the
+  marker.
 - Known issue: `lreq update` (what the Bazel genrule invokes) cannot run inside
   this submodule checkout — `little-requirements`' managed pre-commit-hook
   installer assumes `.git` is a directory, and a submodule's `.git` is a file.

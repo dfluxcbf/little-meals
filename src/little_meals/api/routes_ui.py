@@ -10,11 +10,12 @@ from pydantic import ValidationError
 from little_meals.llm.extraction import ExtractionError, RecipeExtractionService
 from little_meals.llm.ollama_client import OllamaUnavailable
 from little_meals.models import DayOfWeek, HouseholdPreferencesUpdate, MealPlan, Preference, Recipe
-from little_meals.planning.plan_builder import build_weekly_plan, generate_single_replacement, list_controlled_reroll_candidates
+from little_meals.planning.plan_builder import build_meal_specs, generate_single_replacement, list_controlled_reroll_candidates
 from little_meals.planning.shopping_list import build_shopping_list_items
 from little_meals.planning.suggestion import SearchProvider
 from little_meals.store.household_store import HouseholdPreferencesStore
-from little_meals.store.plan_store import MealPlanStore, MealSpec, PlanMealNotFound, PlanNotFound
+from little_meals.store.notification_store import NotificationStore
+from little_meals.store.plan_store import MealPlanStore, PlanMealNotFound, PlanNotFound
 from little_meals.store.recipe_store import RecipeNotFound, RecipeStore
 from little_meals.store.shopping_list_store import ShoppingListItemNotFound, ShoppingListNotFound, ShoppingListStore
 
@@ -26,15 +27,10 @@ def build_ui_router(
     plan_store: MealPlanStore,
     search_provider: SearchProvider,
     shopping_list_store: ShoppingListStore,
+    notification_store: NotificationStore,
     templates: Jinja2Templates,
 ) -> APIRouter:
     router = APIRouter()
-
-    def _build_meals() -> list[MealSpec]:
-        preferences = household_store.get()
-        recipes = store.list()
-        generated = build_weekly_plan(recipes, preferences, store, extractor, search_provider)
-        return [MealSpec(g.recipe.id, g.servings, g.is_suggestion) for g in generated]
 
     def _render_plan(request: Request) -> HTMLResponse:
         plan = plan_store.get_current()
@@ -47,7 +43,9 @@ def build_ui_router(
                     continue
                 meals.append({"meal": meal, "recipe": recipe})
         return templates.TemplateResponse(
-            request, "plan.html", {"plan": plan, "meals": meals, "nav_active": "plan"}
+            request,
+            "plan.html",
+            {"plan": plan, "meals": meals, "nav_active": "plan", "notification_pending": notification_store.is_pending()},
         )
 
     @router.get("/", include_in_schema=False)
@@ -57,7 +55,11 @@ def build_ui_router(
     @router.get("/recipes", response_class=HTMLResponse, include_in_schema=False)
     def recipes_list(request: Request) -> HTMLResponse:
         recipes = store.list()
-        return templates.TemplateResponse(request, "recipes_list.html", {"recipes": recipes, "nav_active": "library"})
+        return templates.TemplateResponse(
+            request,
+            "recipes_list.html",
+            {"recipes": recipes, "nav_active": "library", "notification_pending": notification_store.is_pending()},
+        )
 
     @router.get("/recipes/new", response_class=HTMLResponse, include_in_schema=False)
     def recipe_new_form(request: Request) -> HTMLResponse:
@@ -200,18 +202,19 @@ def build_ui_router(
 
     @router.get("/plan", response_class=HTMLResponse, include_in_schema=False)
     def plan_view(request: Request) -> HTMLResponse:
+        notification_store.clear()
         return _render_plan(request)
 
     @router.post("/plan/generate", include_in_schema=False)
     def plan_generate() -> RedirectResponse:
-        plan_store.create(_build_meals())
+        plan_store.create(build_meal_specs(store, household_store, extractor, search_provider))
         return RedirectResponse(url="/plan", status_code=303)
 
     @router.post("/plan/reroll", include_in_schema=False)
     def plan_reroll_whole() -> RedirectResponse:
         plan = plan_store.get_current()
         if plan is not None and not plan.finalized:
-            plan_store.replace_meals(plan.id, _build_meals())
+            plan_store.replace_meals(plan.id, build_meal_specs(store, household_store, extractor, search_provider))
         return RedirectResponse(url="/plan", status_code=303)
 
     @router.post("/plan/meals/{meal_id}/servings", response_class=HTMLResponse, include_in_schema=False)

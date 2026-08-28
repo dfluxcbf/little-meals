@@ -6,6 +6,7 @@ httpx
 pyyaml
 python-multipart
 pydantic
+apscheduler
 
 # Test-only
 pytest
