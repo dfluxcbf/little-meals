@@ -113,7 +113,6 @@ def test_regenerates_when_current_plan_predates_the_latest_scheduled_slot(tmp_pa
             recipes_per_week=5,
             recommendation_day=scheduled_day,
             recommendation_time=future_now.time(),
-            food_preferences=[],
             ai_suggestions_per_plan=0,
             default_servings="2 adults",
         )

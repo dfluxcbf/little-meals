@@ -262,6 +262,11 @@ nav.tabbar {
   color: var(--ink);
 }
 
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 /* ----------------------------------------------------------------- misc */
 
 .badge {
@@ -518,7 +523,8 @@ form label {
 
 form input[type="text"],
 form input[type="time"],
-form input[type="number"] {
+form input[type="number"],
+form textarea {
   width: 100%;
   font-family: var(--font-body);
   font-size: 14px;
@@ -529,8 +535,13 @@ form input[type="number"] {
   color: var(--ink);
 }
 
+form textarea {
+  resize: vertical;
+}
+
 form input:focus,
-form select:focus {
+form select:focus,
+form textarea:focus {
   outline: 2px solid var(--terracotta);
   outline-offset: 1px;
 }
@@ -550,6 +561,19 @@ form button {
 .settings-section h2 {
   margin-top: 0;
   font-size: 15.5px;
+}
+
+.spoonacular-query-json {
+  background: var(--paper-alt);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+  overflow-x: auto;
+  white-space: pre;
 }
 
 .day-picker {
@@ -589,6 +613,97 @@ form button {
 .day-radio:focus-visible + .day-pill {
   outline: 2px solid var(--terracotta);
   outline-offset: 2px;
+}
+
+/* ------------------------------------------ recipe search preferences */
+
+.filter-field {
+  margin-bottom: 4px;
+}
+
+.checkbox-label {
+  display: flex !important;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+  cursor: pointer;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: 17px;
+  height: 17px;
+  accent-color: var(--terracotta);
+}
+
+.pill-group {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.pill-input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  pointer-events: none;
+}
+
+.pill-label {
+  text-align: center;
+  padding: 7px 12px;
+  border-radius: 10px;
+  border: 1.5px solid var(--line);
+  background: var(--paper-alt);
+  color: var(--ink-soft);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.pill-input:checked + .pill-label {
+  background: var(--terracotta);
+  border-color: var(--terracotta);
+  color: white;
+}
+
+.pill-input:focus-visible + .pill-label {
+  outline: 2px solid var(--terracotta);
+  outline-offset: 2px;
+}
+
+.nutrient-grid {
+  display: grid;
+  grid-template-columns: 1fr 84px 84px;
+  gap: 8px 10px;
+  align-items: center;
+  margin-top: 12px;
+}
+
+.nutrient-grid .nutrient-header {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--ink-soft);
+}
+
+.nutrient-grid label {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.nutrient-grid input[type="number"] {
+  width: 100%;
+  padding: 6px 8px;
+}
+
+.form-errors {
+  margin: 4px 0 12px;
+  padding-left: 20px;
+  color: var(--terracotta-dark);
+  font-size: 13px;
 }
 
 /* ---------------------------------------------------------- weekly plan */

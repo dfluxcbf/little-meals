@@ -40,22 +40,32 @@ def test_non_2xx_response_raises_bad_response():
         client.generate_json("prompt")
 
 
-def test_connect_error_raises_unavailable():
+def test_connect_error_raises_unavailable_and_says_could_not_reach():
     def handler(request: httpx.Request) -> httpx.Response:
         raise httpx.ConnectError("refused", request=request)
 
     client = _client_with(handler)
-    with pytest.raises(OllamaUnavailable):
+    with pytest.raises(OllamaUnavailable, match="Could not reach Ollama"):
         client.generate_json("prompt")
 
 
-def test_read_timeout_raises_unavailable():
+def test_read_timeout_raises_unavailable_and_distinguishes_it_from_a_connect_failure():
+    """A ReadTimeout means Ollama accepted the connection - it IS
+    reachable - but didn't finish responding in time (most often the model
+    still loading). The message must say that, not "could not reach",
+    which would wrongly suggest the server itself is down/unreachable."""
+
     def handler(request: httpx.Request) -> httpx.Response:
         raise httpx.ReadTimeout("timed out", request=request)
 
     client = _client_with(handler)
-    with pytest.raises(OllamaUnavailable):
+    with pytest.raises(OllamaUnavailable) as excinfo:
         client.generate_json("prompt")
+
+    message = str(excinfo.value)
+    assert "Could not reach" not in message
+    assert "accepted the request but didn't respond within 5s" in message
+    assert "LITTLE_MEALS_OLLAMA_TIMEOUT" in message
 
 
 def test_non_json_response_field_raises_bad_response():

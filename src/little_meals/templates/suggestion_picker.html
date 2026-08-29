@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Pick a suggestion - little-meals{% endblock %}
+{% block content %}
+<a href="/plan" style="display: inline-block; margin-bottom: 12px; color: var(--ink-soft);">&larr; Back to this week</a>
+<h1>Pick a suggestion</h1>
+<p class="subtitle">for {{ current_recipe.name }}</p>
+
+{% if not candidates %}
+  <p>No other Spoonacular suggestions were fetched alongside this one.</p>
+{% else %}
+<form method="post" action="/plan/meals/{{ meal_id }}/choose-suggestion">
+  <div class="alternatives-list">
+    {% for candidate in candidates %}
+      <label class="alternative-option">
+        <input type="radio" name="recipe_id" value="{{ candidate.id }}" {% if loop.first %}checked{% endif %}>
+        <span style="flex: 1;">
+          <strong style="font-family: var(--font-display); font-size: 14.5px;">{{ candidate.name }}</strong>
+          <div style="display: flex; gap: 10px; font-size: 11.5px; color: var(--ink-soft); margin-top: 3px;">
+            <span>{{ candidate.cook_time_minutes }} min</span>
+            <span>{{ candidate.nutrition.calories_per_serving }} kcal</span>
+            <span>{{ candidate.classification.value|capitalize }}</span>
+          </div>
+        </span>
+      </label>
+    {% endfor %}
+  </div>
+  <button type="submit" class="btn btn-primary" style="margin-top: 16px; width: 100%;">Use this recipe</button>
+</form>
+{% endif %}
+<p class="subtitle" style="margin-top: 16px;">
+  <a href="/plan/meals/{{ meal_id }}/alternatives">Or select from cookbook &rarr;</a>
+</p>
+{% endblock %}

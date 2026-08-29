@@ -8,7 +8,7 @@ import pytest
 
 from little_meals.llm.extraction import RecipeExtractionService
 from little_meals.llm.ollama_client import OllamaClient
-from little_meals.planning.spoonacular_import import build_search_query, import_recipes
+from little_meals.planning.spoonacular_import import import_recipes
 from little_meals.store.recipe_store import RecipeStore
 
 VALID_EXTRACTED = {
@@ -41,23 +41,14 @@ class _FakeProvider:
 
 
 @pytest.mark.requirement("REQ-000000041")
-def test_build_search_query_joins_preferences():
-    assert build_search_query(["vegetarian", "spicy"]) == "vegetarian spicy"
-
-
-@pytest.mark.requirement("REQ-000000041")
-def test_build_search_query_returns_none_when_no_preferences():
-    assert build_search_query([]) is None
-
-
-@pytest.mark.requirement("REQ-000000041")
 def test_import_recipes_stores_every_extracted_recipe(tmp_path: Path):
     provider = _FakeProvider(["Recipe text one", "Recipe text two"])
     store = RecipeStore(tmp_path / "recipes")
 
-    result = import_recipes(provider, _extractor(_ok_handler), store, query="vegetarian", count=2)
+    result = import_recipes(provider, _extractor(_ok_handler), store, query={"query": "vegetarian"}, count=2)
 
     assert result.requested == 2
+    assert result.found == 2
     assert result.skipped == 0
     assert len(result.imported) == 2
     assert {recipe.name for recipe in result.imported} == {"Fusion Bowl"}
@@ -80,6 +71,7 @@ def test_import_recipes_skips_recipes_that_fail_extraction(tmp_path: Path):
     result = import_recipes(provider, _extractor(flaky_handler), store, query=None, count=2)
 
     assert result.requested == 2
+    assert result.found == 2
     assert result.skipped == 1
     assert len(result.imported) == 1
     assert len(store.list()) == 1
@@ -93,5 +85,22 @@ def test_import_recipes_handles_no_results(tmp_path: Path):
     result = import_recipes(provider, _extractor(_ok_handler), store, query=None, count=5)
 
     assert result.requested == 5
+    assert result.found == 0
     assert result.imported == []
     assert result.skipped == 0
+
+
+@pytest.mark.requirement("REQ-000000041")
+def test_import_recipes_found_reflects_a_search_shortfall_distinct_from_skipped(tmp_path: Path):
+    """Spoonacular can legitimately return fewer candidates than requested
+    (a narrow filter has few matches) with no error at all - `found` lets
+    the CLI tell that apart from a candidate that failed extraction."""
+    provider = _FakeProvider(["Recipe text one"])
+    store = RecipeStore(tmp_path / "recipes")
+
+    result = import_recipes(provider, _extractor(_ok_handler), store, query=None, count=20)
+
+    assert result.requested == 20
+    assert result.found == 1
+    assert result.skipped == 0
+    assert len(result.imported) == 1

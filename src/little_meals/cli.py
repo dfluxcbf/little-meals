@@ -4,6 +4,7 @@ import argparse
 import getpass
 import sys
 from dataclasses import replace
+from pathlib import Path
 from typing import Optional, Sequence
 
 from little_meals import __version__
@@ -42,7 +43,7 @@ def _cmd_serve(args: argparse.Namespace) -> int:
 
     settings = Settings.from_env()
     if args.data_dir:
-        settings = replace(settings, data_dir=args.data_dir)
+        settings = replace(settings, data_dir=Path(args.data_dir))
 
     settings, error_code = _load_spoonacular_api_key(settings)
     if error_code is not None:
@@ -56,14 +57,14 @@ def _cmd_serve(args: argparse.Namespace) -> int:
 def _cmd_import_spoonacular(args: argparse.Namespace) -> int:
     from little_meals.llm.extraction import RecipeExtractionService
     from little_meals.llm.ollama_client import OllamaClient
-    from little_meals.planning.spoonacular_import import build_search_query, import_recipes
+    from little_meals.planning.spoonacular_import import import_recipes
     from little_meals.planning.suggestion import SpoonacularSearchProvider
     from little_meals.store.household_store import HouseholdPreferencesStore
     from little_meals.store.recipe_store import RecipeStore
 
     settings = Settings.from_env()
     if args.data_dir:
-        settings = replace(settings, data_dir=args.data_dir)
+        settings = replace(settings, data_dir=Path(args.data_dir))
 
     settings, error_code = _load_spoonacular_api_key(settings)
     if error_code is not None:
@@ -76,6 +77,18 @@ def _cmd_import_spoonacular(args: argparse.Namespace) -> int:
             file=sys.stderr,
         )
         return 1
+
+    household_store = HouseholdPreferencesStore(settings.household_db_path)
+    preferences = household_store.get()
+    query = preferences.food_filter
+    if query is None:
+        print(
+            "error: no food preferences saved yet - describe your household's tastes on the "
+            "Settings page and save first",
+            file=sys.stderr,
+        )
+        return 1
+    count = args.count if args.count is not None else preferences.recipes_per_week
 
     store = RecipeStore(settings.recipes_dir)
 
@@ -95,11 +108,6 @@ def _cmd_import_spoonacular(args: argparse.Namespace) -> int:
             deleted = store.delete_all()
             print(f"Deleted {deleted} recipe(s) from {settings.recipes_dir}.")
 
-    household_store = HouseholdPreferencesStore(settings.household_db_path)
-    preferences = household_store.get()
-    count = args.count if args.count is not None else preferences.recipes_per_week
-    query = build_search_query(preferences.food_preferences)
-
     provider = SpoonacularSearchProvider(
         settings.spoonacular_api_key,
         base_url=settings.spoonacular_base_url,
@@ -116,9 +124,60 @@ def _cmd_import_spoonacular(args: argparse.Namespace) -> int:
 
     summary = f"Imported {len(result.imported)} of {result.requested} requested recipe(s) from Spoonacular into {settings.recipes_dir}"
     if result.skipped:
-        summary += f" ({result.skipped} skipped)"
+        summary += f" ({result.skipped} skipped - failed extraction)"
     print(summary + ".")
+    if result.found < result.requested:
+        print(
+            f"Note: Spoonacular only had {result.found} matching recipe(s) for your saved search "
+            f"preferences, not {result.requested} - this isn't an error, your filter (cuisine/diet/"
+            "nutrition ranges/etc. on the recipe search preferences page) is just narrow enough that "
+            "fewer recipes qualify. Widen it there if you want more results per import.",
+            file=sys.stderr,
+        )
     return 0 if result.requested == 0 or result.imported else 1
+
+
+def _cmd_settings(args: argparse.Namespace) -> int:
+    from little_meals.store.household_store import HouseholdPreferencesStore
+    from little_meals.store.plan_store import MealPlanStore
+    from little_meals.store.shopping_list_store import ShoppingListStore
+
+    if not args.reset:
+        print("error: no action given (did you mean --reset?)", file=sys.stderr)
+        return 1
+
+    settings = Settings.from_env()
+    if args.data_dir:
+        settings = replace(settings, data_dir=Path(args.data_dir))
+
+    plan_store = MealPlanStore(settings.plan_db_path)
+    shopping_list_store = ShoppingListStore(settings.shopping_list_db_path)
+
+    plan_count = plan_store.count()
+    shopping_list_count = shopping_list_store.count()
+
+    if not args.yes:
+        answer = input(
+            "This will reset your general settings (recipes per week, recommendation "
+            "day/time, AI suggestions per plan, default servings) to their defaults, and "
+            f"permanently delete all {plan_count} meal plan(s) and {shopping_list_count} "
+            "shopping list(s). Your food preferences/query and saved recipes are kept. "
+            "Continue? [y/N] "
+        )
+        if answer.strip().lower() not in ("y", "yes"):
+            print("Aborted - nothing was reset.", file=sys.stderr)
+            return 1
+
+    household_store = HouseholdPreferencesStore(settings.household_db_path)
+    household_store.reset_general_settings()
+    deleted_plans = plan_store.delete_all()
+    deleted_shopping_lists = shopping_list_store.delete_all()
+
+    print(
+        "Settings reset to defaults (food preferences and recipes kept). "
+        f"Deleted {deleted_plans} meal plan(s) and {deleted_shopping_lists} shopping list(s)."
+    )
+    return 0
 
 
 def _cmd_preflight(args: argparse.Namespace) -> int:
@@ -144,6 +203,21 @@ def build_parser() -> argparse.ArgumentParser:
 
     preflight_parser = subparsers.add_parser("preflight", help="check system dependencies")
     preflight_parser.set_defaults(func=_cmd_preflight)
+
+    settings_parser = subparsers.add_parser("settings", help="manage household settings")
+    settings_parser.add_argument(
+        "--reset",
+        action="store_true",
+        help=(
+            "reset general settings (recipes per week, recommendation day/time, AI "
+            "suggestions per plan, default servings) to defaults, and delete all meal "
+            "plans and shopping lists - keeps food preferences/query and saved recipes "
+            "(asks to confirm)"
+        ),
+    )
+    settings_parser.add_argument("--yes", "-y", action="store_true", help="skip the --reset confirmation prompt")
+    settings_parser.add_argument("--data-dir", default=None)
+    settings_parser.set_defaults(func=_cmd_settings)
 
     import_parser = subparsers.add_parser(
         "import-spoonacular", help="bulk-import recipes from Spoonacular into the library"

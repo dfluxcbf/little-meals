@@ -133,10 +133,17 @@ def create_app(
     app.include_router(build_recipes_router(store, extractor, settings))
     app.include_router(build_household_router(household_store))
     app.include_router(build_plan_router(plan_store, store, household_store, extractor, search_provider))
-    app.include_router(build_shopping_router(shopping_list_store, plan_store, store))
+    app.include_router(build_shopping_router(shopping_list_store, plan_store, store, search_provider))
     app.include_router(
         build_ui_router(
-            store, extractor, household_store, plan_store, search_provider, shopping_list_store, notification_store, templates
+            store,
+            extractor,
+            household_store,
+            plan_store,
+            search_provider,
+            shopping_list_store,
+            notification_store,
+            templates,
         )
     )
 

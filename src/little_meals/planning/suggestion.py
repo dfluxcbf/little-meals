@@ -9,19 +9,21 @@ import httpx
 
 from little_meals.llm.extraction import ExtractionError, RecipeExtractionService
 from little_meals.llm.ollama_client import OllamaUnavailable
-from little_meals.models import ExtractedRecipe, Recipe
+from little_meals.models import ExtractedRecipe, IngredientSubstitutes, Recipe
 
 logger = logging.getLogger(__name__)
 
 
 class SearchProvider(Protocol):
     """Seam for the online recipe search architecture.md defers ("Online
-    recipe search | Provider TBD"). A provider turns a query into zero or
+    recipe search | Provider TBD"). A provider turns a filter into zero or
     more free-text recipe blurbs, each of which gets run through the same
-    extraction service as a manual submission - see `generate_search_suggestion`.
+    extraction service as a manual submission - see `generate_search_candidates`.
     """
 
-    def search(self, query: str) -> list[str]: ...
+    def search_many(self, food_filter: Optional[dict], count: int) -> list[str]: ...
+
+    def get_substitutes(self, ingredient_name: str) -> Optional[IngredientSubstitutes]: ...
 
 
 class NullSearchProvider:
@@ -29,8 +31,58 @@ class NullSearchProvider:
     returns no results, so suggestion generation falls back to combining
     stored recipes instead of silently failing or fabricating results."""
 
-    def search(self, query: str) -> list[str]:
+    def search_many(self, food_filter: Optional[dict], count: int) -> list[str]:
         return []
+
+    def get_substitutes(self, ingredient_name: str) -> Optional[IngredientSubstitutes]:
+        return None
+
+
+#: complexSearch parameters every request sets regardless of the household's
+#: filter, overriding anything the household's own pasted-in JSON says for
+#: these specific keys - see docs/spoonacular_plan.md: results must be full
+#: meals (never a side dish/dessert/etc.), never a dish-name-specific search
+#: (only a style/ingredient `query`), never the same handful of top-ranked
+#: hits every time, and always carry nutrition data so a suggestion's
+#: calorie/macro numbers come from Spoonacular rather than being
+#: re-estimated.
+_ALWAYS_ON_SEARCH_PARAMS: dict[str, object] = {
+    "sort": "random",
+    "type": "main course",
+    "instructionsRequired": True,
+    "addRecipeNutrition": True,
+}
+
+
+def build_complex_search_params(food_filter: Optional[dict], count: Optional[int] = None) -> dict[str, object]:
+    """Builds the `/recipes/complexSearch` query parameters for a household
+    filter - the single source of truth for both the real Spoonacular
+    request (SpoonacularSearchProvider.search_many, which adds `apiKey` on
+    top) and the read-only JSON preview shown on the recipe-preferences
+    page, so what the household sees is exactly what gets sent.
+    `food_filter` is the household's own Spoonacular query parameters,
+    built on the dedicated /settings/recipe-preferences page (see
+    docs/spoonacular_api.md) - passed through as-is except that
+    `_ALWAYS_ON_SEARCH_PARAMS` always wins on overlapping keys, and
+    `number` (from `count`) is always software-controlled too. Never
+    includes `apiKey`.
+
+    Any list-valued entry is comma-joined into the single string
+    Spoonacular's own list-shaped parameters (cuisine, intolerances, etc.)
+    actually expect - httpx would otherwise encode a list value as
+    repeated query keys (`cuisine=a&cuisine=b`), which Spoonacular doesn't
+    understand. Only a household whose filter predates the current
+    single-string-per-field form (a hand-pasted JSON filter, or a direct
+    PUT against the JSON API) would ever hit this.
+    """
+    params: dict[str, object] = dict(food_filter) if food_filter else {}
+    for key, value in params.items():
+        if isinstance(value, list):
+            params[key] = ",".join(str(v) for v in value)
+    params.update(_ALWAYS_ON_SEARCH_PARAMS)
+    if count is not None:
+        params["number"] = count
+    return params
 
 
 class SpoonacularSearchProvider:
@@ -45,10 +97,12 @@ class SpoonacularSearchProvider:
     uses, so classification/nutrition estimation stays consistent (and
     LLM-derived) regardless of where a suggestion came from.
 
-    Only returns the single best match (Milestone 4's generate_search_suggestion
-    only ever looks at the first result anyway), so each call to `search` is
-    two HTTP requests: complexSearch to find a candidate, then
-    /recipes/{id}/information for its actual ingredients/instructions.
+    Every complexSearch call always sets `sort=random`, `type=main course`,
+    `instructionsRequired=true`, and `addRecipeNutrition=true` - see
+    build_complex_search_params/docs/spoonacular_plan.md: results must be
+    full meals (never a side dish/dessert/etc.), never a dish-name-specific
+    search (only a style/ingredient `query`), and never the same handful of
+    top-ranked hits every time.
     """
 
     def __init__(
@@ -63,28 +117,11 @@ class SpoonacularSearchProvider:
         self._owns_client = client is None
         self._client = client or httpx.Client(timeout=timeout_s)
 
-    def search(self, query: str) -> list[str]:
-        search_response = self._client.get(
-            f"{self._base_url}/recipes/complexSearch",
-            params={"query": query, "number": 1, "apiKey": self._api_key},
-        )
-        search_response.raise_for_status()
-        results = search_response.json().get("results", [])
-        if not results:
-            return []
-
-        recipe_id = results[0]["id"]
-        info_response = self._client.get(
-            f"{self._base_url}/recipes/{recipe_id}/information",
-            params={"apiKey": self._api_key},
-        )
-        info_response.raise_for_status()
-        return [format_spoonacular_recipe(info_response.json())]
-
-    def search_many(self, query: Optional[str], count: int) -> list[str]:
-        """Fetches up to `count` recipes in bulk - used by the standalone
-        Spoonacular import command (planning/spoonacular_import.py) rather
-        than the one-result-at-a-time `search` above.
+    def search_many(self, food_filter: Optional[dict], count: int) -> list[str]:
+        """Fetches up to `count` recipes in bulk - used both by the
+        standalone Spoonacular import command (planning/spoonacular_import.py)
+        and by plan_builder's suggestion-candidate fetch (3 per AI-suggestion
+        slot).
 
         Deliberately two HTTP calls total, regardless of `count`: one
         complexSearch for candidate ids, one informationBulk for all of
@@ -95,9 +132,9 @@ class SpoonacularSearchProvider:
         if count <= 0:
             return []
 
-        params: dict[str, object] = {"number": count, "apiKey": self._api_key}
-        if query:
-            params["query"] = query
+        params = build_complex_search_params(food_filter, count=count)
+        params["apiKey"] = self._api_key
+
         search_response = self._client.get(f"{self._base_url}/recipes/complexSearch", params=params)
         search_response.raise_for_status()
         results = search_response.json().get("results", [])
@@ -111,6 +148,22 @@ class SpoonacularSearchProvider:
         )
         bulk_response.raise_for_status()
         return [format_spoonacular_recipe(info) for info in bulk_response.json()]
+
+    def get_substitutes(self, ingredient_name: str) -> IngredientSubstitutes:
+        """For the shopping-list "find a substitute" action - looked up by
+        plain ingredient name (a shopping-list item is a merged free-text
+        name, not a Spoonacular ingredient id)."""
+        response = self._client.get(
+            f"{self._base_url}/food/ingredients/substitutes",
+            params={"ingredientName": ingredient_name, "apiKey": self._api_key},
+        )
+        response.raise_for_status()
+        data = response.json()
+        return IngredientSubstitutes(
+            ingredient=data.get("ingredient", ingredient_name),
+            substitutes=data.get("substitutes") or [],
+            message=data.get("message", ""),
+        )
 
     def close(self) -> None:
         if self._owns_client:
@@ -193,24 +246,27 @@ def generate_combination_suggestion(
         return None
 
 
-def generate_search_suggestion(
+def generate_search_candidates(
     provider: SearchProvider,
-    query: str,
+    food_filter: Optional[dict],
     extractor: RecipeExtractionService,
-) -> Optional[ExtractedRecipe]:
-    """Search-based suggestion: ask the provider for candidate text, extract
-    the first result. Returns None if the provider has nothing (including
-    the NullSearchProvider default) or extraction fails."""
+    count: int,
+) -> list[ExtractedRecipe]:
+    """Search-based suggestion candidates: ask the provider for up to
+    `count` results, extract each. A provider failure (including the
+    NullSearchProvider default returning nothing) or a candidate that fails
+    extraction just means fewer candidates - possibly zero, never an
+    exception that aborts plan generation."""
     try:
-        results = provider.search(query)
+        results = provider.search_many(food_filter, count)
     except Exception as exc:  # noqa: BLE001 - a third-party search backend can fail in unpredictable ways
         logger.warning("Search provider %s failed, skipping: %s", type(provider).__name__, exc)
-        return None
-    if not results:
-        return None
+        return []
 
-    try:
-        return extractor.extract(results[0])
-    except (ExtractionError, OllamaUnavailable) as exc:
-        logger.warning("Search-based suggestion failed, skipping: %s", exc)
-        return None
+    candidates = []
+    for text in results:
+        try:
+            candidates.append(extractor.extract(text))
+        except (ExtractionError, OllamaUnavailable) as exc:
+            logger.warning("Skipping a suggestion candidate that failed extraction: %s", exc)
+    return candidates

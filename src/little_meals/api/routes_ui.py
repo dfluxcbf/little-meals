@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, time, timezone
+from typing import Optional
 
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -12,7 +13,15 @@ from little_meals.llm.ollama_client import OllamaUnavailable
 from little_meals.models import DayOfWeek, HouseholdPreferencesUpdate, MealPlan, Preference, Recipe
 from little_meals.planning.plan_builder import build_meal_specs, generate_single_replacement, list_controlled_reroll_candidates
 from little_meals.planning.shopping_list import build_shopping_list_items
-from little_meals.planning.suggestion import SearchProvider
+from little_meals.planning.spoonacular_fields import (
+    FILTER_SECTIONS,
+    MACRONUTRIENTS,
+    VITAMINS_AND_MINERALS,
+    filter_to_display,
+    form_to_display,
+    parse_filter_form,
+)
+from little_meals.planning.suggestion import SearchProvider, build_complex_search_params
 from little_meals.store.household_store import HouseholdPreferencesStore
 from little_meals.store.notification_store import NotificationStore
 from little_meals.store.plan_store import MealPlanStore, PlanMealNotFound, PlanNotFound
@@ -150,14 +159,24 @@ def build_ui_router(
             pass
         return RedirectResponse(url="/recipes", status_code=303)
 
+    def _settings_context(
+        preferences,
+        *,
+        error: Optional[str] = None,
+        saved: bool = False,
+    ) -> dict:
+        return {
+            "preferences": preferences,
+            "days": list(DayOfWeek),
+            "error": error,
+            "saved": saved,
+            "nav_active": "settings",
+        }
+
     @router.get("/settings", response_class=HTMLResponse, include_in_schema=False)
     def settings_form(request: Request) -> HTMLResponse:
         preferences = household_store.get()
-        return templates.TemplateResponse(
-            request,
-            "settings.html",
-            {"preferences": preferences, "days": list(DayOfWeek), "error": None, "saved": False, "nav_active": "settings"},
-        )
+        return templates.TemplateResponse(request, "settings.html", _settings_context(preferences))
 
     @router.post("/settings", response_class=HTMLResponse, include_in_schema=False)
     def settings_submit(
@@ -165,39 +184,82 @@ def build_ui_router(
         recipes_per_week: int = Form(...),
         recommendation_day: str = Form(...),
         recommendation_time: str = Form(...),
-        food_preferences: str = Form(""),
         ai_suggestions_per_plan: int = Form(...),
         default_servings: str = Form(...),
+        food_preferences_text: str = Form(""),
     ) -> HTMLResponse:
         try:
             update = HouseholdPreferencesUpdate(
                 recipes_per_week=recipes_per_week,
                 recommendation_day=DayOfWeek(recommendation_day),
                 recommendation_time=time.fromisoformat(recommendation_time),
-                food_preferences=_parse_food_preferences(food_preferences),
                 ai_suggestions_per_plan=ai_suggestions_per_plan,
                 default_servings=default_servings,
+                food_preferences_text=food_preferences_text,
             )
         except (ValidationError, ValueError) as exc:
             preferences = household_store.get()
             return templates.TemplateResponse(
                 request,
                 "settings.html",
-                {
-                    "preferences": preferences,
-                    "days": list(DayOfWeek),
-                    "error": str(exc),
-                    "saved": False,
-                    "nav_active": "settings",
-                },
+                _settings_context(preferences, error=str(exc)),
                 status_code=422,
             )
 
         preferences = household_store.put(update)
+        return templates.TemplateResponse(request, "settings.html", _settings_context(preferences, saved=True))
+
+    def _recipe_preferences_context(
+        preferences,
+        *,
+        error: Optional[str] = None,
+        errors: Optional[list[str]] = None,
+        saved: bool = False,
+        display: Optional[dict] = None,
+    ) -> dict:
+        return {
+            "preferences": preferences,
+            "sections": FILTER_SECTIONS,
+            "macronutrients": MACRONUTRIENTS,
+            "vitamins_and_minerals": VITAMINS_AND_MINERALS,
+            "display": display if display is not None else filter_to_display(preferences.food_filter),
+            "error": error,
+            "errors": errors or [],
+            "saved": saved,
+            "spoonacular_query_preview": (
+                build_complex_search_params(preferences.food_filter) if preferences.food_filter else None
+            ),
+            "nav_active": "settings",
+        }
+
+    @router.get("/settings/recipe-preferences", response_class=HTMLResponse, include_in_schema=False)
+    def recipe_preferences_form(request: Request) -> HTMLResponse:
+        preferences = household_store.get()
         return templates.TemplateResponse(
-            request,
-            "settings.html",
-            {"preferences": preferences, "days": list(DayOfWeek), "error": None, "saved": True, "nav_active": "settings"},
+            request, "recipe_preferences.html", _recipe_preferences_context(preferences)
+        )
+
+    @router.post("/settings/recipe-preferences", response_class=HTMLResponse, include_in_schema=False)
+    async def recipe_preferences_submit(request: Request) -> HTMLResponse:
+        form = await request.form()
+        food_filter, errors = parse_filter_form(form)
+        preferences = household_store.get()
+        if errors:
+            return templates.TemplateResponse(
+                request,
+                "recipe_preferences.html",
+                _recipe_preferences_context(
+                    preferences,
+                    error="Could not save recipe search preferences.",
+                    errors=errors,
+                    display=form_to_display(form),
+                ),
+                status_code=422,
+            )
+
+        preferences = household_store.save_food_filter(food_filter)
+        return templates.TemplateResponse(
+            request, "recipe_preferences.html", _recipe_preferences_context(preferences, saved=True)
         )
 
     @router.get("/plan", response_class=HTMLResponse, include_in_schema=False)
@@ -262,7 +324,14 @@ def build_ui_router(
         if replacement is None:
             return _render_plan(request)
         try:
-            plan = plan_store.set_recipe(plan.id, meal_id, replacement.recipe.id, replacement.servings, replacement.is_suggestion)
+            plan = plan_store.set_recipe(
+                plan.id,
+                meal_id,
+                replacement.recipe.id,
+                replacement.servings,
+                replacement.is_suggestion,
+                tuple(replacement.candidate_recipe_ids),
+            )
         except (PlanNotFound, PlanMealNotFound):
             return RedirectResponse(url="/plan", status_code=303)
         return _render_plan_meal(request, templates, plan, meal_id, store)
@@ -295,6 +364,48 @@ def build_ui_router(
             return RedirectResponse(url="/plan", status_code=303)
         try:
             plan_store.set_recipe(plan.id, meal_id, recipe.id, recipe.servings, is_suggestion=False)
+        except (PlanNotFound, PlanMealNotFound):
+            pass
+        return RedirectResponse(url="/plan", status_code=303)
+
+    @router.get("/plan/meals/{meal_id}/suggestions", response_class=HTMLResponse, include_in_schema=False)
+    def plan_meal_suggestions(request: Request, meal_id: str) -> HTMLResponse:
+        plan = plan_store.get_current()
+        if plan is None:
+            return RedirectResponse(url="/plan", status_code=303)
+        meal = next((m for m in plan.meals if m.id == meal_id), None)
+        if meal is None:
+            return RedirectResponse(url="/plan", status_code=303)
+        candidate_ids = [rid for rid in plan_store.get_candidates(plan.id, meal_id) if rid != meal.recipe_id]
+        candidates = []
+        for rid in candidate_ids:
+            try:
+                candidates.append(store.get(rid))
+            except RecipeNotFound:
+                continue
+        current_recipe = store.get(meal.recipe_id)
+        return templates.TemplateResponse(
+            request,
+            "suggestion_picker.html",
+            {"meal_id": meal_id, "current_recipe": current_recipe, "candidates": candidates, "nav_active": "plan"},
+        )
+
+    @router.post("/plan/meals/{meal_id}/choose-suggestion", include_in_schema=False)
+    def plan_meal_choose_suggestion(meal_id: str, recipe_id: str = Form(...)) -> RedirectResponse:
+        plan = plan_store.get_current()
+        if plan is None or plan.finalized:
+            return RedirectResponse(url="/plan", status_code=303)
+        candidate_ids = plan_store.get_candidates(plan.id, meal_id)
+        if recipe_id not in candidate_ids:
+            return RedirectResponse(url="/plan", status_code=303)
+        try:
+            recipe = store.get(recipe_id)
+        except RecipeNotFound:
+            return RedirectResponse(url="/plan", status_code=303)
+        try:
+            plan_store.set_recipe(
+                plan.id, meal_id, recipe.id, recipe.servings, is_suggestion=True, candidate_recipe_ids=tuple(candidate_ids)
+            )
         except (PlanNotFound, PlanMealNotFound):
             pass
         return RedirectResponse(url="/plan", status_code=303)
@@ -341,13 +452,36 @@ def build_ui_router(
         item = next(i for i in shopping_list.items if i.id == item_id)
         return templates.TemplateResponse(request, "partials/_shopping_item.html", {"item": item})
 
-    @router.post("/shopping/cost", include_in_schema=False)
-    def shopping_cost(actual_cost: float = Form(...)) -> RedirectResponse:
+    @router.get("/shopping/items/{item_id}/substitutes", response_class=HTMLResponse, include_in_schema=False)
+    def shopping_item_substitutes(request: Request, item_id: str) -> HTMLResponse:
         plan = plan_store.get_current()
-        if plan is not None:
+        if plan is None:
+            return HTMLResponse("")
+        shopping_list = shopping_list_store.get_for_plan(plan.id)
+        if shopping_list is None:
+            return HTMLResponse("")
+        item = next((i for i in shopping_list.items if i.id == item_id), None)
+        if item is None:
+            return HTMLResponse("")
+        result = search_provider.get_substitutes(item.name)
+        return templates.TemplateResponse(request, "partials/_shopping_substitutes.html", {"item_id": item_id, "result": result})
+
+    @router.post("/shopping/cost", include_in_schema=False)
+    def shopping_cost(actual_cost: str = Form("")) -> RedirectResponse:
+        # The field is optional in the UI (no cost yet is a normal state,
+        # not an error) - only a non-blank, valid, non-negative amount is
+        # saved; anything else is left as-is rather than raising a 422 on
+        # what amounts to submitting the form with nothing entered.
+        plan = plan_store.get_current()
+        if plan is not None and actual_cost.strip():
             shopping_list = shopping_list_store.get_for_plan(plan.id)
-            if shopping_list is not None and actual_cost >= 0:
-                shopping_list_store.set_actual_cost(shopping_list.id, actual_cost)
+            if shopping_list is not None:
+                try:
+                    cost = float(actual_cost)
+                except ValueError:
+                    cost = None
+                if cost is not None and cost >= 0:
+                    shopping_list_store.set_actual_cost(shopping_list.id, cost)
         return RedirectResponse(url="/shopping", status_code=303)
 
     return router
@@ -359,7 +493,3 @@ def _render_plan_meal(
     meal = next(m for m in plan.meals if m.id == meal_id)
     recipe = store.get(meal.recipe_id)
     return templates.TemplateResponse(request, "partials/_plan_meal.html", {"plan": plan, "meal": meal, "recipe": recipe})
-
-
-def _parse_food_preferences(raw: str) -> list[str]:
-    return [item.strip() for item in raw.split(",") if item.strip()]

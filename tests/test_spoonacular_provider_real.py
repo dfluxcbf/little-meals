@@ -38,8 +38,8 @@ def real_provider():
     provider.close()
 
 
-def test_real_spoonacular_search_returns_recipe_text(real_provider: SpoonacularSearchProvider):
-    results = real_provider.search("vegetarian pasta")
+def test_real_spoonacular_search_many_returns_recipe_text(real_provider: SpoonacularSearchProvider):
+    results = real_provider.search_many({"query": "vegetarian pasta"}, 1)
 
     assert len(results) == 1
     text = results[0]
@@ -48,17 +48,24 @@ def test_real_spoonacular_search_returns_recipe_text(real_provider: SpoonacularS
     assert len(text) > 50
 
 
-def test_real_spoonacular_search_with_an_unlikely_query_returns_no_results_gracefully(
+def test_real_spoonacular_search_many_with_an_unlikely_query_returns_no_results_gracefully(
     real_provider: SpoonacularSearchProvider,
 ):
     # Not asserting == [] here - Spoonacular may still surface something for
     # an odd query - just that a genuinely obscure query doesn't raise.
-    results = real_provider.search("xyzzy nonexistent dish qwertyuiop12345")
+    results = real_provider.search_many({"query": "xyzzy nonexistent dish qwertyuiop12345"}, 3)
     assert isinstance(results, list)
 
 
+def test_real_spoonacular_get_substitutes_returns_a_result(real_provider: SpoonacularSearchProvider):
+    result = real_provider.get_substitutes("butter")
+    assert result.ingredient
+    # Either real substitutes or an explanatory message - never both empty.
+    assert result.substitutes or result.message
+
+
 def test_real_spoonacular_result_feeds_the_real_extraction_pipeline(real_provider: SpoonacularSearchProvider):
-    """The end-to-end path generate_search_suggestion exercises: a real
+    """The end-to-end path generate_search_candidates exercises: a real
     Spoonacular hit, fed into the real local extraction service. Needs both
     a Spoonacular key and a reachable Ollama daemon - skips cleanly if
     Ollama isn't up, since that's this test's second real dependency."""
@@ -68,7 +75,7 @@ def test_real_spoonacular_result_feeds_the_real_extraction_pipeline(real_provide
         ollama_client.close()
         pytest.skip(f"Ollama not reachable at {settings.ollama_base_url} - is `ollama serve` running?")
 
-    results = real_provider.search("chicken soup")
+    results = real_provider.search_many({"query": "chicken soup"}, 1)
     assert results, "expected at least one Spoonacular result for a common query"
 
     service = RecipeExtractionService(ollama_client)

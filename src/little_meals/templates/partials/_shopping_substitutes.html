@@ -1,0 +1,7 @@
+{% if result is none %}
+  <p class="subtitle" style="margin: 4px 0 0 28px; font-size: 11.5px;">No Spoonacular API key is configured.</p>
+{% elif result.substitutes %}
+  <p class="subtitle" style="margin: 4px 0 0 28px; font-size: 11.5px;">Substitute: {{ result.substitutes|join(", ") }}</p>
+{% else %}
+  <p class="subtitle" style="margin: 4px 0 0 28px; font-size: 11.5px;">{{ result.message or "No substitutes found." }}</p>
+{% endif %}

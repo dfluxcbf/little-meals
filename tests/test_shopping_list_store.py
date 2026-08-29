@@ -80,3 +80,26 @@ def test_set_actual_cost_persists(shopping_list_store: ShoppingListStore):
 def test_set_actual_cost_unknown_list_raises(shopping_list_store: ShoppingListStore):
     with pytest.raises(ShoppingListNotFound):
         shopping_list_store.set_actual_cost("does-not-exist", 10.0)
+
+
+def test_count_reflects_the_number_of_lists(shopping_list_store: ShoppingListStore):
+    assert shopping_list_store.count() == 0
+    shopping_list_store.create("plan-1", [])
+    shopping_list_store.create("plan-2", [])
+    assert shopping_list_store.count() == 2
+
+
+def test_delete_all_removes_every_list_and_its_items(shopping_list_store: ShoppingListStore):
+    shopping_list_store.create("plan-1", [MergedItem("A", 1.0, "g")])
+    shopping_list_store.create("plan-2", [MergedItem("B", 2.0, "g")])
+
+    removed = shopping_list_store.delete_all()
+
+    assert removed == 2
+    assert shopping_list_store.count() == 0
+    assert shopping_list_store.get_for_plan("plan-1") is None
+    assert shopping_list_store.get_for_plan("plan-2") is None
+
+
+def test_delete_all_is_a_no_op_when_nothing_stored(shopping_list_store: ShoppingListStore):
+    assert shopping_list_store.delete_all() == 0
