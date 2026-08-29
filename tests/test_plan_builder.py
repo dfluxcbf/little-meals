@@ -10,7 +10,12 @@ import pytest
 from little_meals.llm.extraction import RecipeExtractionService
 from little_meals.llm.ollama_client import OllamaClient
 from little_meals.models import Classification, HouseholdPreferences, Ingredient, Nutrition, Preference, Recipe
-from little_meals.planning.plan_builder import build_weekly_plan, generate_single_replacement, list_controlled_reroll_candidates
+from little_meals.planning.plan_builder import (
+    _search_filter,
+    build_weekly_plan,
+    generate_single_replacement,
+    list_controlled_reroll_candidates,
+)
 from little_meals.planning.suggestion import NullSearchProvider
 from little_meals.store.recipe_store import RecipeStore
 
@@ -105,8 +110,8 @@ def test_build_weekly_plan_uses_search_provider_when_it_has_results(store: Recip
     store.create(_recipe("A"))
 
     class _Provider:
-        def search(self, query: str) -> list[str]:
-            return ["a great dinner idea"]
+        def search_many(self, food_filter, count: int) -> list[str]:
+            return ["a great dinner idea"] * count
 
     preferences = HouseholdPreferences(recipes_per_week=1, ai_suggestions_per_plan=1)
     generated = build_weekly_plan(store.list(), preferences, store, _extractor(_ok_handler), _Provider(), rng=random.Random(0))
@@ -114,6 +119,27 @@ def test_build_weekly_plan_uses_search_provider_when_it_has_results(store: Recip
     suggestion_meals = [g for g in generated if g.is_suggestion]
     assert len(suggestion_meals) == 1
     assert suggestion_meals[0].recipe.name == "Fusion Bowl"
+
+
+@pytest.mark.requirement("REQ-000000024")
+def test_build_weekly_plan_commits_every_fetched_candidate_and_records_them(store: RecipeStore):
+    store.create(_recipe("A"))
+
+    class _Provider:
+        def search_many(self, food_filter, count: int) -> list[str]:
+            return ["a great dinner idea"] * count
+
+    preferences = HouseholdPreferences(recipes_per_week=1, ai_suggestions_per_plan=1)
+    generated = build_weekly_plan(store.list(), preferences, store, _extractor(_ok_handler), _Provider(), rng=random.Random(0))
+
+    suggestion = next(g for g in generated if g.is_suggestion)
+    # 3 candidates fetched and committed to the library, even though only
+    # one fills this slot - see plan_builder._generate_suggestion_meal.
+    all_recipes = store.list()
+    fusion_bowls = [r for r in all_recipes if r.name == "Fusion Bowl"]
+    assert len(fusion_bowls) == 3
+    assert len(suggestion.candidate_recipe_ids) == 3
+    assert suggestion.recipe.id in suggestion.candidate_recipe_ids
 
 
 @pytest.mark.requirement("REQ-000000026")
@@ -201,3 +227,15 @@ def test_list_controlled_reroll_candidates_caps_at_limit():
     candidates = list_controlled_reroll_candidates(set(), recipes, limit=10, rng=random.Random(0))
 
     assert len(candidates) == 10
+
+
+@pytest.mark.requirement("REQ-000000043")
+def test_search_filter_falls_back_when_no_filter_configured():
+    preferences = HouseholdPreferences()
+    assert _search_filter(preferences) == {"query": "a simple weeknight dinner"}
+
+
+@pytest.mark.requirement("REQ-000000043")
+def test_search_filter_uses_the_configured_filter():
+    preferences = HouseholdPreferences(food_filter={"query": "pork with lemon"})
+    assert _search_filter(preferences) == {"query": "pork with lemon"}

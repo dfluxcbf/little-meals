@@ -140,6 +140,22 @@ class ShoppingListStore:
                 raise ShoppingListNotFound(list_id)
         return self.get(list_id)
 
+    def count(self) -> int:
+        """Number of stored shopping lists - used by `lmeals settings
+        --reset` to report how many will be deleted before asking for
+        confirmation."""
+        with self._connection() as conn:
+            return conn.execute("SELECT COUNT(*) FROM shopping_lists").fetchone()[0]
+
+    def delete_all(self) -> int:
+        """Deletes every shopping list (and its items) - used by `lmeals
+        settings --reset`. Returns the number of lists removed."""
+        with self._connection() as conn:
+            removed = conn.execute("SELECT COUNT(*) FROM shopping_lists").fetchone()[0]
+            conn.execute("DELETE FROM shopping_list_items")
+            conn.execute("DELETE FROM shopping_lists")
+        return removed
+
 
 def _row_to_list(list_row: tuple, item_rows: list[tuple]) -> ShoppingList:
     list_id, plan_id, created_at, actual_cost = list_row

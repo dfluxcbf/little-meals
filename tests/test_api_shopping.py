@@ -1,8 +1,49 @@
 from __future__ import annotations
 
+import httpx
 import pytest
 
 from fastapi.testclient import TestClient
+
+from little_meals.api.app import create_app
+from little_meals.config import Settings
+from little_meals.llm.extraction import RecipeExtractionService
+from little_meals.llm.ollama_client import OllamaClient
+from little_meals.models import IngredientSubstitutes
+from little_meals.store.household_store import HouseholdPreferencesStore
+from little_meals.store.notification_store import NotificationStore
+from little_meals.store.plan_store import MealPlanStore
+from little_meals.store.recipe_store import RecipeStore
+from little_meals.store.shopping_list_store import ShoppingListStore
+
+
+class _FakeSubstitutesProvider:
+    def search_many(self, food_filter, count: int) -> list[str]:
+        return []
+
+    def get_substitutes(self, ingredient_name: str) -> IngredientSubstitutes:
+        return IngredientSubstitutes(ingredient=ingredient_name, substitutes=["margarine"], message="")
+
+
+def _client_with_substitutes(tmp_path) -> TestClient:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"response": "{}"})
+
+    ollama_client = OllamaClient(
+        "http://ollama.test", "test-model", 5.0, client=httpx.Client(transport=httpx.MockTransport(handler))
+    )
+    settings = Settings(data_dir=tmp_path)
+    app = create_app(
+        settings=settings,
+        store=RecipeStore(tmp_path / "recipes"),
+        extractor=RecipeExtractionService(ollama_client),
+        household_store=HouseholdPreferencesStore(tmp_path / "household.db"),
+        plan_store=MealPlanStore(tmp_path / "plan.db"),
+        search_provider=_FakeSubstitutesProvider(),
+        shopping_list_store=ShoppingListStore(tmp_path / "shopping_list.db"),
+        notification_store=NotificationStore(tmp_path / "notification.db"),
+    )
+    return TestClient(app)
 
 
 def _create_recipe(client: TestClient, sample_recipe) -> dict:
@@ -153,4 +194,39 @@ def test_get_by_id(client: TestClient, sample_recipe):
 @pytest.mark.requirement("REQ-000000031")
 def test_get_by_id_unknown_404(client: TestClient):
     response = client.get("/api/shopping-list/does-not-exist")
+    assert response.status_code == 404
+
+
+def test_item_substitutes_returns_503_when_no_provider_configured(client: TestClient, sample_recipe):
+    _finalized_plan(client, sample_recipe)
+    shopping_list = client.post("/api/shopping-list/generate").json()
+    item_id = shopping_list["items"][0]["id"]
+
+    response = client.get(f"/api/shopping-list/{shopping_list['id']}/items/{item_id}/substitutes")
+    assert response.status_code == 503
+    assert response.json()["code"] == "SPOONACULAR_UNAVAILABLE"
+
+
+def test_item_substitutes_returns_the_provider_result(tmp_path, sample_recipe):
+    client = _client_with_substitutes(tmp_path)
+    _finalized_plan(client, sample_recipe)
+    shopping_list = client.post("/api/shopping-list/generate").json()
+    item_id = shopping_list["items"][0]["id"]
+
+    response = client.get(f"/api/shopping-list/{shopping_list['id']}/items/{item_id}/substitutes")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["substitutes"] == ["margarine"]
+
+
+def test_item_substitutes_unknown_item_404(client: TestClient, sample_recipe):
+    _finalized_plan(client, sample_recipe)
+    shopping_list = client.post("/api/shopping-list/generate").json()
+
+    response = client.get(f"/api/shopping-list/{shopping_list['id']}/items/does-not-exist/substitutes")
+    assert response.status_code == 404
+
+
+def test_item_substitutes_unknown_list_404(client: TestClient):
+    response = client.get("/api/shopping-list/does-not-exist/items/i1/substitutes")
     assert response.status_code == 404

@@ -1,17 +1,19 @@
 from __future__ import annotations
 
 import random
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Optional
 
 from little_meals.llm.extraction import RecipeExtractionService
 from little_meals.models import HouseholdPreferences, Preference, Recipe
 from little_meals.planning.selection import select_recipes_for_plan
-from little_meals.planning.suggestion import SearchProvider, generate_combination_suggestion, generate_search_suggestion
+from little_meals.planning.suggestion import SearchProvider, generate_combination_suggestion, generate_search_candidates
 from little_meals.store.household_store import HouseholdPreferencesStore
 from little_meals.store.plan_store import MealSpec
 from little_meals.store.recipe_store import RecipeStore
+
+_CANDIDATES_PER_SUGGESTION = 3
 
 
 @dataclass
@@ -22,6 +24,12 @@ class GeneratedMeal:
     recipe: Recipe
     servings: int
     is_suggestion: bool
+    candidate_recipe_ids: list[str] = field(default_factory=list)
+    """Sibling recipe ids fetched alongside this one from the same
+    Spoonacular batch (including this meal's own id) - empty for library
+    picks and combination-suggestion fallbacks. Lets the plan-review UI
+    show "the same N already-normalized dishes" for this slot without a
+    new fetch - see plan_store.py's plan_meal_candidates table."""
 
 
 def build_weekly_plan(
@@ -54,9 +62,9 @@ def build_weekly_plan(
     meals = [GeneratedMeal(recipe=r, servings=r.servings, is_suggestion=False) for r in library_picks]
 
     liked = [r for r in recipes if r.preference == Preference.LIKED]
-    query = _search_query(preferences)
+    filter_ = _search_filter(preferences)
     for _ in range(ai_count):
-        generated = _generate_one_suggestion(liked, query, recipe_store, extractor, search_provider, rng)
+        generated = _generate_suggestion_meal(liked, filter_, recipe_store, extractor, search_provider, rng)
         if generated is not None:
             meals.append(generated)
 
@@ -78,7 +86,7 @@ def build_meal_specs(
     preferences = household_store.get()
     recipes = recipe_store.list(extractor)
     generated = build_weekly_plan(recipes, preferences, recipe_store, extractor, search_provider, rng=rng)
-    return [MealSpec(g.recipe.id, g.servings, g.is_suggestion) for g in generated]
+    return [MealSpec(g.recipe.id, g.servings, g.is_suggestion, tuple(g.candidate_recipe_ids)) for g in generated]
 
 
 def generate_single_replacement(
@@ -101,7 +109,7 @@ def generate_single_replacement(
         chosen = rng.choice(unused)
         return GeneratedMeal(recipe=chosen, servings=chosen.servings, is_suggestion=False)
 
-    return _generate_one_suggestion(liked, _search_query(preferences), recipe_store, extractor, search_provider, rng)
+    return _generate_suggestion_meal(liked, _search_filter(preferences), recipe_store, extractor, search_provider, rng)
 
 
 def list_controlled_reroll_candidates(
@@ -123,27 +131,43 @@ def list_controlled_reroll_candidates(
     return rng.sample(candidates, k=limit)
 
 
-def _generate_one_suggestion(
+def _generate_suggestion_meal(
     liked: list[Recipe],
-    query: str,
+    filter_: dict,
     recipe_store: RecipeStore,
     extractor: RecipeExtractionService,
     search_provider: SearchProvider,
     rng: random.Random,
 ) -> Optional[GeneratedMeal]:
-    extracted = generate_search_suggestion(search_provider, query, extractor)
-    if extracted is None:
-        extracted = generate_combination_suggestion(liked, extractor, rng=rng)
-    if extracted is None:
+    """Fetches up to `_CANDIDATES_PER_SUGGESTION` Spoonacular candidates for
+    one suggestion slot (falling back to a single combination suggestion if
+    the search provider has nothing), commits every extracted candidate to
+    the library immediately - same as any other suggestion, per
+    architecture.md's "a suggestion is a normal recipe from the moment it's
+    generated" rule - and picks one at random to fill the slot. The other
+    committed candidates ride along as `candidate_recipe_ids` so the plan
+    review UI can offer them later without a second fetch."""
+    candidates = generate_search_candidates(search_provider, filter_, extractor, _CANDIDATES_PER_SUGGESTION)
+    if not candidates:
+        combo = generate_combination_suggestion(liked, extractor, rng=rng)
+        candidates = [combo] if combo is not None else []
+    if not candidates:
         return None
 
-    new_recipe = recipe_store.create(
-        Recipe.from_extracted(extracted, id="", source_text=None, now=datetime.now(timezone.utc))
+    committed = [
+        recipe_store.create(Recipe.from_extracted(c, id="", source_text=None, now=datetime.now(timezone.utc)))
+        for c in candidates
+    ]
+    chosen = rng.choice(committed)
+    return GeneratedMeal(
+        recipe=chosen,
+        servings=chosen.servings,
+        is_suggestion=True,
+        candidate_recipe_ids=[r.id for r in committed],
     )
-    return GeneratedMeal(recipe=new_recipe, servings=new_recipe.servings, is_suggestion=True)
 
 
-def _search_query(preferences: HouseholdPreferences) -> str:
-    if preferences.food_preferences:
-        return ", ".join(preferences.food_preferences)
-    return "a simple weeknight dinner"
+def _search_filter(preferences: HouseholdPreferences) -> dict:
+    if preferences.food_filter is not None:
+        return preferences.food_filter
+    return {"query": "a simple weeknight dinner"}

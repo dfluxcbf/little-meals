@@ -107,6 +107,47 @@ def test_set_recipe_unknown_plan_raises(plan_store: MealPlanStore):
         plan_store.set_recipe("does-not-exist", "m1", "recipe-z", 2)
 
 
+def test_create_records_candidate_recipe_ids_for_a_suggestion_slot(plan_store: MealPlanStore):
+    plan = plan_store.create(
+        [MealSpec("recipe-a", 2, is_suggestion=True, candidate_recipe_ids=("recipe-a", "recipe-b", "recipe-c"))]
+    )
+    assert plan_store.get_candidates(plan.id, "m1") == ["recipe-a", "recipe-b", "recipe-c"]
+
+
+def test_get_candidates_returns_empty_list_when_none_recorded(plan_store: MealPlanStore):
+    plan = plan_store.create([MealSpec("recipe-a", 2)])
+    assert plan_store.get_candidates(plan.id, "m1") == []
+
+
+def test_set_recipe_replaces_the_candidate_set(plan_store: MealPlanStore):
+    plan = plan_store.create(
+        [MealSpec("recipe-a", 2, is_suggestion=True, candidate_recipe_ids=("recipe-a", "recipe-b"))]
+    )
+
+    plan_store.set_recipe(plan.id, "m1", "recipe-b", 2, is_suggestion=True, candidate_recipe_ids=("recipe-a", "recipe-b"))
+    assert plan_store.get_candidates(plan.id, "m1") == ["recipe-a", "recipe-b"]
+
+
+def test_set_recipe_default_clears_stale_candidates(plan_store: MealPlanStore):
+    # e.g. "select from cookbook" replacing a suggestion slot - the old
+    # Spoonacular candidates no longer apply to this slot.
+    plan = plan_store.create(
+        [MealSpec("recipe-a", 2, is_suggestion=True, candidate_recipe_ids=("recipe-a", "recipe-b"))]
+    )
+
+    plan_store.set_recipe(plan.id, "m1", "recipe-z", 2, is_suggestion=False)
+    assert plan_store.get_candidates(plan.id, "m1") == []
+
+
+def test_replace_meals_clears_candidates_from_the_previous_meal_set(plan_store: MealPlanStore):
+    plan = plan_store.create(
+        [MealSpec("recipe-a", 2, is_suggestion=True, candidate_recipe_ids=("recipe-a", "recipe-b"))]
+    )
+
+    plan_store.replace_meals(plan.id, [MealSpec("recipe-c", 2)])
+    assert plan_store.get_candidates(plan.id, "m1") == []
+
+
 @pytest.mark.requirement("REQ-000000019")
 def test_replace_meals_swaps_the_whole_list_but_keeps_the_plan_id(plan_store: MealPlanStore):
     plan = plan_store.create([MealSpec("recipe-a", 2), MealSpec("recipe-b", 4)])
@@ -141,6 +182,33 @@ def test_finalize_marks_plan_finalized(plan_store: MealPlanStore):
 def test_finalize_unknown_plan_raises(plan_store: MealPlanStore):
     with pytest.raises(PlanNotFound):
         plan_store.finalize("does-not-exist")
+
+
+def test_count_reflects_the_number_of_plans(plan_store: MealPlanStore):
+    assert plan_store.count() == 0
+    plan_store.create([MealSpec("recipe-a", 2)])
+    plan_store.create([MealSpec("recipe-b", 2)])
+    assert plan_store.count() == 2
+
+
+def test_delete_all_removes_every_plan_meal_and_candidate_row(plan_store: MealPlanStore):
+    plan = plan_store.create(
+        [MealSpec("recipe-a", 2, is_suggestion=True, candidate_recipe_ids=("recipe-a", "recipe-b"))]
+    )
+    plan_store.create([MealSpec("recipe-c", 2)])
+
+    removed = plan_store.delete_all()
+
+    assert removed == 2
+    assert plan_store.count() == 0
+    assert plan_store.get_current() is None
+    with pytest.raises(PlanNotFound):
+        plan_store.get(plan.id)
+    assert plan_store.get_candidates(plan.id, "m1") == []
+
+
+def test_delete_all_is_a_no_op_when_nothing_stored(plan_store: MealPlanStore):
+    assert plan_store.delete_all() == 0
 
 
 @pytest.mark.requirement("REQ-000000019")

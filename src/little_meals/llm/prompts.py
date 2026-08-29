@@ -3,8 +3,14 @@ from __future__ import annotations
 import json
 
 EXTRACTION_SYSTEM_PROMPT = """You are a recipe-extraction assistant. Given free-text \
-describing a dish, reply with a single JSON object matching the provided schema \
-exactly - no prose, no markdown code fences, just the JSON object.
+describing a dish, extract and reply with ONLY a single JSON object matching the \
+provided schema exactly.
+
+**OUTPUT REQUIREMENT: JSON ONLY**
+- Return ONLY valid JSON. No prose, explanations, markdown code fences (```), or any \
+text outside the JSON object.
+- The response must start with '{' and end with '}'. Nothing else.
+- If you cannot produce valid JSON, the system will fail. Double-check the schema.
 
 Rules:
 - Estimate cook time in whole minutes.
