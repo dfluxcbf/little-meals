@@ -9,6 +9,8 @@ load("@rules_python//python:pip.bzl", "compile_pip_requirements")
 #   bazel run   //:preflight            → system-dependency check (ollama, pipx, ...)
 #   bazel run   //:install              → preflight, then pipx-install the wheel
 #   bazel run   //:serve                → run the web app (uvicorn)
+#   bazel run   //:deploy               → rebuild+reinstall, then restart the
+#                                          little-meals systemd --user service
 #   bazel test  //...                   → unit tests
 #   bazel run   //:requirements.update  → regenerate requirements_lock.txt
 # ---------------------------------------------------------------------------
@@ -61,6 +63,17 @@ py_binary(
     name = "install",
     srcs = ["tools/install_wheel.py"],
     main = "tools/install_wheel.py",
+    data = ["//src/little_meals:wheel"],
+    deps = ["//src/little_meals:lib"],
+    visibility = ["//visibility:public"],
+)
+
+# Deploy: rebuilds+reinstalls the wheel (same steps as //:install), then
+# restarts the little-meals systemd --user service.
+py_binary(
+    name = "deploy",
+    srcs = ["tools/deploy_main.py"],
+    main = "tools/deploy_main.py",
     data = ["//src/little_meals:wheel"],
     deps = ["//src/little_meals:lib"],
     visibility = ["//visibility:public"],

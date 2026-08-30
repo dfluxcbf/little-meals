@@ -1,0 +1,13 @@
+[Unit]
+Description=little-meals (meal planning facilitator and recipe book)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/lmeals serve
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target
