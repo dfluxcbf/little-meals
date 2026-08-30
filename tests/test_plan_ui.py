@@ -95,7 +95,7 @@ def test_finalize_marks_plan_finalized_and_hides_the_button(client: TestClient, 
 
     response = client.get("/plan")
     assert "Finalized" in response.text
-    assert "Finalize plan" not in response.text
+    assert "Confirm Plan" not in response.text
 
 
 @pytest.mark.requirement("REQ-000000021")
@@ -195,7 +195,7 @@ def test_plan_page_shows_cancel_button_when_plan_exists(client: TestClient, samp
 
     response = client.get("/plan")
     assert 'action="/plan/cancel"' in response.text
-    assert "Cancel week's plans" in response.text
+    assert "Cancel Plan" in response.text
 
 
 def _set_preferences(client: TestClient, **overrides) -> None:

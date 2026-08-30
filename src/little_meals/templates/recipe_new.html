@@ -6,12 +6,19 @@
 {% if error %}
   <p class="error">Could not extract a recipe: {{ error }}</p>
 {% endif %}
-<form method="post" action="/recipes">
+<form method="post" action="/recipes" id="new-recipe-form">
   <label for="text">Recipe text</label>
   <div class="index-card">
     <textarea id="text" name="text" rows="14" required placeholder="Ingredients, steps, anything - paste the whole thing in."></textarea>
   </div>
   <p class="hint">Cook time, calories, ingredients &amp; steps are pulled out automatically.</p>
-  <button type="submit" class="btn btn-primary">Extract &amp; save</button>
+  <button type="submit" class="btn btn-primary" id="new-recipe-submit">Extract &amp; save</button>
 </form>
+<script>
+  document.getElementById("new-recipe-form").addEventListener("submit", function () {
+    var btn = document.getElementById("new-recipe-submit");
+    btn.disabled = true;
+    btn.textContent = "Extracting… this can take up to a minute";
+  });
+</script>
 {% endblock %}

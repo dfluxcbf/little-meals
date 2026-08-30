@@ -12,13 +12,6 @@
 
 <a href="/recipes/{{ recipe.id }}/cook" class="btn btn-primary" style="margin-bottom: 8px;">Cook along</a>
 
-<h2>Steps</h2>
-<ol class="steps-list">
-  {% for step in recipe.steps %}
-    <li>{{ step }}</li>
-  {% endfor %}
-</ol>
-
 <details class="fridge">
   <summary>
     <span>
@@ -41,6 +34,13 @@
     {% endfor %}
   </ul>
 </details>
+
+<h2>Steps</h2>
+<ol class="steps-list">
+  {% for step in recipe.steps %}
+    <li>{{ step }}</li>
+  {% endfor %}
+</ol>
 
 <form method="post" action="/recipes/{{ recipe.id }}/delete" onsubmit="return confirm('Delete this recipe?');" style="margin-top: 24px;">
   <button type="submit" class="btn btn-secondary">Delete recipe</button>
