@@ -240,6 +240,16 @@ class MealPlanStore:
         with self._connection() as conn:
             return conn.execute("SELECT COUNT(*) FROM meal_plans").fetchone()[0]
 
+    def delete(self, plan_id: str) -> None:
+        """Deletes one plan (and its meals/candidate rows) - used by
+        POST /plan/cancel. Raises PlanNotFound if the plan doesn't exist."""
+        with self._connection() as conn:
+            if conn.execute("SELECT 1 FROM meal_plans WHERE id = ?", (plan_id,)).fetchone() is None:
+                raise PlanNotFound(plan_id)
+            conn.execute("DELETE FROM plan_meal_candidates WHERE plan_id = ?", (plan_id,))
+            conn.execute("DELETE FROM plan_meals WHERE plan_id = ?", (plan_id,))
+            conn.execute("DELETE FROM meal_plans WHERE id = ?", (plan_id,))
+
     def delete_all(self) -> int:
         """Deletes every plan (and its meals/candidate rows) - used by
         `lmeals settings --reset`. Returns the number of plans removed."""

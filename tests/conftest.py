@@ -13,6 +13,7 @@ from little_meals.config import Settings
 from little_meals.llm.extraction import RecipeExtractionService
 from little_meals.llm.ollama_client import OllamaClient
 from little_meals.models import Classification, Ingredient, Nutrition, Preference, Recipe
+from little_meals.store.cook_along_store import CookAlongStore
 from little_meals.store.household_store import HouseholdPreferencesStore
 from little_meals.store.notification_store import NotificationStore
 from little_meals.store.plan_store import MealPlanStore
@@ -61,6 +62,11 @@ def notification_store(tmp_path: Path) -> NotificationStore:
 
 
 @pytest.fixture
+def cook_along_store(tmp_path: Path) -> CookAlongStore:
+    return CookAlongStore(tmp_path / "cook_along.db")
+
+
+@pytest.fixture
 def sample_recipe() -> Recipe:
     now = datetime(2026, 1, 1, tzinfo=timezone.utc)
     return Recipe(
@@ -100,6 +106,7 @@ def client(
     plan_store: MealPlanStore,
     shopping_list_store: ShoppingListStore,
     notification_store: NotificationStore,
+    cook_along_store: CookAlongStore,
 ) -> TestClient:
     settings = Settings(data_dir=store._dir.parent)
 
@@ -116,5 +123,6 @@ def client(
         plan_store=plan_store,
         shopping_list_store=shopping_list_store,
         notification_store=notification_store,
+        cook_along_store=cook_along_store,
     )
     return TestClient(app)

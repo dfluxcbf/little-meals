@@ -197,6 +197,59 @@ def test_finalize_with_no_current_plan_is_a_harmless_redirect(client: TestClient
     assert response.headers["location"] == "/plan"
 
 
+def test_plan_cancel_clears_the_plan(client: TestClient, sample_recipe, plan_store):
+    _create_recipe(client, sample_recipe)
+    client.post("/plan/generate", follow_redirects=False)
+    assert plan_store.get_current() is not None
+
+    response = client.post("/plan/cancel", follow_redirects=False)
+    assert response.status_code == 303
+    assert response.headers["location"] == "/plan"
+
+    assert plan_store.get_current() is None
+    response = client.get("/plan")
+    assert "Generate this week's plan" in response.text
+
+
+def test_plan_cancel_clears_the_shopping_list_too(client: TestClient, sample_recipe, plan_store, shopping_list_store):
+    _create_recipe(client, sample_recipe)
+    client.post("/plan/generate", follow_redirects=False)
+    plan = plan_store.get_current()
+    client.post("/plan/finalize", follow_redirects=False)
+    client.post("/shopping/generate", follow_redirects=False)
+    assert shopping_list_store.get_for_plan(plan.id) is not None
+
+    client.post("/plan/cancel", follow_redirects=False)
+
+    assert shopping_list_store.get_for_plan(plan.id) is None
+
+
+def test_plan_cancel_is_a_no_op_when_no_current_plan(client: TestClient, plan_store):
+    response = client.post("/plan/cancel", follow_redirects=False)
+    assert response.status_code == 303
+    assert response.headers["location"] == "/plan"
+    assert plan_store.count() == 0
+
+
+def test_plan_cancel_works_when_finalized(client: TestClient, sample_recipe, plan_store):
+    _create_recipe(client, sample_recipe)
+    client.post("/plan/generate", follow_redirects=False)
+    client.post("/plan/finalize", follow_redirects=False)
+
+    client.post("/plan/cancel", follow_redirects=False)
+
+    assert plan_store.get_current() is None
+
+
+def test_plan_page_shows_cancel_button_when_plan_exists(client: TestClient, sample_recipe):
+    _create_recipe(client, sample_recipe)
+    client.post("/plan/generate", follow_redirects=False)
+
+    response = client.get("/plan")
+    assert 'action="/plan/cancel"' in response.text
+    assert "Cancel week's plans" in response.text
+
+
 def _set_preferences(client: TestClient, **overrides) -> None:
     payload = {
         "recipes_per_week": 1,

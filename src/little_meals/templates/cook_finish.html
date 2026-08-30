@@ -9,32 +9,32 @@
 </head>
 <body>
   <div class="cook-shell cook-finish">
-    {% if feedback is none %}
+    {% if result is none %}
       <svg width="54" height="54" viewBox="0 0 24 24" fill="none" stroke="var(--sage)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom: 18px;"><path d="M12 2 3 7v6c0 5 4 8 9 9 5-1 9-4 9-9V7l-9-5Z"></path><path d="m9 12 2 2 4-4"></path></svg>
       <h1>Nicely done!</h1>
-      <p>{{ recipe.name }} is off the stove. How did it turn out?</p>
+      <p>{{ recipe.name }} is off the stove. Did you cook it?</p>
       <div class="cook-feedback-actions">
         <form method="post" action="/recipes/{{ recipe.id }}/cook/finish">
-          <input type="hidden" name="preference" value="liked">
+          <input type="hidden" name="action" value="cooked">
           <button type="submit" class="cook-feedback-btn">
-            <svg viewBox="0 0 24 24" fill="none" stroke="var(--sage)" stroke-width="1.9"><path d="M7 10v11H3V10h4Zm0 0 4-7a2 2 0 0 1 2 2v4h5.3a2 2 0 0 1 1.9 2.6l-2 7A2 2 0 0 1 16.3 21H7"></path></svg>
-            Loved it
+            <svg viewBox="0 0 24 24" fill="none" stroke="var(--sage)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"></path></svg>
+            Mark as cooked
           </button>
         </form>
         <form method="post" action="/recipes/{{ recipe.id }}/cook/finish">
-          <input type="hidden" name="preference" value="disliked">
+          <input type="hidden" name="action" value="uncooked">
           <button type="submit" class="cook-feedback-btn">
-            <svg viewBox="0 0 24 24" fill="none" stroke="var(--rose)" stroke-width="1.9" style="transform: scaleY(-1);"><path d="M7 10v11H3V10h4Zm0 0 4-7a2 2 0 0 1 2 2v4h5.3a2 2 0 0 1 1.9 2.6l-2 7A2 2 0 0 1 16.3 21H7"></path></svg>
-            Not for us
+            <svg viewBox="0 0 24 24" fill="none" stroke="var(--rose)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+            Leave uncooked
           </button>
         </form>
       </div>
     {% else %}
-      <div class="cook-finish-icon" style="background: {{ 'var(--sage-soft)' if feedback == 'liked' else 'var(--rose-soft)' }};">
-        <svg viewBox="0 0 24 24" fill="none" stroke="{{ 'var(--sage)' if feedback == 'liked' else 'var(--rose)' }}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"></path></svg>
+      <div class="cook-finish-icon" style="background: {{ 'var(--sage-soft)' if result == 'cooked' else 'var(--rose-soft)' }};">
+        <svg viewBox="0 0 24 24" fill="none" stroke="{{ 'var(--sage)' if result == 'cooked' else 'var(--rose)' }}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"></path></svg>
       </div>
       <h1>Got it</h1>
-      <p>{{ "Saved as a favorite in your cookbook." if feedback == "liked" else "Noted - we won't suggest this one again." }}</p>
+      <p>{{ "Marked as cooked in this week's plan." if result == "cooked" else "Left uncooked - you can cook it again anytime." }}</p>
       <a href="/plan" class="btn btn-primary">Back to this week</a>
     {% endif %}
   </div>

@@ -35,5 +35,9 @@
       <button type="submit" class="btn btn-primary">Finalize plan</button>
     </form>
   {% endif %}
+
+  <form method="post" action="/plan/cancel" onsubmit="return confirm('Cancel this week\'s plan? This deletes all planned meals and the shopping list. This cannot be undone.');" style="margin-top: 16px;">
+    <button type="submit" class="btn btn-danger">Cancel week's plans</button>
+  </form>
 {% endif %}
 {% endblock %}

@@ -22,11 +22,49 @@ def _create_recipe(client: TestClient, sample_recipe) -> dict:
 
 
 @pytest.mark.requirement("REQ-000000033")
-def test_cook_start_redirects_to_step_1(client: TestClient, sample_recipe):
+def test_cook_start_redirects_to_step_0_on_a_fresh_recipe(client: TestClient, sample_recipe):
     created = _create_recipe(client, sample_recipe)
     response = client.get(f"/recipes/{created['id']}/cook", follow_redirects=False)
     assert response.status_code == 303
-    assert response.headers["location"] == f"/recipes/{created['id']}/cook/1"
+    assert response.headers["location"] == f"/recipes/{created['id']}/cook/0"
+
+
+@pytest.mark.requirement("REQ-000000033")
+def test_cook_start_with_an_existing_session_shows_resume_chooser(client: TestClient, sample_recipe):
+    created = _create_recipe(client, sample_recipe)
+    client.get(f"/recipes/{created['id']}/cook", follow_redirects=False)
+    client.get(f"/recipes/{created['id']}/cook/2")
+
+    response = client.get(f"/recipes/{created['id']}/cook")
+    assert response.status_code == 200
+    assert "Continue" in response.text
+    assert "Start Over" in response.text
+    assert f'href="/recipes/{created["id"]}/cook/2"' in response.text
+
+
+@pytest.mark.requirement("REQ-000000033")
+def test_cook_start_over_resets_the_session(client: TestClient, sample_recipe, cook_along_store):
+    created = _create_recipe(client, sample_recipe)
+    client.get(f"/recipes/{created['id']}/cook", follow_redirects=False)
+    client.get(f"/recipes/{created['id']}/cook/2")
+
+    response = client.post(f"/recipes/{created['id']}/cook/start-over", follow_redirects=False)
+    assert response.status_code == 303
+    assert response.headers["location"] == f"/recipes/{created['id']}/cook/0"
+
+    session = cook_along_store.get(created["id"])
+    assert session.current_step == 0
+    assert session.checked_ingredients == []
+
+
+@pytest.mark.requirement("REQ-000000033")
+def test_cook_step_0_shows_ingredients_checklist(client: TestClient, sample_recipe):
+    created = _create_recipe(client, sample_recipe)
+    response = client.get(f"/recipes/{created['id']}/cook/0")
+    assert response.status_code == 200
+    assert "Ingredients" in response.text
+    for ingredient in sample_recipe.ingredients:
+        assert ingredient.name in response.text
 
 
 @pytest.mark.requirement("REQ-000000033")
@@ -53,15 +91,11 @@ def test_cook_step_unknown_recipe_404(client: TestClient):
 
 
 @pytest.mark.requirement("REQ-000000033")
-def test_cook_step_zero_or_negative_redirects_to_step_1(client: TestClient, sample_recipe):
+def test_cook_step_negative_redirects_to_step_0(client: TestClient, sample_recipe):
     created = _create_recipe(client, sample_recipe)
-    response = client.get(f"/recipes/{created['id']}/cook/0", follow_redirects=False)
-    assert response.status_code == 303
-    assert response.headers["location"] == f"/recipes/{created['id']}/cook/1"
-
     response = client.get(f"/recipes/{created['id']}/cook/-5", follow_redirects=False)
     assert response.status_code == 303
-    assert response.headers["location"] == f"/recipes/{created['id']}/cook/1"
+    assert response.headers["location"] == f"/recipes/{created['id']}/cook/0"
 
 
 @pytest.mark.requirement("REQ-000000033")
@@ -72,8 +106,8 @@ def test_cook_step_past_the_last_step_shows_finish_prompt(client: TestClient, sa
     response = client.get(f"/recipes/{created['id']}/cook/{total_steps + 1}")
     assert response.status_code == 200
     assert "Nicely done!" in response.text
-    assert "Loved it" in response.text
-    assert "Not for us" in response.text
+    assert "Mark as cooked" in response.text
+    assert "Leave uncooked" in response.text
 
 
 @pytest.mark.requirement("REQ-000000033")
@@ -85,47 +119,100 @@ def test_cook_step_last_step_shows_finish_cooking_label(client: TestClient, samp
     assert "Finish cooking" in response.text
 
 
-@pytest.mark.requirement("REQ-000000034")
-def test_cook_finish_sets_preference_liked(client: TestClient, sample_recipe):
+@pytest.mark.requirement("REQ-000000033")
+def test_cook_step_1_prev_link_points_to_ingredients(client: TestClient, sample_recipe):
+    created = _create_recipe(client, sample_recipe)
+    response = client.get(f"/recipes/{created['id']}/cook/1")
+    assert f'href="/recipes/{created["id"]}/cook/0"' in response.text
+
+
+@pytest.mark.requirement("REQ-000000033")
+def test_cook_ingredient_toggle_flips_checked_state(client: TestClient, sample_recipe, cook_along_store):
     created = _create_recipe(client, sample_recipe)
 
-    response = client.post(f"/recipes/{created['id']}/cook/finish", data={"preference": "liked"})
+    response = client.post(f"/recipes/{created['id']}/cook/ingredients/0/checked")
+    assert response.status_code == 200
+    session = cook_along_store.get(created["id"])
+    assert session.checked_ingredients == [0]
+
+    response = client.post(f"/recipes/{created['id']}/cook/ingredients/0/checked")
+    assert response.status_code == 200
+    session = cook_along_store.get(created["id"])
+    assert session.checked_ingredients == []
+
+
+@pytest.mark.requirement("REQ-000000033")
+def test_cook_ingredient_toggle_unknown_recipe_404(client: TestClient):
+    response = client.post("/recipes/does-not-exist/cook/ingredients/0/checked")
+    assert response.status_code == 404
+
+
+@pytest.mark.requirement("REQ-000000033")
+def test_leaving_and_returning_resumes_at_the_saved_step(client: TestClient, sample_recipe):
+    created = _create_recipe(client, sample_recipe)
+    client.get(f"/recipes/{created['id']}/cook", follow_redirects=False)
+    client.get(f"/recipes/{created['id']}/cook/2")
+
+    # "Leaving" is just navigating away - no explicit action deletes the session.
+    client.get(f"/recipes/{created['id']}")
+
+    response = client.get(f"/recipes/{created['id']}/cook")
+    assert response.status_code == 200
+    assert f'href="/recipes/{created["id"]}/cook/2"' in response.text
+
+
+@pytest.mark.requirement("REQ-000000034")
+def test_cook_finish_marks_cooked_does_not_change_preference(client: TestClient, sample_recipe):
+    created = _create_recipe(client, sample_recipe)
+
+    response = client.post(f"/recipes/{created['id']}/cook/finish", data={"action": "cooked"})
     assert response.status_code == 200
     assert "Got it" in response.text
-    assert "Saved as a favorite" in response.text
+    assert "Marked as cooked" in response.text
 
     recipe = client.get(f"/api/recipes/{created['id']}").json()
-    assert recipe["preference"] == "liked"
+    assert recipe["preference"] == created["preference"]
 
 
 @pytest.mark.requirement("REQ-000000034")
-def test_cook_finish_sets_preference_disliked(client: TestClient, sample_recipe):
+def test_cook_finish_leave_uncooked_does_not_change_preference(client: TestClient, sample_recipe):
     created = _create_recipe(client, sample_recipe)
 
-    response = client.post(f"/recipes/{created['id']}/cook/finish", data={"preference": "disliked"})
+    response = client.post(f"/recipes/{created['id']}/cook/finish", data={"action": "uncooked"})
     assert response.status_code == 200
-    assert "suggest this one again" in response.text
+    assert "Left uncooked" in response.text
 
     recipe = client.get(f"/api/recipes/{created['id']}").json()
-    assert recipe["preference"] == "disliked"
+    assert recipe["preference"] == created["preference"]
 
 
 @pytest.mark.requirement("REQ-000000034")
 def test_cook_finish_unknown_recipe_404(client: TestClient):
-    response = client.post("/recipes/does-not-exist/cook/finish", data={"preference": "liked"})
+    response = client.post("/recipes/does-not-exist/cook/finish", data={"action": "cooked"})
     assert response.status_code == 404
 
 
 @pytest.mark.requirement("REQ-000000034")
-def test_cook_finish_marks_matching_plan_meal_cooked(client: TestClient, sample_recipe, store, plan_store):
+def test_cook_finish_cooked_marks_matching_plan_meal_cooked(client: TestClient, sample_recipe, store, plan_store):
     created = store.create(sample_recipe)
     plan = plan_store.create([MealSpec(created.id, created.servings)])
     assert plan.meals[0].cooked is False
 
-    client.post(f"/recipes/{created.id}/cook/finish", data={"preference": "liked"})
+    client.post(f"/recipes/{created.id}/cook/finish", data={"action": "cooked"})
 
     updated = plan_store.get(plan.id)
     assert updated.meals[0].cooked is True
+
+
+@pytest.mark.requirement("REQ-000000034")
+def test_cook_finish_uncooked_does_not_mark_plan_meal_cooked(client: TestClient, sample_recipe, store, plan_store):
+    created = store.create(sample_recipe)
+    plan = plan_store.create([MealSpec(created.id, created.servings)])
+
+    client.post(f"/recipes/{created.id}/cook/finish", data={"action": "uncooked"})
+
+    updated = plan_store.get(plan.id)
+    assert updated.meals[0].cooked is False
 
 
 @pytest.mark.requirement("REQ-000000034")
@@ -136,7 +223,7 @@ def test_cook_finish_is_a_no_op_on_plan_state_when_recipe_not_in_current_plan(
     other = store.create(sample_recipe.model_copy(update={"id": "", "name": "Other"}))
     plan = plan_store.create([MealSpec(other.id, other.servings)])
 
-    client.post(f"/recipes/{created.id}/cook/finish", data={"preference": "liked"})
+    client.post(f"/recipes/{created.id}/cook/finish", data={"action": "cooked"})
 
     updated = plan_store.get(plan.id)
     assert updated.meals[0].cooked is False
@@ -145,8 +232,20 @@ def test_cook_finish_is_a_no_op_on_plan_state_when_recipe_not_in_current_plan(
 @pytest.mark.requirement("REQ-000000034")
 def test_cook_finish_with_no_current_plan_does_not_error(client: TestClient, sample_recipe):
     created = _create_recipe(client, sample_recipe)
-    response = client.post(f"/recipes/{created['id']}/cook/finish", data={"preference": "liked"})
+    response = client.post(f"/recipes/{created['id']}/cook/finish", data={"action": "cooked"})
     assert response.status_code == 200
+
+
+@pytest.mark.requirement("REQ-000000034")
+@pytest.mark.parametrize("action", ["cooked", "uncooked"])
+def test_cook_finish_clears_the_session(client: TestClient, sample_recipe, cook_along_store, action):
+    created = _create_recipe(client, sample_recipe)
+    client.get(f"/recipes/{created['id']}/cook", follow_redirects=False)
+    assert cook_along_store.get(created["id"]) is not None
+
+    client.post(f"/recipes/{created['id']}/cook/finish", data={"action": action})
+
+    assert cook_along_store.get(created["id"]) is None
 
 
 @pytest.mark.requirement("REQ-000000033")
