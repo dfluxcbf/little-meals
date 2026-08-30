@@ -7,7 +7,6 @@ from little_meals.api.errors import ApiError
 from little_meals.llm.extraction import RecipeExtractionService
 from little_meals.models import CookedUpdate, MealPlan, Recipe, ServingsUpdate
 from little_meals.planning.plan_builder import build_meal_specs, generate_single_replacement, list_controlled_reroll_candidates
-from little_meals.planning.suggestion import SearchProvider
 from little_meals.store.household_store import HouseholdPreferencesStore
 from little_meals.store.plan_store import MealPlanStore, PlanMealNotFound, PlanNotFound
 from little_meals.store.recipe_store import RecipeNotFound, RecipeStore
@@ -22,7 +21,6 @@ def build_plan_router(
     recipe_store: RecipeStore,
     household_store: HouseholdPreferencesStore,
     extractor: RecipeExtractionService,
-    search_provider: SearchProvider,
 ) -> APIRouter:
     router = APIRouter(prefix="/api/plan")
 
@@ -45,33 +43,25 @@ def build_plan_router(
 
     @router.post("/generate", response_model=MealPlan, status_code=201)
     def generate() -> MealPlan:
-        return store.create(build_meal_specs(recipe_store, household_store, extractor, search_provider))
+        return store.create(build_meal_specs(recipe_store, household_store, extractor))
 
     @router.post("/{plan_id}/reroll", response_model=MealPlan)
     def reroll_whole_plan(plan_id: str) -> MealPlan:
         plan = _fetch(plan_id)
         _require_draft(plan)
-        return store.replace_meals(plan_id, build_meal_specs(recipe_store, household_store, extractor, search_provider))
+        return store.replace_meals(plan_id, build_meal_specs(recipe_store, household_store, extractor))
 
     @router.post("/{plan_id}/meals/{meal_id}/reroll", response_model=MealPlan)
     def reroll_single_meal(plan_id: str, meal_id: str) -> MealPlan:
         plan = _fetch(plan_id)
         _require_draft(plan)
-        preferences = household_store.get()
         recipes = recipe_store.list(extractor)
         excluded = {meal.recipe_id for meal in plan.meals}
-        replacement = generate_single_replacement(excluded, recipes, recipe_store, extractor, search_provider, preferences)
+        replacement = generate_single_replacement(excluded, recipes)
         if replacement is None:
-            raise ApiError(422, "NO_REPLACEMENT_AVAILABLE", "Could not find or generate a replacement recipe")
+            raise ApiError(422, "NO_REPLACEMENT_AVAILABLE", "No unused liked recipe available in the library")
         try:
-            return store.set_recipe(
-                plan_id,
-                meal_id,
-                replacement.recipe.id,
-                replacement.servings,
-                replacement.is_suggestion,
-                tuple(replacement.candidate_recipe_ids),
-            )
+            return store.set_recipe(plan_id, meal_id, replacement.recipe.id, replacement.servings)
         except PlanMealNotFound as exc:
             raise ApiError(404, "NOT_FOUND", str(exc)) from exc
 
@@ -93,43 +83,7 @@ def build_plan_router(
         except RecipeNotFound as exc:
             raise ApiError(404, "NOT_FOUND", f"Recipe not found: {payload.recipe_id}") from exc
         try:
-            return store.set_recipe(plan_id, meal_id, recipe.id, recipe.servings, is_suggestion=False)
-        except PlanMealNotFound as exc:
-            raise ApiError(404, "NOT_FOUND", str(exc)) from exc
-
-    @router.get("/{plan_id}/meals/{meal_id}/suggestions", response_model=list[Recipe])
-    def suggestion_candidates(plan_id: str, meal_id: str) -> list[Recipe]:
-        """The other Spoonacular candidates fetched alongside this
-        suggestion meal - "shows all 3 collected dishes", never a new
-        fetch/reroll, per docs/spoonacular_plan.md."""
-        plan = _fetch(plan_id)
-        meal = next((m for m in plan.meals if m.id == meal_id), None)
-        if meal is None:
-            raise ApiError(404, "NOT_FOUND", f"Meal {meal_id} not found in plan {plan_id}")
-        candidate_ids = [rid for rid in store.get_candidates(plan_id, meal_id) if rid != meal.recipe_id]
-        candidates = []
-        for rid in candidate_ids:
-            try:
-                candidates.append(recipe_store.get(rid))
-            except RecipeNotFound:
-                continue  # deleted from the library since it was fetched
-        return candidates
-
-    @router.post("/{plan_id}/meals/{meal_id}/choose-suggestion", response_model=MealPlan)
-    def choose_suggestion(plan_id: str, meal_id: str, payload: ChooseRecipe) -> MealPlan:
-        plan = _fetch(plan_id)
-        _require_draft(plan)
-        candidate_ids = store.get_candidates(plan_id, meal_id)
-        if payload.recipe_id not in candidate_ids:
-            raise ApiError(422, "NOT_A_CANDIDATE", "That recipe isn't one of this slot's fetched suggestions")
-        try:
-            recipe = recipe_store.get(payload.recipe_id)
-        except RecipeNotFound as exc:
-            raise ApiError(404, "NOT_FOUND", f"Recipe not found: {payload.recipe_id}") from exc
-        try:
-            return store.set_recipe(
-                plan_id, meal_id, recipe.id, recipe.servings, is_suggestion=True, candidate_recipe_ids=tuple(candidate_ids)
-            )
+            return store.set_recipe(plan_id, meal_id, recipe.id, recipe.servings)
         except PlanMealNotFound as exc:
             raise ApiError(404, "NOT_FOUND", str(exc)) from exc
 

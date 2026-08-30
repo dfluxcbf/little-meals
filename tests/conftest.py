@@ -28,7 +28,6 @@ def pytest_configure(config: pytest.Config) -> None:
     # it here makes `@pytest.mark.requirement(...)` valid in both environments.
     config.addinivalue_line("markers", "requirement(requirement_id): little-requirements requirement ID")
     config.addinivalue_line("markers", "real_ollama: hits a real local Ollama daemon over HTTP")
-    config.addinivalue_line("markers", "real_spoonacular: hits the real Spoonacular API over HTTP")
 
 
 @pytest.fixture

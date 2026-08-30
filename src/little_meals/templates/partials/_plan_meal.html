@@ -2,7 +2,6 @@
   <div class="plan-meal-top">
     <h3><a href="/recipes/{{ recipe.id }}">{{ recipe.name }}</a></h3>
     <div style="display: flex; gap: 6px; align-items: center; flex-shrink: 0;">
-      {% if meal.is_suggestion %}<span class="badge badge-new">NEW</span>{% endif %}
       <form hx-post="/plan/meals/{{ meal.id }}/cooked" hx-target="#plan-meal-{{ meal.id }}" hx-swap="outerHTML">
         <input type="hidden" name="cooked" value="{{ 'false' if meal.cooked else 'true' }}">
         <button type="submit" class="pot-stamp {% if meal.cooked %}pot-stamp-active{% endif %}">
@@ -49,17 +48,11 @@
     </div>
     {% if not plan.finalized %}
     <div class="reroll-actions">
-      {% if not meal.is_suggestion %}
       <form hx-post="/plan/meals/{{ meal.id }}/reroll" hx-target="#plan-meal-{{ meal.id }}" hx-swap="outerHTML">
         <button type="submit" class="reroll-btn" title="Reroll this meal" aria-label="Reroll this meal">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="4" y="4" width="16" height="16" rx="3"></rect><circle cx="9" cy="9" r="1.2" fill="currentColor"></circle><circle cx="15" cy="15" r="1.2" fill="currentColor"></circle></svg>
         </button>
       </form>
-      {% else %}
-      <a href="/plan/meals/{{ meal.id }}/suggestions" class="reroll-btn" title="See other suggestions" aria-label="See other suggestions">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3M12 18v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M3 12h3M18 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"></path></svg>
-      </a>
-      {% endif %}
       <a href="/plan/meals/{{ meal.id }}/alternatives" class="reroll-btn" title="Select from cookbook" aria-label="Select from cookbook">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="12" height="12" rx="2"></rect><path d="M9 8h11v11H9z"></path></svg>
       </a>

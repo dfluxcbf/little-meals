@@ -576,19 +576,6 @@ form button {
   font-size: 15.5px;
 }
 
-.spoonacular-query-json {
-  background: var(--paper-alt);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 12px 14px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 12.5px;
-  line-height: 1.5;
-  color: var(--ink-soft);
-  overflow-x: auto;
-  white-space: pre;
-}
-
 .day-picker {
   display: flex;
   gap: 6px;
@@ -879,11 +866,6 @@ form button {
 .reroll-btn svg {
   width: 14px;
   height: 14px;
-}
-
-.badge-new {
-  background: oklch(84% 0.09 95);
-  color: oklch(35% 0.06 90);
 }
 
 .alternatives-list {

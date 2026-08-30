@@ -3,17 +3,14 @@ from __future__ import annotations
 from fastapi import APIRouter
 
 from little_meals.api.errors import ApiError
-from little_meals.models import ActualCostUpdate, IngredientSubstitutes, ItemCheckedUpdate, ShoppingList
+from little_meals.models import ActualCostUpdate, ItemCheckedUpdate, ShoppingList
 from little_meals.planning.shopping_list import build_shopping_list_items
-from little_meals.planning.suggestion import SearchProvider
 from little_meals.store.plan_store import MealPlanStore
 from little_meals.store.recipe_store import RecipeStore
 from little_meals.store.shopping_list_store import ShoppingListItemNotFound, ShoppingListNotFound, ShoppingListStore
 
 
-def build_shopping_router(
-    store: ShoppingListStore, plan_store: MealPlanStore, recipe_store: RecipeStore, search_provider: SearchProvider
-) -> APIRouter:
+def build_shopping_router(store: ShoppingListStore, plan_store: MealPlanStore, recipe_store: RecipeStore) -> APIRouter:
     router = APIRouter(prefix="/api/shopping-list")
 
     def _current_finalized_plan():
@@ -61,19 +58,5 @@ def build_shopping_router(
             return store.get(list_id)
         except ShoppingListNotFound as exc:
             raise ApiError(404, "NOT_FOUND", str(exc)) from exc
-
-    @router.get("/{list_id}/items/{item_id}/substitutes", response_model=IngredientSubstitutes)
-    def item_substitutes(list_id: str, item_id: str) -> IngredientSubstitutes:
-        try:
-            shopping_list = store.get(list_id)
-        except ShoppingListNotFound as exc:
-            raise ApiError(404, "NOT_FOUND", str(exc)) from exc
-        item = next((i for i in shopping_list.items if i.id == item_id), None)
-        if item is None:
-            raise ApiError(404, "NOT_FOUND", f"Item {item_id} not found in shopping list {list_id}")
-        result = search_provider.get_substitutes(item.name)
-        if result is None:
-            raise ApiError(503, "SPOONACULAR_UNAVAILABLE", "No Spoonacular API key is configured")
-        return result
 
     return router

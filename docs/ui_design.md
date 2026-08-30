@@ -41,7 +41,6 @@ without a reason tied to one of these roles.
 | Rose (negative) | `oklch(58% 0.12 20)` | Disliked state |
 | Rose soft | `oklch(93% 0.02 20)` | Disliked backgrounds |
 | Teal | `oklch(55% 0.08 210)` | Pescetarian tag |
-| Butter | `oklch(84% 0.09 95)` | "New suggestion" badge |
 | Fridge blue-gray | `oklch(95% 0.015 220)` bg / `oklch(45% 0.03 220)` fg | Fridge-door ingredients panel only |
 
 Typography: **Fraunces** (display — headings, recipe titles, the logotype;
@@ -64,8 +63,8 @@ carry over to the real app.
 | Recipe library | 2-col card grid (desktop: 4-col with a left-rail nav instead of the bottom tab bar); spine-colored top edge by classification; tap-heart to like |
 | Recipe detail | Like/dislike as a pair of thumb pills; servings stepper; steps as a numbered list; ingredients behind the fridge-door toggle |
 | Add recipe | Free-text paste into an index-card-styled textarea → "Simmering your recipe…" processing state → extracted-recipe preview card with save/start-over |
-| Household settings | Grouped paper cards per section (meal rhythm, food preferences as a free-text field plus a pasted-in Spoonacular search-filter JSON field, AI suggestions, household size); sticky save with a confirmation toast |
-| Weekly plan review | Open-cookbook layout, one meal per "page" row; no day-to-day scheduling — the household picks meals from the week's set in whatever order they like; like/dislike + per-meal servings; a pot-stamp toggle marks a meal cooked directly from this screen; whole-plan reroll, single-meal reroll, and controlled-reroll entry points per meal |
+| Household settings | Grouped paper cards per section (meal rhythm, household size); sticky save with a confirmation toast |
+| Weekly plan review | Open-cookbook layout, one meal per "page" row; no day-to-day scheduling — the household picks meals from the week's set in whatever order they like; like/dislike + per-meal servings; a pot-stamp toggle marks a meal cooked directly from this screen; whole-plan reroll, single-meal reroll, and controlled-reroll entry points per meal, all drawing from the existing library |
 | Controlled reroll | Single-select list of 10 alternatives for one meal slot; sticky confirm button, disabled until a pick is made |
 | Shopping list | Paper note pinned to a fridge (torn edge, magnet), one flat checklist (no grocery-category grouping), checkbox rows that strike through, cost-entry field |
 | Cook-along | One big step card at a time, progress dots, prev/next; ends in a like/dislike prompt that feeds back into the recipe's preference state |
@@ -75,9 +74,8 @@ Shopping / Settings) becomes a left rail on desktop. Recipe detail, add
 recipe, the reroll picker, and cook-along are drill-in screens (back chevron,
 no tab bar) reached from the four tab screens, not tabs themselves.
 
-**The pot stamp**: on a meal card that isn't a fresh suggestion, the
-top-right corner (where a "NEW" badge sits on suggestions) holds a
-toggleable "mark as cooked" control instead — a small pill with a pot icon.
+**The pot stamp**: the top-right corner of a meal card holds a
+toggleable "mark as cooked" control — a small pill with a pot icon.
 Unmarked, it's an outline pill in muted ink. Marked, it flips to a
 terracotta-inked, slightly rotated stamp look (dashed ring, small rotation)
 reading "Cooked" — a deliberate rubber-stamp feel, distinct from the

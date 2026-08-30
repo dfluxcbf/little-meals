@@ -128,11 +128,6 @@ class PlanMeal(BaseModel):
     recipe_id: str
     servings: int = Field(ge=1)
     cooked: bool = False
-    is_suggestion: bool = False
-    """True if this slot was filled by the AI suggestion engine (Milestone 4)
-    rather than drawn from the existing library (Milestone 3) - drives the
-    "NEW" badge in the UI. Purely presentational: once created, a suggestion
-    is a normal Recipe like any other (see planning/suggestion.py)."""
 
 
 class MealPlan(BaseModel):
@@ -200,15 +195,6 @@ class HouseholdPreferences(BaseModel):
     recipes_per_week: int = Field(default=5, ge=1)
     recommendation_day: DayOfWeek = DayOfWeek.SUNDAY
     recommendation_time: time = time(9, 0)
-    food_preferences_text: str = Field(default="", max_length=2000)
-    food_filter: Optional[dict] = None
-    """The household's own Spoonacular `/recipes/complexSearch` query
-    parameters (see https://spoonacular.com/food-api/docs), built
-    field-by-field on the dedicated /settings/recipe-preferences page
-    (planning/spoonacular_fields.py) - never LLM-generated or otherwise
-    interpreted, just stored and merged with the software's own always-on
-    parameters (see planning/suggestion.py's build_complex_search_params)."""
-    ai_suggestions_per_plan: int = Field(default=2, ge=0)
     default_servings: str = "2 adults"
     updated_at: Optional[datetime] = None
 
@@ -217,22 +203,4 @@ class HouseholdPreferencesUpdate(BaseModel):
     recipes_per_week: int = Field(ge=1)
     recommendation_day: DayOfWeek
     recommendation_time: time
-    ai_suggestions_per_plan: int = Field(ge=0)
     default_servings: str
-    food_preferences_text: str = Field(default="", max_length=2000)
-    food_filter: Optional[dict] = None
-    """Only inspected by the JSON API (routes_household.py) via
-    `model_fields_set`, so a partial update that omits this key leaves the
-    household's previously-saved filter untouched rather than clearing it -
-    the dedicated /settings/recipe-preferences page instead always calls
-    HouseholdPreferencesStore.save_food_filter() directly with whatever
-    parse_filter_form built from its own POST body."""
-
-
-class IngredientSubstitutes(BaseModel):
-    """Spoonacular's /food/ingredients/substitutes response, for the
-    shopping-list "find a substitute" action."""
-
-    ingredient: str
-    substitutes: list[str] = Field(default_factory=list)
-    message: str = ""

@@ -116,6 +116,39 @@ test coverage are tracked exclusively through **little-requirements**
   A follow-up on the same branch added REQ-000000042 for the `--reset` flag
   (`RecipeStore.count`/`delete_all`, plus the CLI's confirm-before-delete
   prompt) — tagged in `tests/test_recipe_store.py` and `tests/test_cli.py`.
+- Milestone 10 (`m10-remove-spoonacular-and-suggestions` suite) removed
+  Spoonacular and the entire AI-suggestion/recipe-recommendation system added
+  in Milestone 4 - see `milestones.md`'s M10 entry. Deleted requirements:
+  REQ-000000022, REQ-000000023, REQ-000000024, REQ-000000038, REQ-000000041,
+  REQ-000000042 (all M4-suite, Spoonacular/AI-suggestion-specific), and
+  REQ-000000043 (M2-suite, the Spoonacular recipe-search-preferences page).
+  Edited in place rather than deleted, since the underlying behavior survives
+  in a library-only form: REQ-000000010/REQ-000000012 (household preferences
+  store/UI, dropped the food-preferences/AI-suggestions wording),
+  REQ-000000025 (whole-plan reroll), REQ-000000026 (single-meal reroll, now
+  library-only with no generation fallback), REQ-000000027 (controlled
+  reroll), and REQ-000000028 (plan review like/dislike, dropped the NEW-badge
+  clause). Created REQ-000000044, tagged in `tests/test_plan_builder.py`, for
+  the library-only plan-generation behavior this milestone left in place of
+  M4's generation path.
+- Known issue: `lreq` aggregates a requirement's pass/fail verdict across
+  every test-case hash ever reported against it, with no CLI/MCP affordance
+  to unlink a stale one - deleting a test that was tagged with
+  `@pytest.mark.requirement(...)` (as M10 did for the old "NEW badge" test
+  under REQ-000000028) or renaming one (as M10 did for
+  `test_plan_store.py`'s `is_suggestion`-migration regression test, under
+  REQ-000000019 - a rename changes the reported test-case hash) leaves that
+  test's last-recorded verdict permanently mixed into the aggregate, even
+  though the live suite no longer runs it and every currently-tagged test for
+  that requirement passes. `lreq requirement set-verdict` only adds another
+  test-case record rather than clearing the stale one, so it doesn't fix this
+  either. REQ-000000028 and REQ-000000019 will keep reporting "Fail" in
+  `lreq` output/reports despite every one of their live test cases passing -
+  confirmed via `lreq inspect` against
+  `requirement_test_table`/`test_cases_table` (one stale `verdict=0` row each,
+  outnumbered by passing live ones). If this needs to show clean, the only
+  known fix is deleting and recreating the requirement (which reassigns its
+  ID and requires retagging every test and doc reference to it).
 - Known issue: `lreq update` (what the Bazel genrule invokes) cannot run inside
   this submodule checkout — `little-requirements`' managed pre-commit-hook
   installer assumes `.git` is a directory, and a submodule's `.git` is a file.

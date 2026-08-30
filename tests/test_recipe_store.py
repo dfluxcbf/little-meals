@@ -104,41 +104,6 @@ def test_delete_unknown_id_raises_not_found(store: RecipeStore):
         store.delete("does-not-exist")
 
 
-@pytest.mark.requirement("REQ-000000042")
-def test_count_reflects_number_of_recipe_files(store: RecipeStore, sample_recipe: Recipe):
-    assert store.count() == 0
-    store.create(sample_recipe.model_copy(update={"name": "Apple Pie"}))
-    store.create(sample_recipe.model_copy(update={"name": "Zucchini Bread"}))
-    assert store.count() == 2
-
-
-@pytest.mark.requirement("REQ-000000042")
-def test_delete_all_removes_every_recipe_file_and_returns_count(store: RecipeStore, sample_recipe: Recipe):
-    store.create(sample_recipe.model_copy(update={"name": "Apple Pie"}))
-    store.create(sample_recipe.model_copy(update={"name": "Zucchini Bread"}))
-
-    deleted = store.delete_all()
-
-    assert deleted == 2
-    assert store.count() == 0
-    assert store.list() == []
-
-
-@pytest.mark.requirement("REQ-000000042")
-def test_delete_all_removes_files_that_fail_to_parse_too(store: RecipeStore, tmp_recipes_dir: Path):
-    tmp_recipes_dir.mkdir(parents=True, exist_ok=True)
-    (tmp_recipes_dir / "broken.md").write_text("not a valid recipe file", encoding="utf-8")
-
-    deleted = store.delete_all()
-
-    assert deleted == 1
-    assert store.count() == 0
-
-
-def test_delete_all_on_empty_library_returns_zero(store: RecipeStore):
-    assert store.delete_all() == 0
-
-
 def test_hand_edited_file_is_picked_up_on_next_read(store: RecipeStore, sample_recipe: Recipe, tmp_recipes_dir: Path):
     created = store.create(sample_recipe)
     path = tmp_recipes_dir / f"{created.id}.md"

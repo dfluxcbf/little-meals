@@ -93,29 +93,6 @@ def test_shopping_item_checked_returns_fragment_and_persists(client: TestClient,
     assert refreshed["items"][0]["checked"] is True
 
 
-def test_shopping_item_substitutes_shows_unavailable_message_without_a_provider(client: TestClient, sample_recipe):
-    _create_recipe(client, sample_recipe)
-    client.post("/plan/generate", follow_redirects=False)
-    client.post("/plan/finalize", follow_redirects=False)
-    client.post("/shopping/generate", follow_redirects=False)
-    shopping_list = client.get("/api/shopping-list/current").json()
-    item_id = shopping_list["items"][0]["id"]
-
-    response = client.get(f"/shopping/items/{item_id}/substitutes")
-    assert response.status_code == 200
-    assert "No Spoonacular API key is configured" in response.text
-
-
-def test_shopping_item_substitutes_empty_response_when_item_unknown(client: TestClient, sample_recipe):
-    _create_recipe(client, sample_recipe)
-    client.post("/plan/generate", follow_redirects=False)
-    client.post("/plan/finalize", follow_redirects=False)
-    client.post("/shopping/generate", follow_redirects=False)
-
-    response = client.get("/shopping/items/does-not-exist/substitutes")
-    assert response.status_code == 200
-    assert response.text == ""
-
 
 @pytest.mark.requirement("REQ-000000032")
 def test_shopping_item_checked_redirects_when_no_plan(client: TestClient):
