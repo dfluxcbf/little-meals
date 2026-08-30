@@ -84,22 +84,11 @@ FILTER_SECTIONS: tuple[FilterSection, ...] = (
     )),
     FilterSection("Diet & cuisine", (
         FilterField("diet", "Diet", "single_select", options=DIETS),
-        FilterField("cuisine", "Cuisines to include", "multi_select", options=CUISINES),
         FilterField("excludeCuisine", "Cuisines to exclude", "multi_select", options=CUISINES),
         FilterField("intolerances", "Intolerances", "multi_select", options=INTOLERANCES),
     )),
     FilterSection("Ingredients & equipment", (
-        FilterField("includeIngredients", "Must include ingredients", "text", placeholder="e.g. tomato,cheese"),
         FilterField("excludeIngredients", "Must exclude ingredients", "text", placeholder="e.g. eggs"),
-        FilterField("equipment", "Equipment", "text", placeholder="e.g. blender, frying pan"),
-        FilterField("ignorePantry", "Ignore typical pantry items (water, salt, flour, etc.)", "boolean"),
-    )),
-    FilterSection("Recipe matching", (
-        FilterField("author", "Author username", "text"),
-        FilterField("tags", "Tags", "text", placeholder="diet, meal type, cuisine, or intolerance tags"),
-        FilterField("recipeBoxId", "Recipe box id", "number"),
-        FilterField("fillIngredients", "Show which ingredients are used vs. missing", "boolean"),
-        FilterField("addRecipeInformation", "Include extra recipe information", "boolean"),
     )),
     FilterSection("Timing, servings & pagination", (
         FilterField("maxReadyTime", "Max ready time (minutes)", "number"),

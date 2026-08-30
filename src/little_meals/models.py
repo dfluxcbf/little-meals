@@ -142,6 +142,20 @@ class MealPlan(BaseModel):
     meals: list[PlanMeal] = Field(default_factory=list)
 
 
+class CookAlongSession(BaseModel):
+    """An in-progress cook-along's position, keyed by recipe_id - a
+    household only ever has one active cook-along per recipe. A row's
+    existence means the household left mid-session (resumable via
+    "Continue"); finishing (cooked or not) always deletes it, so the next
+    cook-along for that recipe starts fresh."""
+
+    recipe_id: str
+    current_step: int = 0
+    checked_ingredients: list[int] = Field(default_factory=list)
+    started_at: datetime
+    updated_at: datetime
+
+
 class ServingsUpdate(BaseModel):
     servings: int = Field(ge=1)
 

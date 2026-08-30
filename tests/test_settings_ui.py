@@ -82,13 +82,12 @@ def test_recipe_preferences_form_has_no_dropdowns_and_exposes_every_field(client
     text = response.text
     assert "<select" not in text
     # A representative field of each kind: free text, single-select
-    # (diet), multi-select (cuisine/intolerances), boolean, and a nutrient
+    # (diet), multi-select (excludeCuisine/intolerances), and a nutrient
     # min/max pair.
     assert 'name="query"' in text
     assert 'name="diet"' in text
-    assert 'name="cuisine"' in text
+    assert 'name="excludeCuisine"' in text
     assert 'name="intolerances"' in text
-    assert 'name="ignorePantry"' in text
     assert 'name="minCalories"' in text
     assert 'name="maxCalories"' in text
     # sort/type/instructionsRequired/addRecipeNutrition/number are hardcoded
@@ -108,11 +107,10 @@ def test_recipe_preferences_submit_saves_structured_fields(client: TestClient):
         data={
             "query": "dinner",
             "diet": "Vegan",
-            "cuisine": ["Italian", "Mexican"],
+            "excludeCuisine": ["Italian", "Mexican"],
             "intolerances": ["Peanut"],
             "maxCalories": "850",
             "minFiber": "8",
-            "ignorePantry": "on",
         },
     )
 
@@ -123,11 +121,10 @@ def test_recipe_preferences_submit_saves_structured_fields(client: TestClient):
     assert food_filter == {
         "query": "dinner",
         "diet": "Vegan",
-        "cuisine": "Italian,Mexican",
+        "excludeCuisine": "Italian,Mexican",
         "intolerances": "Peanut",
         "maxCalories": 850,
         "minFiber": 8,
-        "ignorePantry": True,
     }
 
 
@@ -135,7 +132,7 @@ def test_recipe_preferences_submit_saves_structured_fields(client: TestClient):
 def test_recipe_preferences_form_renders_a_legacy_list_valued_filter(client: TestClient):
     """A household that saved its filter before this page existed (a
     hand-pasted JSON filter, or a direct PUT against the JSON API) may
-    have a JSON list stored for a multi-select field like cuisine -
+    have a JSON list stored for a multi-select field like excludeCuisine -
     the page must still render, not 500."""
     client.put(
         "/api/household-preferences",
@@ -145,7 +142,7 @@ def test_recipe_preferences_form_renders_a_legacy_list_valued_filter(client: Tes
             "recommendation_time": "09:00",
             "ai_suggestions_per_plan": 2,
             "default_servings": "2 adults",
-            "food_filter": {"cuisine": ["Italian", "Mexican"], "intolerances": ["Peanut"]},
+            "food_filter": {"excludeCuisine": ["Italian", "Mexican"], "intolerances": ["Peanut"]},
         },
     )
 

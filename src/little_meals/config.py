@@ -54,6 +54,10 @@ class Settings:
     def notification_db_path(self) -> Path:
         return self.data_dir / "notification.db"
 
+    @property
+    def cook_along_db_path(self) -> Path:
+        return self.data_dir / "cook_along.db"
+
     @classmethod
     def from_env(cls) -> "Settings":
         key_file = os.environ.get("LITTLE_MEALS_SPOONACULAR_KEY_FILE")

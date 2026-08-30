@@ -25,6 +25,8 @@
   --shadow: 0 2px 8px oklch(30% 0.02 50 / 0.08);
   --rail-width: 220px;
   --tabbar-height: 76px;
+  --cook-header-height: 64px;
+  --cook-nav-height: 84px;
 }
 
 * {
@@ -260,6 +262,17 @@ nav.tabbar {
 .btn-secondary:hover {
   border-color: var(--ink-faint);
   color: var(--ink);
+}
+
+.btn-danger {
+  background: var(--rose-soft);
+  border-color: var(--rose);
+  color: var(--rose);
+}
+
+.btn-danger:hover {
+  background: var(--rose);
+  color: white;
 }
 
 .btn:disabled {
@@ -1039,16 +1052,25 @@ form button {
 }
 
 .cook-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding: 20px 20px 0;
+  padding: calc(16px + env(safe-area-inset-top, 0px)) 20px 16px;
+  background: var(--cream);
+  border-bottom: 1px solid var(--line);
 }
 
 .cook-close {
   color: var(--ink-soft);
   display: inline-flex;
+  align-items: center;
+  gap: 4px;
   padding: 6px;
   margin-left: -6px;
 }
@@ -1056,6 +1078,11 @@ form button {
 .cook-close svg {
   width: 20px;
   height: 20px;
+}
+
+.cook-close-label {
+  font-size: 11px;
+  font-weight: 600;
 }
 
 .cook-title {
@@ -1079,7 +1106,7 @@ form button {
 .cook-progress {
   display: flex;
   gap: 6px;
-  padding: 14px 20px 0;
+  padding: calc(var(--cook-header-height) + env(safe-area-inset-top, 0px) + 14px) 20px 0;
 }
 
 .cook-progress-dot {
@@ -1099,8 +1126,27 @@ form button {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 20px 30px;
+  padding: 20px 30px calc(var(--cook-nav-height) + env(safe-area-inset-bottom, 0px));
   text-align: center;
+}
+
+.cook-ingredients-body {
+  flex: 1;
+  padding: calc(var(--cook-header-height) + env(safe-area-inset-top, 0px) + 20px) 20px
+    calc(var(--cook-nav-height) + env(safe-area-inset-bottom, 0px) + 20px);
+  overflow-y: auto;
+}
+
+.cook-ingredients-heading {
+  font-family: var(--font-display);
+  font-size: 20px;
+  margin: 0 0 16px;
+}
+
+.cook-ingredients-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .cook-step-number {
@@ -1129,13 +1175,20 @@ form button {
 }
 
 .cook-nav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
   display: flex;
   gap: 10px;
-  padding: 0 20px 40px;
+  padding: 12px 20px calc(16px + env(safe-area-inset-bottom, 0px));
   max-width: 32rem;
   margin: 0 auto;
   width: 100%;
   box-sizing: border-box;
+  background: var(--cream);
+  border-top: 1px solid var(--line);
 }
 
 .cook-prev {

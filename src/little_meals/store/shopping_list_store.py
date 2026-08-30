@@ -147,6 +147,18 @@ class ShoppingListStore:
         with self._connection() as conn:
             return conn.execute("SELECT COUNT(*) FROM shopping_lists").fetchone()[0]
 
+    def delete_for_plan(self, plan_id: str) -> None:
+        """Deletes the shopping list (and items) for one plan, if any exists -
+        used by POST /plan/cancel. No-op if the plan was never finalized /
+        has no list, not an error."""
+        with self._connection() as conn:
+            row = conn.execute("SELECT id FROM shopping_lists WHERE plan_id = ?", (plan_id,)).fetchone()
+            if row is None:
+                return
+            list_id = row[0]
+            conn.execute("DELETE FROM shopping_list_items WHERE list_id = ?", (list_id,))
+            conn.execute("DELETE FROM shopping_lists WHERE id = ?", (list_id,))
+
     def delete_all(self) -> int:
         """Deletes every shopping list (and its items) - used by `lmeals
         settings --reset`. Returns the number of lists removed."""
