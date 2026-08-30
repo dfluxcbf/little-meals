@@ -113,6 +113,43 @@ whether it's past your configured recommendation day/time and the current
 plan predates it, auto-generating a fresh one and flagging an in-app
 notification banner when it does — no cron job or separate process needed.
 
+## Remote deployment (Milestone 11)
+
+If you're developing by sending prompts to a Claude Code session running
+directly on the home server (e.g. via Claude Remote Control), you'll want
+`lmeals serve` running as a background service you can redeploy in one
+command, rather than a foreground process tied to a terminal session. This
+is one-time setup; after it's done, every later change is just `bazel run
+//:deploy`.
+
+**One-time setup:**
+
+```
+mkdir -p ~/.config/systemd/user
+cp tools/little-meals.service ~/.config/systemd/user/little-meals.service
+systemctl --user daemon-reload
+systemctl --user enable --now little-meals.service
+loginctl enable-linger $(whoami)   # keeps it running after you log out
+```
+
+`enable --now` starts it immediately in addition to enabling it at boot. If
+something (e.g. a manually-started `lmeals serve`) is already holding port
+8765, stop that first (`kill <pid>`) or the service will fail to bind and
+sit in an auto-restart loop — check with `systemctl --user status
+little-meals.service`.
+
+**Every later deploy**, once a change looks good:
+
+```
+bazel run //:deploy   # rebuild + pipx reinstall + systemctl --user restart
+```
+
+This is the same preflight-gated rebuild `//:install` does, followed by
+`systemctl --user restart little-meals.service` — see `architecture.md`'s
+"Deployment" section for why it's structured this way. It doesn't touch
+`tailscale serve` (Milestone 8) — that keeps pointing at the same local port
+across restarts, so nothing else needs to change on the tailnet side.
+
 ## Troubleshooting
 
 | Symptom | Likely cause |
@@ -122,3 +159,4 @@ notification banner when it does — no cron job or separate process needed.
 | Recipe extraction hangs or times out | Ollama isn't actually serving, or the configured model isn't pulled — recheck step 2. `LITTLE_MEALS_OLLAMA_TIMEOUT` (seconds, default 120) if it's just slow on your hardware. |
 | A plan generates with fewer meals than configured | Not enough liked recipes in the library yet — see step 4.2. Not a bug: a short plan beats a failed one, and meal planning only ever draws from recipes already saved. |
 | A recipe file you hand-edited (or dropped in from elsewhere) doesn't show up in the library | It's likely not valid Markdown+YAML-frontmatter — `RecipeStore.list()` normalizes it through the same LLM extraction pipeline automatically (see `architecture.md`'s "Recipe file normalization" row); if that also fails, it's skipped with a warning logged rather than crashing the page. |
+| `bazel run //:deploy` fails at `systemctl restart` with "Unit little-meals.service not found" | The systemd unit hasn't been installed yet — see the "Remote deployment" setup steps above. |

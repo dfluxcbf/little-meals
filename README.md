@@ -6,14 +6,15 @@ visual design system, [`docs/architecture.md`](docs/architecture.md) for
 technical decisions, and [`docs/milestones.md`](docs/milestones.md) for the
 implementation roadmap.
 
-Status: Milestones 1-3 and 5-9 implemented (recipe ingestion, household
+Status: Milestones 1-3 and 5-11 implemented (recipe ingestion, household
 preferences, visual design system, weekly plan generation from the recipe
 library, reroll among library recipes, shopping list, cook-along, weekly
-scheduling). Milestone 4's AI-suggestion/Spoonacular integration was removed
-entirely (see M10 in `docs/milestones.md`) - meal planning now draws only
-from recipes already in the cookbook. Milestones 8 (Tailscale remote access)
-and 11 (remote deployment via a systemd service + `bazel run //:deploy`) are
-host/network setup, not application code - see `docs/milestones.md`.
+scheduling, Tailscale remote access, remote deployment). Milestone 4's
+AI-suggestion/Spoonacular integration was removed entirely (see M10 in
+`docs/milestones.md`) - meal planning now draws only from recipes already in
+the cookbook. Milestones 8 (Tailscale remote access) and 11 (remote
+deployment via a systemd service + `bazel run //:deploy`) are host/network
+setup, not application code - see `docs/milestones.md`.
 
 ## Quickstart
 
