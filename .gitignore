@@ -11,3 +11,4 @@ bazel-*
 dist/
 *.egg-info/
 MODULE.bazel.lock
+CLAUDE.md
