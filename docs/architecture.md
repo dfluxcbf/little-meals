@@ -33,6 +33,7 @@ milestone lands.
 | Visual design | `docs/ui_design.md`'s design system, applied at Milestone 9 | Cream/terracotta/sage palette, Fraunces + Inter typography, and the cookbook/fridge-door/pinned-paper metaphors, implemented as plain CSS (`static/app.css`, `static/fonts.css`) plus native HTML disclosure (`<details>`/`<summary>` for the ingredients fridge-door toggle, `<input type="radio">` + `<label>` for the settings day-picker pills) — no client-side JS framework, consistent with the Frontend decision above. Fonts are vendored (`static/vendor/fonts/*.woff2`, SIL OFL-licensed) rather than linked from Google Fonts, for the same no-third-party-CDN reasoning as htmx. |
 | Weekly scheduling | In-process `apscheduler` `BackgroundScheduler` (a thread, not asyncio - matches the rest of the backend's synchronous style), a 60s interval job wrapping `WeeklyScheduler.check_and_maybe_generate` - see the Scheduler component entry above | Single-user, single-host — no need for an external job queue/broker at this scale. Interval polling over a precise cron-style trigger specifically so a household preferences change doesn't require rescheduling anything. |
 | Remote access | [Tailscale](https://tailscale.com) private mesh network (WireGuard-based) | See "Remote access & network security" below. |
+| Deployment | `systemd --user` service + `bazel run //:deploy` | See "Deployment" below. |
 
 ## Remote access & network security
 
@@ -89,6 +90,40 @@ Setup is host-machine configuration (installing/configuring `tailscaled` and
 is tracked as its own milestone (see `milestones.md`) since it has real setup
 steps, a definition of done, and should be documented as it's done.
 
+## Deployment
+
+Development happens by sending prompts to a Claude Code session running directly
+on the home server (via Claude Remote Control), rather than editing locally and
+pushing/pulling. The remaining gap that closes with Milestone 11 is getting an
+accepted change from "edited on disk" to "actually running" without babysitting a
+terminal for it.
+
+**Chosen approach: `lmeals serve` as a `systemd --user` service, redeployed by a
+single Bazel target.**
+
+- `lmeals serve` runs under a user-level systemd unit
+  (`~/.config/systemd/user/little-meals.service`) instead of a foreground
+  terminal/tmux process. `Restart=on-failure` recovers it if it crashes;
+  `systemctl --user enable little-meals` plus `loginctl enable-linger
+  <user>` makes it start at boot and keep running after the Remote Control
+  session that configured it ends — a bare foreground process would die the
+  moment its shell session does, which defeats "reachable whenever I'm away
+  from home."
+- `bazel run //:deploy` is the one command to redeploy a change: it runs
+  `//:install` (preflight + rebuild the wheel + `pipx install --force`) and then
+  `systemctl --user restart little-meals`. Triggering it is a manual step taken
+  in the Remote Control session once a change looks good — no CI/webhook/auto-
+  deploy-on-save, since a change mid-edit shouldn't bounce the household's app.
+- `tailscale serve` (Milestone 8) points at the service's fixed local port
+  (`127.0.0.1:8765`) once, at Milestone 8 setup time, and needs no
+  reconfiguration on any later deploy — restarting the systemd unit doesn't
+  change the port it binds, so the tailnet hostname keeps working across
+  deploys with zero extra steps.
+- No blue/green or zero-downtime handoff: `systemctl restart` has a brief
+  (sub-second, typically) gap while the new process starts. Acceptable at
+  household scale — a two-person household — where a deploy is a rare,
+  deliberate action taken by the person driving it, not a live multi-user cutover.
+
 ## Recipe storage format
 
 Each recipe is one Markdown file under a `recipes/` directory (path configurable),
@@ -140,7 +175,8 @@ dependencies resolved via `pip.parse` off a fully-hashed `requirements_lock.txt`
 | `bazel build //:wheel` | Build the Python wheel. |
 | `bazel run //:preflight` | Run the system-dependency check on its own. |
 | `bazel run //:install` | Preflight-gated `pipx install` of the wheel. |
-| `bazel run //:serve` | Run the web app (`uvicorn`). |
+| `bazel run //:serve` | Run the web app (`uvicorn`), foreground, for local development. |
+| `bazel run //:deploy` | Milestone 11: rebuild + `pipx install` the wheel, then restart the `little-meals` systemd `--user` service — see "Deployment" below. |
 | `bazel test //...` | Run the unit test suite (hermetic, no network). |
 
 The non-Bazel path (`pyproject.toml`, `pip install .`) exists for local/editable

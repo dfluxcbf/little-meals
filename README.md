@@ -11,8 +11,9 @@ preferences, visual design system, weekly plan generation from the recipe
 library, reroll among library recipes, shopping list, cook-along, weekly
 scheduling). Milestone 4's AI-suggestion/Spoonacular integration was removed
 entirely (see M10 in `docs/milestones.md`) - meal planning now draws only
-from recipes already in the cookbook. Milestone 8 (Tailscale remote access)
-is host/network setup, not application code - see `docs/milestones.md`.
+from recipes already in the cookbook. Milestones 8 (Tailscale remote access)
+and 11 (remote deployment via a systemd service + `bazel run //:deploy`) are
+host/network setup, not application code - see `docs/milestones.md`.
 
 ## Quickstart
 
