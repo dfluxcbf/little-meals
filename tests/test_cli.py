@@ -78,15 +78,19 @@ def _seed_household_preferences(db_path, *, recipes_per_week):
     HouseholdPreferencesStore(db_path).put(
         HouseholdPreferencesUpdate(
             recipes_per_week=recipes_per_week,
+            recommendation_enabled=True,
             recommendation_day=DayOfWeek.SUNDAY,
             recommendation_time=time(9, 0),
+            auto_confirm_enabled=False,
+            auto_confirm_day=DayOfWeek.SUNDAY,
+            auto_confirm_time=time(9, 0),
             default_servings="2 adults",
         )
     )
 
 
 def _seed_recipe(store, name: str = "Old Recipe"):
-    from little_meals.models import Classification, Ingredient, Nutrition, Preference, Recipe
+    from little_meals.models import Classification, Ingredient, Nutrition, Recipe
 
     now = datetime.now(timezone.utc)
     return store.create(
@@ -98,7 +102,6 @@ def _seed_recipe(store, name: str = "Old Recipe"):
             nutrition=Nutrition(calories_per_serving=100),
             ingredients=[Ingredient(name="salt")],
             steps=["Do it."],
-            preference=Preference.LIKED,
             created_at=now,
             updated_at=now,
         )
@@ -150,8 +153,12 @@ def test_settings_reset_resets_settings_but_keeps_recipes(monkeypatch, tmp_path,
     household_store.put(
         HouseholdPreferencesUpdate(
             recipes_per_week=7,
+            recommendation_enabled=True,
             recommendation_day=DayOfWeek.SUNDAY,
             recommendation_time=time(9, 0),
+            auto_confirm_enabled=False,
+            auto_confirm_day=DayOfWeek.SUNDAY,
+            auto_confirm_time=time(9, 0),
             default_servings="2 adults",
         )
     )

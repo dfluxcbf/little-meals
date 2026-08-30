@@ -9,7 +9,7 @@
   <p class="subtitle"><a href="/plan">Finalize this week's plan</a> to generate a shopping list for it.</p>
 {% elif shopping_list is none %}
   <p class="subtitle">Ready when you are.</p>
-  <form method="post" action="/shopping/generate">
+  <form method="post" action="/shopping/generate" class="btn-form-right">
     <button type="submit" class="btn btn-primary">Generate shopping list</button>
   </form>
 {% else %}

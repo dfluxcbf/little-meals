@@ -12,7 +12,7 @@ def test_current_plan_404_when_none_generated(client: TestClient):
 
 
 @pytest.mark.requirement("REQ-000000020")
-def test_generate_creates_a_plan_from_liked_library_recipes(client: TestClient, sample_recipe):
+def test_generate_creates_a_plan_from_library_recipes(client: TestClient, sample_recipe):
     created = client.post("/api/recipes", json=_recipe_create_payload(sample_recipe)).json()
     client.put(
         "/api/household-preferences",
@@ -31,16 +31,6 @@ def test_generate_creates_a_plan_from_liked_library_recipes(client: TestClient, 
     assert len(body["meals"]) == 1
     assert body["meals"][0]["recipe_id"] == created["id"]
     assert body["meals"][0]["cooked"] is False
-
-
-@pytest.mark.requirement("REQ-000000020")
-def test_generate_excludes_disliked_recipes(client: TestClient, sample_recipe):
-    created = client.post("/api/recipes", json=_recipe_create_payload(sample_recipe)).json()
-    client.patch(f"/api/recipes/{created['id']}/preference", json={"preference": "disliked"})
-
-    response = client.post("/api/plan/generate")
-    assert response.status_code == 201
-    assert response.json()["meals"] == []
 
 
 @pytest.mark.requirement("REQ-000000020")
@@ -75,10 +65,22 @@ def test_update_cooked(client: TestClient, sample_recipe):
     client.post("/api/recipes", json=_recipe_create_payload(sample_recipe))
     plan = client.post("/api/plan/generate").json()
     meal_id = plan["meals"][0]["id"]
+    client.post(f"/api/plan/{plan['id']}/finalize")
 
     response = client.patch(f"/api/plan/{plan['id']}/meals/{meal_id}/cooked", json={"cooked": True})
     assert response.status_code == 200
     assert response.json()["meals"][0]["cooked"] is True
+
+
+@pytest.mark.requirement("REQ-000000046")
+def test_update_cooked_on_a_draft_plan_returns_409(client: TestClient, sample_recipe):
+    client.post("/api/recipes", json=_recipe_create_payload(sample_recipe))
+    plan = client.post("/api/plan/generate").json()
+    meal_id = plan["meals"][0]["id"]
+
+    response = client.patch(f"/api/plan/{plan['id']}/meals/{meal_id}/cooked", json={"cooked": True})
+    assert response.status_code == 409
+    assert response.json()["code"] == "PLAN_NOT_FINALIZED"
 
 
 @pytest.mark.requirement("REQ-000000020")
@@ -114,6 +116,7 @@ def test_get_plan_by_id_unknown_404(client: TestClient):
 @pytest.mark.requirement("REQ-000000020")
 def test_update_cooked_unknown_meal_404(client: TestClient):
     plan = client.post("/api/plan/generate").json()
+    client.post(f"/api/plan/{plan['id']}/finalize")
     response = client.patch(f"/api/plan/{plan['id']}/meals/does-not-exist/cooked", json={"cooked": True})
     assert response.status_code == 404
 
@@ -151,8 +154,12 @@ def test_reroll_single_meal_swaps_in_an_unused_library_recipe(client: TestClient
         "/api/household-preferences",
         json={
             "recipes_per_week": 1,
+            "recommendation_enabled": True,
             "recommendation_day": "sunday",
             "recommendation_time": "09:00",
+            "auto_confirm_enabled": False,
+            "auto_confirm_day": "sunday",
+            "auto_confirm_time": "09:00",
             "default_servings": "2 adults",
         },
     )
@@ -174,8 +181,12 @@ def test_reroll_single_meal_422_when_nothing_available(client: TestClient, sampl
         "/api/household-preferences",
         json={
             "recipes_per_week": 1,
+            "recommendation_enabled": True,
             "recommendation_day": "sunday",
             "recommendation_time": "09:00",
+            "auto_confirm_enabled": False,
+            "auto_confirm_day": "sunday",
+            "auto_confirm_time": "09:00",
             "default_servings": "2 adults",
         },
     )
@@ -197,6 +208,83 @@ def test_reroll_single_meal_on_finalized_plan_409(client: TestClient, sample_rec
     assert response.status_code == 409
 
 
+@pytest.mark.requirement("REQ-000000047")
+def test_add_meal_appends_an_unused_recipe(client: TestClient, sample_recipe):
+    created = client.post("/api/recipes", json=_recipe_create_payload(sample_recipe)).json()
+    client.put(
+        "/api/household-preferences",
+        json={
+            "recipes_per_week": 1,
+            "recommendation_enabled": True,
+            "recommendation_day": "sunday",
+            "recommendation_time": "09:00",
+            "auto_confirm_enabled": False,
+            "auto_confirm_day": "sunday",
+            "auto_confirm_time": "09:00",
+            "default_servings": "2 adults",
+        },
+    )
+    plan = client.post("/api/plan/generate").json()
+
+    other = {**_recipe_create_payload(sample_recipe), "name": "Other Dish"}
+    other_created = client.post("/api/recipes", json=other).json()
+
+    response = client.post(f"/api/plan/{plan['id']}/meals")
+    assert response.status_code == 201
+    body = response.json()
+    assert len(body["meals"]) == 2
+    assert {m["recipe_id"] for m in body["meals"]} == {created["id"], other_created["id"]}
+
+
+@pytest.mark.requirement("REQ-000000047")
+def test_add_meal_422_when_nothing_available(client: TestClient, sample_recipe):
+    client.post("/api/recipes", json=_recipe_create_payload(sample_recipe))
+    plan = client.post("/api/plan/generate").json()
+
+    response = client.post(f"/api/plan/{plan['id']}/meals")
+    assert response.status_code == 422
+    assert response.json()["code"] == "NO_REPLACEMENT_AVAILABLE"
+
+
+@pytest.mark.requirement("REQ-000000047")
+def test_add_meal_on_finalized_plan_409(client: TestClient, sample_recipe):
+    client.post("/api/recipes", json=_recipe_create_payload(sample_recipe))
+    plan = client.post("/api/plan/generate").json()
+    client.post(f"/api/plan/{plan['id']}/finalize")
+
+    response = client.post(f"/api/plan/{plan['id']}/meals")
+    assert response.status_code == 409
+
+
+@pytest.mark.requirement("REQ-000000047")
+def test_remove_meal_deletes_it(client: TestClient, sample_recipe):
+    client.post("/api/recipes", json=_recipe_create_payload(sample_recipe))
+    plan = client.post("/api/plan/generate").json()
+    meal_id = plan["meals"][0]["id"]
+
+    response = client.delete(f"/api/plan/{plan['id']}/meals/{meal_id}")
+    assert response.status_code == 200
+    assert response.json()["meals"] == []
+
+
+@pytest.mark.requirement("REQ-000000047")
+def test_remove_meal_unknown_meal_404(client: TestClient):
+    plan = client.post("/api/plan/generate").json()
+    response = client.delete(f"/api/plan/{plan['id']}/meals/does-not-exist")
+    assert response.status_code == 404
+
+
+@pytest.mark.requirement("REQ-000000047")
+def test_remove_meal_on_finalized_plan_409(client: TestClient, sample_recipe):
+    client.post("/api/recipes", json=_recipe_create_payload(sample_recipe))
+    plan = client.post("/api/plan/generate").json()
+    meal_id = plan["meals"][0]["id"]
+    client.post(f"/api/plan/{plan['id']}/finalize")
+
+    response = client.delete(f"/api/plan/{plan['id']}/meals/{meal_id}")
+    assert response.status_code == 409
+
+
 @pytest.mark.requirement("REQ-000000027")
 def test_controlled_reroll_alternatives_excludes_meals_already_in_plan(client: TestClient, sample_recipe):
     created = client.post("/api/recipes", json=_recipe_create_payload(sample_recipe)).json()
@@ -207,8 +295,12 @@ def test_controlled_reroll_alternatives_excludes_meals_already_in_plan(client: T
         "/api/household-preferences",
         json={
             "recipes_per_week": 1,
+            "recommendation_enabled": True,
             "recommendation_day": "sunday",
             "recommendation_time": "09:00",
+            "auto_confirm_enabled": False,
+            "auto_confirm_day": "sunday",
+            "auto_confirm_time": "09:00",
             "default_servings": "2 adults",
         },
     )
@@ -218,8 +310,8 @@ def test_controlled_reroll_alternatives_excludes_meals_already_in_plan(client: T
     response = client.get(f"/api/plan/{plan['id']}/meals/{meal_id}/alternatives")
     assert response.status_code == 200
     ids = [r["id"] for r in response.json()]
-    # Whichever of the two liked recipes ISN'T already in the plan (selection
-    # is randomized) should show up as the one available alternative.
+    # Whichever of the two recipes ISN'T already in the plan (selection is
+    # randomized) should show up as the one available alternative.
     assert ids == list(both_ids - {plan["meals"][0]["recipe_id"]})
     assert plan["meals"][0]["recipe_id"] not in ids
 
@@ -240,8 +332,12 @@ def test_choose_alternative_sets_the_recipe(client: TestClient, sample_recipe):
         "/api/household-preferences",
         json={
             "recipes_per_week": 1,
+            "recommendation_enabled": True,
             "recommendation_day": "sunday",
             "recommendation_time": "09:00",
+            "auto_confirm_enabled": False,
+            "auto_confirm_day": "sunday",
+            "auto_confirm_time": "09:00",
             "default_servings": "2 adults",
         },
     )

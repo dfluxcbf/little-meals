@@ -11,7 +11,7 @@ import yaml
 
 from little_meals.llm.extraction import ExtractionError, RecipeExtractionService
 from little_meals.llm.ollama_client import OllamaUnavailable
-from little_meals.models import Preference, Recipe
+from little_meals.models import Recipe
 from little_meals.store.frontmatter import FrontmatterError, render, slugify, split
 
 logger = logging.getLogger(__name__)
@@ -105,15 +105,8 @@ class RecipeStore:
                 "id": recipe_id,
                 "created_at": existing.created_at,
                 "updated_at": datetime.now(timezone.utc),
-                "preference": existing.preference,
             }
         )
-        self._write(stored)
-        return stored
-
-    def set_preference(self, recipe_id: str, preference: Preference) -> Recipe:
-        existing = self.get(recipe_id)
-        stored = existing.model_copy(update={"preference": preference, "updated_at": datetime.now(timezone.utc)})
         self._write(stored)
         return stored
 
@@ -142,7 +135,6 @@ class RecipeStore:
             servings=data.get("servings", 2),
             ingredients=data["ingredients"],
             steps=steps,
-            preference=data.get("preference", "liked"),
             source_text=data.get("source_text"),
             created_at=data["created_at"],
             updated_at=data["updated_at"],
@@ -157,7 +149,6 @@ class RecipeStore:
             "nutrition": recipe.nutrition.model_dump(exclude_none=True),
             "servings": recipe.servings,
             "ingredients": [ingredient.model_dump(exclude_none=True) for ingredient in recipe.ingredients],
-            "preference": recipe.preference.value,
             "source_text": recipe.source_text,
             "created_at": recipe.created_at.isoformat(),
             "updated_at": recipe.updated_at.isoformat(),

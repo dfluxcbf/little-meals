@@ -141,6 +141,36 @@ main.content {
   padding: 24px 20px calc(var(--tabbar-height) + 24px + env(safe-area-inset-bottom, 0px));
 }
 
+/* This week's plan: the whole page fits one screen, no scrolling - the
+   meal card centers in whatever vertical space is left over once the
+   title/subtitle and the fixed header/tabbar/action-bar are accounted
+   for. app-shell's height is capped to the viewport (rather than just
+   min-height) only while this page is showing, via :has(). */
+.app-shell:has(main.content-plan) {
+  height: 100dvh;
+  overflow: hidden;
+}
+
+main.content.content-plan {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+main.content.content-plan > h1,
+main.content.content-plan > .subtitle,
+main.content.content-plan > .badge {
+  flex-shrink: 0;
+}
+
+.plan-center {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
 nav.tabbar {
   position: fixed;
   left: 0;
@@ -306,14 +336,9 @@ nav.tabbar {
   color: var(--terracotta);
 }
 
-.badge-liked {
+.badge-finalized {
   background: var(--sage-soft);
   color: var(--sage);
-}
-
-.badge-disliked {
-  background: var(--rose-soft);
-  color: var(--rose);
 }
 
 /* -------------------------------------------------------- recipe library */
@@ -376,25 +401,6 @@ nav.tabbar {
   gap: 10px;
   font-size: 12px;
   color: var(--ink-soft);
-}
-
-.heart-btn {
-  border: none;
-  background: none;
-  padding: 2px;
-  cursor: pointer;
-  flex-shrink: 0;
-  color: var(--ink-faint);
-  line-height: 0;
-}
-
-.heart-btn.heart-liked {
-  color: var(--sage);
-}
-
-.heart-btn svg {
-  width: 20px;
-  height: 20px;
 }
 
 /* --------------------------------------------------------- recipe detail */
@@ -563,6 +569,96 @@ form button {
   margin-top: 20px;
 }
 
+.editor-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.editor-row {
+  display: grid;
+  grid-template-columns: 1fr 120px auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.editor-row-step {
+  grid-template-columns: 1fr auto;
+}
+
+.row-remove-btn {
+  margin-top: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1.5px solid var(--line);
+  background: var(--paper);
+  color: var(--ink-soft);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.row-remove-btn:hover {
+  border-color: var(--rose);
+  color: var(--rose);
+}
+
+.add-row-btn {
+  display: block;
+  margin-top: 10px;
+  margin-left: auto;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.form-actions .btn {
+  margin-top: 0;
+}
+
+.delete-recipe-form {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 24px;
+}
+
+.delete-recipe-form .btn {
+  margin-top: 0;
+}
+
+.detail-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+/* Right-hand-thumb-first ergonomics (see ui_design.md): wrap a lone
+   action button (or a button that's the only thing in its form) in this
+   to pin it to the right edge instead of the left. Not for rows that are
+   already a deliberate side-by-side pairing (cook-along prev/next, the
+   cook-finish choice cards, the bottom plan toolbar) - those keep their
+   own layout. */
+.btn-form-right {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.detail-actions form {
+  margin: 0;
+}
+
+.detail-actions .btn {
+  margin-top: 0;
+}
+
 .settings-section {
   background: var(--paper);
   border: 1px solid var(--line);
@@ -674,7 +770,7 @@ form button {
 
 .nutrient-grid {
   display: grid;
-  grid-template-columns: 1fr 84px 84px;
+  grid-template-columns: 1fr 110px;
   gap: 8px 10px;
   align-items: center;
   margin-top: 12px;
@@ -900,38 +996,8 @@ main.content:has(+ .plan-actions-bar) {
 .plan-meal-actions {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   margin-top: 10px;
-}
-
-.thumb-btn {
-  width: 30px;
-  height: 30px;
-  border-radius: 999px;
-  border: 1.5px solid var(--line);
-  background: var(--paper);
-  color: var(--ink-soft);
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.thumb-btn svg {
-  width: 14px;
-  height: 14px;
-}
-
-.thumb-liked {
-  border-color: var(--sage);
-  background: var(--sage-soft);
-  color: var(--sage);
-}
-
-.thumb-disliked {
-  border-color: var(--rose);
-  background: var(--rose-soft);
-  color: var(--rose);
 }
 
 .reroll-actions {

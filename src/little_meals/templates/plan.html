@@ -1,21 +1,32 @@
 {% extends "base.html" %}
 {% block title %}This week - little-meals{% endblock %}
+{% block content_class %}content-plan{% endblock %}
 {% block content %}
 <h1>This week's plan</h1>
 
 {% if plan is none %}
   <p class="subtitle">No plan yet - the household picks meals from the cookbook whenever suits them, no day-to-day schedule.</p>
-  <form method="post" action="/plan/generate">
-    <button type="submit" class="btn btn-primary">Generate this week's plan</button>
-  </form>
 {% else %}
   <p class="subtitle">Pick what you're making this week, in any order.</p>
   {% if plan.finalized %}
-    <p class="badge badge-liked" style="margin-bottom: 16px;">Finalized</p>
+    <p class="badge badge-finalized" style="margin-bottom: 16px;">Finalized</p>
   {% endif %}
+{% endif %}
 
-  {% if not meals %}
-    <p>No recipes in the cookbook yet to fill a plan. <a href="/recipes/new">Add one</a>, then generate again.</p>
+<div class="plan-center">
+  {% if plan is none %}
+    <form method="post" action="/plan/generate" class="btn-form-right">
+      <button type="submit" class="btn btn-primary">Generate this week's plan</button>
+    </form>
+  {% elif not meals %}
+    {% if library_has_recipes %}
+      <p>No meals in this plan yet.</p>
+      <form method="post" action="/plan/meals/add" class="btn-form-right">
+        <button type="submit" class="btn btn-primary">+ Add a meal</button>
+      </form>
+    {% else %}
+      <p>No recipes in the cookbook yet to fill a plan. <a href="/recipes/new">Add one</a>, then generate again.</p>
+    {% endif %}
   {% else %}
     <div class="plan-flipbook">
       <div class="flipbook-spine" aria-hidden="true">
@@ -38,8 +49,13 @@
         {% for item in meals %}<span class="flipbook-dot"></span>{% endfor %}
       </div>
     {% endif %}
+    {% if not plan.finalized %}
+      <form method="post" action="/plan/meals/add" class="btn-form-right" style="margin-top: 14px;">
+        <button type="submit" class="btn btn-secondary">+ Add a meal</button>
+      </form>
+    {% endif %}
   {% endif %}
-{% endif %}
+</div>
 {% endblock %}
 
 {% block extra_scripts %}
@@ -59,9 +75,15 @@
       <button type="submit" class="btn btn-primary">Confirm Plan</button>
     </form>
   {% endif %}
-  <form method="post" action="/plan/cancel" onsubmit="return confirm('Cancel this week\'s plan? This deletes all planned meals and the shopping list. This cannot be undone.');">
-    <button type="submit" class="btn btn-danger">Cancel Plan</button>
-  </form>
+  {% if all_cooked %}
+    <form method="post" action="/plan/generate">
+      <button type="submit" class="btn btn-primary">Plan Ahead</button>
+    </form>
+  {% else %}
+    <form method="post" action="/plan/cancel" onsubmit="return confirm('Cancel this week\'s plan? This deletes all planned meals and the shopping list. This cannot be undone.');">
+      <button type="submit" class="btn btn-danger">Cancel Plan</button>
+    </form>
+  {% endif %}
 </div>
 {% endif %}
 {% endblock %}

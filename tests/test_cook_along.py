@@ -162,7 +162,7 @@ def test_leaving_and_returning_resumes_at_the_saved_step(client: TestClient, sam
 
 
 @pytest.mark.requirement("REQ-000000034")
-def test_cook_finish_marks_cooked_does_not_change_preference(client: TestClient, sample_recipe):
+def test_cook_finish_marks_cooked(client: TestClient, sample_recipe):
     created = _create_recipe(client, sample_recipe)
 
     response = client.post(f"/recipes/{created['id']}/cook/finish", data={"action": "cooked"})
@@ -170,20 +170,14 @@ def test_cook_finish_marks_cooked_does_not_change_preference(client: TestClient,
     assert "Got it" in response.text
     assert "Marked as cooked" in response.text
 
-    recipe = client.get(f"/api/recipes/{created['id']}").json()
-    assert recipe["preference"] == created["preference"]
-
 
 @pytest.mark.requirement("REQ-000000034")
-def test_cook_finish_leave_uncooked_does_not_change_preference(client: TestClient, sample_recipe):
+def test_cook_finish_leave_uncooked(client: TestClient, sample_recipe):
     created = _create_recipe(client, sample_recipe)
 
     response = client.post(f"/recipes/{created['id']}/cook/finish", data={"action": "uncooked"})
     assert response.status_code == 200
     assert "Left uncooked" in response.text
-
-    recipe = client.get(f"/api/recipes/{created['id']}").json()
-    assert recipe["preference"] == created["preference"]
 
 
 @pytest.mark.requirement("REQ-000000034")

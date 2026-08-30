@@ -149,6 +149,31 @@ test coverage are tracked exclusively through **little-requirements**
   outnumbered by passing live ones). If this needs to show clean, the only
   known fix is deleting and recreating the requirement (which reassigns its
   ID and requires retagging every test and doc reference to it).
+- Milestone 12 (`m12-recipe-add-edit` suite) created one requirement,
+  REQ-000000045, covering the shared recipe edit page (new/edit) — tagged
+  across the `test_new_recipe_form_*`/`test_edit_recipe_form_*` cases in
+  `tests/test_api_ui.py`. The M1 free-text/Ollama-extraction "New recipe"
+  flow and its `recipe_new.html` template were removed as part of this
+  milestone (the JSON API's `POST /api/recipes/extract` endpoint was left
+  as-is, out of scope - it isn't the UI flow M12 replaces).
+- Milestone 13 (`m13-remove-like-dislike` suite) removed the liked/disliked
+  recipe-preference feature entirely (see `milestones.md`'s M13 entry).
+  Deleted requirements: REQ-000000002 (preference persistence in the recipe
+  store) and REQ-000000028 (plan-review like/dislike UI). Edited in place:
+  REQ-000000006 (recipe CRUD JSON API - dropped the preference filter/toggle
+  clauses), REQ-000000018 (selection engine - no longer liked-only),
+  REQ-000000025 to REQ-000000027 (whole-plan/single-meal/controlled reroll -
+  no longer liked-only). No new requirements were created, since this
+  milestone only removes behavior other requirements already covered more
+  broadly.
+- Milestone 14 (`m14-plan-lifecycle-automation` suite) created four
+  requirements, REQ-000000046 to REQ-000000049, covering mark-cooked
+  visibility + the "Plan Ahead" button, per-plan add/remove-meal, the
+  recommendation-day enable toggle + force-finalize-on-generate, and the new
+  independent auto-confirm-plan schedule (see `milestones.md`'s M14 entry) -
+  tagged across `tests/test_plan_store.py`, `tests/test_scheduler.py`,
+  `tests/test_plan_ui.py`, `tests/test_api_plan.py`, and
+  `tests/test_settings_ui.py`.
 - Known issue: `lreq update` (what the Bazel genrule invokes) cannot run inside
   this submodule checkout — `little-requirements`' managed pre-commit-hook
   installer assumes `.git` is a directory, and a submodule's `.git` is a file.

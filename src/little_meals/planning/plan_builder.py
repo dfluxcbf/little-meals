@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 from little_meals.llm.extraction import RecipeExtractionService
-from little_meals.models import HouseholdPreferences, Preference, Recipe
+from little_meals.models import HouseholdPreferences, Recipe
 from little_meals.planning.selection import select_recipes_for_plan
 from little_meals.store.household_store import HouseholdPreferencesStore
 from little_meals.store.plan_store import MealSpec
@@ -23,8 +23,8 @@ class GeneratedMeal:
 
 def build_weekly_plan(recipes: list[Recipe], preferences: HouseholdPreferences, rng: Optional[random.Random] = None) -> list[GeneratedMeal]:
     """Fills a plan from the existing recipe library only (Milestone 3's
-    selection engine), up to `recipes_per_week` - a library with fewer liked
-    recipes than that yields a shorter plan rather than inventing anything."""
+    selection engine), up to `recipes_per_week` - a smaller library yields a
+    shorter plan rather than inventing anything."""
     rng = rng or random.Random()
     library_picks = select_recipes_for_plan(recipes, preferences.recipes_per_week, rng=rng)
     return [GeneratedMeal(recipe=r, servings=r.servings) for r in library_picks]
@@ -52,12 +52,11 @@ def generate_single_replacement(
     recipes: list[Recipe],
     rng: Optional[random.Random] = None,
 ) -> Optional[GeneratedMeal]:
-    """Single-meal reroll: pick a liked library recipe not already used
-    elsewhere in the plan. Returns None if the library has nothing left to
-    offer (caller leaves the slot as it was)."""
+    """Single-meal reroll: pick a library recipe not already used elsewhere
+    in the plan. Returns None if the library has nothing left to offer
+    (caller leaves the slot as it was)."""
     rng = rng or random.Random()
-    liked = [r for r in recipes if r.preference == Preference.LIKED]
-    unused = [r for r in liked if r.id not in excluded_recipe_ids]
+    unused = [r for r in recipes if r.id not in excluded_recipe_ids]
     if not unused:
         return None
     chosen = rng.choice(unused)
@@ -70,9 +69,9 @@ def list_controlled_reroll_candidates(
     limit: int = 10,
     rng: Optional[random.Random] = None,
 ) -> list[Recipe]:
-    """Controlled reroll: up to `limit` liked library recipes not already
-    used elsewhere in the plan, for the household to pick from directly."""
-    candidates = [r for r in recipes if r.preference == Preference.LIKED and r.id not in excluded_recipe_ids]
+    """Controlled reroll: up to `limit` library recipes not already used
+    elsewhere in the plan, for the household to pick from directly."""
+    candidates = [r for r in recipes if r.id not in excluded_recipe_ids]
     if len(candidates) <= limit:
         return candidates
     rng = rng or random.Random()

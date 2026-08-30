@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from little_meals.models import Classification, HouseholdPreferences, Ingredient, Nutrition, Preference, Recipe
+from little_meals.models import Classification, HouseholdPreferences, Ingredient, Nutrition, Recipe
 from little_meals.planning.plan_builder import (
     build_weekly_plan,
     generate_single_replacement,
@@ -14,7 +14,7 @@ from little_meals.planning.plan_builder import (
 from little_meals.store.recipe_store import RecipeStore
 
 
-def _recipe(name: str, preference: Preference = Preference.LIKED) -> Recipe:
+def _recipe(name: str) -> Recipe:
     now = datetime(2026, 1, 1, tzinfo=timezone.utc)
     return Recipe(
         id=name.lower().replace(" ", "-"),
@@ -25,7 +25,6 @@ def _recipe(name: str, preference: Preference = Preference.LIKED) -> Recipe:
         servings=2,
         ingredients=[Ingredient(name="something", quantity=1, unit="cup")],
         steps=["Cook it."],
-        preference=preference,
         created_at=now,
         updated_at=now,
     )
@@ -41,18 +40,6 @@ def test_build_weekly_plan_fills_from_library_up_to_recipes_per_week(store: Reci
 
     assert len(generated) == 2
     assert {g.recipe.name for g in generated} == {"A", "B"}
-
-
-@pytest.mark.requirement("REQ-000000044")
-def test_build_weekly_plan_excludes_disliked_recipes(store: RecipeStore):
-    store.create(_recipe("A"))
-    store.create(_recipe("B", Preference.DISLIKED))
-    preferences = HouseholdPreferences(recipes_per_week=5)
-
-    generated = build_weekly_plan(store.list(), preferences, rng=random.Random(0))
-
-    assert len(generated) == 1
-    assert generated[0].recipe.name == "A"
 
 
 @pytest.mark.requirement("REQ-000000044")
@@ -96,16 +83,16 @@ def test_generate_single_replacement_returns_none_when_nothing_available(store: 
 
 
 @pytest.mark.requirement("REQ-000000027")
-def test_list_controlled_reroll_candidates_excludes_used_and_disliked(store: RecipeStore):
+def test_list_controlled_reroll_candidates_excludes_used(store: RecipeStore):
     store.create(_recipe("A"))
     store.create(_recipe("B"))
-    store.create(_recipe("C", Preference.DISLIKED))
+    store.create(_recipe("C"))
     recipes = store.list()
     used = {r.id for r in recipes if r.name == "A"}
 
     candidates = list_controlled_reroll_candidates(used, recipes)
 
-    assert {c.name for c in candidates} == {"B"}
+    assert {c.name for c in candidates} == {"B", "C"}
 
 
 @pytest.mark.requirement("REQ-000000027")
