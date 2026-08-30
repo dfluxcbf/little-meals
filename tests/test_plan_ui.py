@@ -1,59 +1,7 @@
 from __future__ import annotations
 
-import json
-
-import httpx
 import pytest
 from fastapi.testclient import TestClient
-
-from little_meals.api.app import create_app
-from little_meals.config import Settings
-from little_meals.llm.extraction import RecipeExtractionService
-from little_meals.llm.ollama_client import OllamaClient
-from little_meals.store.household_store import HouseholdPreferencesStore
-from little_meals.store.notification_store import NotificationStore
-from little_meals.store.plan_store import MealPlanStore, MealSpec
-from little_meals.store.recipe_store import RecipeStore
-from little_meals.store.shopping_list_store import ShoppingListStore
-
-VALID_EXTRACTED = {
-    "name": "Fusion Bowl",
-    "cook_time_minutes": 25,
-    "classification": "vegetarian",
-    "nutrition": {"calories_per_serving": 420},
-    "servings": 2,
-    "ingredients": [{"name": "rice", "quantity": 1, "unit": "cup"}],
-    "steps": ["Cook it."],
-}
-
-
-class _FakeSearchProvider:
-    def search_many(self, food_filter, count: int) -> list[str]:
-        return [f"candidate {i}" for i in range(count)]
-
-    def get_substitutes(self, ingredient_name: str):
-        return None
-
-
-def _client_with_suggestions(tmp_path) -> TestClient:
-    def handler(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(200, json={"response": json.dumps(VALID_EXTRACTED)})
-
-    ollama_client = OllamaClient(
-        "http://ollama.test", "test-model", 5.0, client=httpx.Client(transport=httpx.MockTransport(handler))
-    )
-    settings = Settings(data_dir=tmp_path)
-    app = create_app(
-        settings=settings,
-        store=RecipeStore(tmp_path / "recipes"),
-        extractor=RecipeExtractionService(ollama_client),
-        household_store=HouseholdPreferencesStore(tmp_path / "household.db"),
-        plan_store=MealPlanStore(tmp_path / "plan.db"),
-        search_provider=_FakeSearchProvider(),
-        shopping_list_store=ShoppingListStore(tmp_path / "shopping_list.db"),
-        notification_store=NotificationStore(tmp_path / "notification.db"),
-    )
-    return TestClient(app)
 
 
 def _create_recipe(client: TestClient, sample_recipe) -> dict:
@@ -255,7 +203,6 @@ def _set_preferences(client: TestClient, **overrides) -> None:
         "recipes_per_week": 1,
         "recommendation_day": "sunday",
         "recommendation_time": "09:00",
-        "ai_suggestions_per_plan": 0,
         "default_servings": "2 adults",
     }
     payload.update(overrides)
@@ -504,17 +451,6 @@ def test_plan_meal_choose_with_unknown_recipe_redirects(client: TestClient, samp
     assert response.status_code == 303
 
 
-@pytest.mark.requirement("REQ-000000028")
-def test_new_suggestion_shows_new_badge(client: TestClient, sample_recipe, store, plan_store):
-    created = store.create(sample_recipe)
-    plan_store.create([MealSpec(created.id, created.servings, is_suggestion=True)])
-
-    response = client.get("/plan")
-    assert response.status_code == 200
-    assert "NEW" in response.text
-    assert "badge-new" in response.text
-
-
 @pytest.mark.requirement("REQ-000000021")
 def test_plan_page_skips_meals_whose_recipe_was_since_deleted(client: TestClient, sample_recipe):
     created = _create_recipe(client, sample_recipe)
@@ -526,55 +462,3 @@ def test_plan_page_skips_meals_whose_recipe_was_since_deleted(client: TestClient
     assert sample_recipe.name not in response.text
 
 
-def _generate_one_suggestion_plan(client: TestClient) -> dict:
-    client.post(
-        "/settings",
-        data={
-            "recipes_per_week": "1",
-            "recommendation_day": "sunday",
-            "recommendation_time": "09:00",
-            "ai_suggestions_per_plan": "1",
-            "default_servings": "2 adults",
-        },
-    )
-    client.post("/plan/generate", follow_redirects=False)
-    return client.get("/api/plan/current").json()
-
-
-def test_suggestion_meal_has_no_dice_reroll_but_has_see_suggestions_link(tmp_path):
-    client = _client_with_suggestions(tmp_path)
-    plan = _generate_one_suggestion_plan(client)
-    meal_id = plan["meals"][0]["id"]
-
-    response = client.get("/plan")
-    assert f'/plan/meals/{meal_id}/reroll' not in response.text
-    assert f'/plan/meals/{meal_id}/suggestions' in response.text
-
-
-def test_suggestions_picker_lists_the_sibling_candidates(tmp_path):
-    client = _client_with_suggestions(tmp_path)
-    plan = _generate_one_suggestion_plan(client)
-    meal_id = plan["meals"][0]["id"]
-
-    response = client.get(f"/plan/meals/{meal_id}/suggestions")
-    assert response.status_code == 200
-    assert "Pick a suggestion" in response.text
-    assert "Fusion Bowl" in response.text
-
-
-def test_choose_suggestion_swaps_the_recipe_and_redirects(tmp_path):
-    client = _client_with_suggestions(tmp_path)
-    plan = _generate_one_suggestion_plan(client)
-    meal_id = plan["meals"][0]["id"]
-    original_recipe_id = plan["meals"][0]["recipe_id"]
-    other = client.get(f"/api/plan/{plan['id']}/meals/{meal_id}/suggestions").json()[0]
-
-    response = client.post(
-        f"/plan/meals/{meal_id}/choose-suggestion", data={"recipe_id": other["id"]}, follow_redirects=False
-    )
-    assert response.status_code == 303
-
-    updated = client.get("/api/plan/current").json()
-    assert updated["meals"][0]["recipe_id"] == other["id"]
-    assert updated["meals"][0]["recipe_id"] != original_recipe_id
-    assert updated["meals"][0]["is_suggestion"] is True

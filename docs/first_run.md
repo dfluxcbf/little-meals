@@ -11,9 +11,6 @@ this way — this doc is just the "how do I get it up" walkthrough.
 - [Ollama](https://ollama.com) installed, with a model pulled (default:
   `qwen2.5-coder:14b`). This is the only hard dependency `bazel run
   //:install` checks for — see `preflight.py`.
-- Optionally, a [Spoonacular](https://spoonacular.com/food-api) API key, if
-  you want AI suggestions to pull from a real recipe search instead of just
-  recombining recipes already in your library. Not required to run the app.
 
 ## 1. Build and install
 
@@ -50,36 +47,12 @@ ollama pull qwen2.5-coder:14b       # pull the default model, if you haven't
 If you want a different model, set `LITTLE_MEALS_OLLAMA_MODEL` before
 starting the server (step 4).
 
-## 3. (Optional) Configure Spoonacular
-
-Skip this the first time through — the app works fully without it, just
-without one of the two AI-suggestion sources (see `architecture.md`'s
-"Online recipe search" row). Come back to it once you want that.
-
-Two ways to configure the key, pick one:
-
-- **Quick, for testing**: `export LITTLE_MEALS_SPOONACULAR_API_KEY=<your key>`
-- **Recommended, for actual use**: encrypt it once, decrypt at server
-  startup:
-
-  ```
-  openssl enc -aes-256-cbc -pbkdf2 -salt -in key.txt -out spoonacular.enc
-  chmod 600 spoonacular.enc
-  export LITTLE_MEALS_SPOONACULAR_KEY_FILE=~/.vault/spoonacular.enc  # wherever you put it
-  ```
-
-  `lmeals serve` will prompt for the passphrase on startup and hold the
-  decrypted key in memory only — see `architecture.md`'s "Spoonacular API key
-  storage" row for why.
-
-## 4. Start the server
+## 3. Start the server
 
 ```
 lmeals serve
 ```
 
-- Prompts for the vault passphrase first, if `LITTLE_MEALS_SPOONACULAR_KEY_FILE`
-  is set.
 - Once you see `Uvicorn running on http://127.0.0.1:8765`, open that URL in a
   browser. On WSL2, this is normally reachable from a Windows browser at the
   same address without any extra port-forwarding.
@@ -92,37 +65,34 @@ lmeals serve
 Leave this running in its own terminal — it's the whole app (frontend and
 API in one process). `Ctrl+C` to stop it.
 
-## 5. Walk through the app once
+## 4. Walk through the app once
 
 The recipe library starts empty. A sensible first pass:
 
-1. **`/settings`** — review the household preferences (recipes per week, AI
-   suggestions per plan, recommendation day/time, food preferences, default
-   servings). Sane defaults are already in effect even if you skip this —
-   5 recipes/week, 2 of them AI-suggested, Sundays at 09:00 — but it's worth
-   a look before your first plan generates.
+1. **`/settings`** — review the household preferences (recipes per week,
+   recommendation day/time, default servings). Sane defaults are already in
+   effect even if you skip this — 5 recipes/week, Sundays at 09:00 — but
+   it's worth a look before your first plan generates.
 
-2. **`/recipes/new`** — add 2-3 recipes by pasting in free text (a copied
-   recipe, or just plain description of how you make something). Each
-   submission goes through the local LLM for extraction (cook time,
+2. **`/recipes/new`** — add a handful of recipes by pasting in free text (a
+   copied recipe, or just plain description of how you make something).
+   Each submission goes through the local LLM for extraction (cook time,
    classification, nutrition estimate, ingredients, steps) — this is the
-   slowest step in the app, give it a few seconds. Add at least two you'd
-   mark "liked" (the default) — the AI suggestion engine needs at least two
-   liked recipes in the library to generate a combination suggestion if
-   Spoonacular isn't configured, so a plan generated against an empty
-   library will come back short (see `plan_builder.py`: "a shorter plan
-   beats no plan," it won't error, just skip what it can't fill).
+   slowest step in the app, give it a few seconds. A plan can only be built
+   from recipes already in the library, so add at least as many as your
+   `recipes_per_week` setting if you want a full plan on the first try -
+   a smaller library just yields a shorter plan rather than an error (see
+   `plan_builder.py`: "a shorter plan beats no plan").
 
 3. **`/recipes`** — confirm they extracted sensibly. You can edit or delete
    any of them here, or open one to check the parsed ingredients/steps.
 
-4. **`/plan`** — generate a weekly plan. It fills the library-drawn slots
-   from what you just added, then tops up with AI suggestions (search, if
-   configured, else combining two liked recipes). Like/dislike each meal,
-   adjust servings, or reroll (whole plan, one meal, or a controlled reroll
-   offering ten alternatives for a single slot) if something doesn't land.
-   Finalize the plan once you're happy — this locks it and unblocks the
-   shopping list.
+4. **`/plan`** — generate a weekly plan. It draws recipes from the library
+   you just built, up to your configured `recipes_per_week` count.
+   Like/dislike each meal, adjust servings, or reroll (whole plan, one meal,
+   or a controlled reroll offering ten alternatives for a single slot,
+   always among your own liked recipes) if something doesn't land. Finalize
+   the plan once you're happy — this locks it and unblocks the shopping list.
 
 5. **`/shopping`** — generate the shopping list for the finalized plan.
    Ingredients are merged and scaled across all the week's recipes. Check
@@ -150,6 +120,5 @@ notification banner when it does — no cron job or separate process needed.
 | `bazel run //:install` stops at "local LLM runtime" | Ollama isn't installed/reachable — see step 2. |
 | `lmeals: command not found` after install | pipx's bin dir isn't on `PATH` in this shell — check `pipx list` shows `little-meals`, then add `~/.local/bin` to `PATH` (or open a new shell). |
 | Recipe extraction hangs or times out | Ollama isn't actually serving, or the configured model isn't pulled — recheck step 2. `LITTLE_MEALS_OLLAMA_TIMEOUT` (seconds, default 120) if it's just slow on your hardware. |
-| A plan generates with fewer meals than configured | Not enough liked library recipes and no search provider configured — see step 5.2. Not a bug: a short plan beats a failed one. |
-| Server prompts for a vault passphrase you don't want to enter right now | Unset `LITTLE_MEALS_SPOONACULAR_KEY_FILE` for that run, or set an empty `LITTLE_MEALS_SPOONACULAR_API_KEY`-free environment — Spoonacular is optional. |
+| A plan generates with fewer meals than configured | Not enough liked recipes in the library yet — see step 4.2. Not a bug: a short plan beats a failed one, and meal planning only ever draws from recipes already saved. |
 | A recipe file you hand-edited (or dropped in from elsewhere) doesn't show up in the library | It's likely not valid Markdown+YAML-frontmatter — `RecipeStore.list()` normalizes it through the same LLM extraction pipeline automatically (see `architecture.md`'s "Recipe file normalization" row); if that also fails, it's skipped with a warning logged rather than crashing the page. |
