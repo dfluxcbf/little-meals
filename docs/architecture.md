@@ -114,6 +114,22 @@ single Bazel target.**
   `systemctl --user restart little-meals`. Triggering it is a manual step taken
   in the Remote Control session once a change looks good — no CI/webhook/auto-
   deploy-on-save, since a change mid-edit shouldn't bounce the household's app.
+- `bazel run //:relaunch` is a more defensive variant of the same idea, for
+  when the service, `tailscaled`, and/or `tailscale serve` are in an unknown
+  state (e.g. after a host reboot, or a stray manually-started `lmeals serve`
+  from before this unit existed is holding the port): it stops the service,
+  kills any `lmeals serve` process still holding port 8765, runs the same
+  install-the-wheel step as `//:deploy`, starts the service back up, checks
+  `tailscaled` is active (starting it if not — see `first_run.md`'s "Remote
+  deployment" section for the passwordless-sudo caveat on that last part),
+  and re-runs `tailscale serve --bg 8765` if `tailscale serve status` shows
+  no config pointed at the app's port. That last check makes `//:relaunch`
+  self-healing against the serve config silently going missing (observed in
+  practice, cause unconfirmed), which `//:deploy` does not attempt. Every
+  step is non-interactive by design, since it's meant to be safely
+  triggerable from a Remote Control session with nobody watching —
+  `tailscale serve` specifically needs `sudo tailscale set
+  --operator=<user>` run once beforehand so it doesn't need root either.
 - `tailscale serve` (Milestone 8) points at the service's fixed local port
   (`127.0.0.1:8765`) once, at Milestone 8 setup time, and needs no
   reconfiguration on any later deploy — restarting the systemd unit doesn't
@@ -177,6 +193,7 @@ dependencies resolved via `pip.parse` off a fully-hashed `requirements_lock.txt`
 | `bazel run //:install` | Preflight-gated `pipx install` of the wheel. |
 | `bazel run //:serve` | Run the web app (`uvicorn`), foreground, for local development. |
 | `bazel run //:deploy` | Milestone 11: rebuild + `pipx install` the wheel, then restart the `little-meals` systemd `--user` service — see "Deployment" below. |
+| `bazel run //:relaunch` | Milestone 11: like `//:deploy`, but also kills any stray `lmeals serve` process and ensures `tailscaled` + `tailscale serve` are up — see "Deployment" below. |
 | `bazel test //...` | Run the unit test suite (hermetic, no network). |
 
 The non-Bazel path (`pyproject.toml`, `pip install .`) exists for local/editable

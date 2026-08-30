@@ -150,6 +150,31 @@ This is the same preflight-gated rebuild `//:install` does, followed by
 `tailscale serve` (Milestone 8) — that keeps pointing at the same local port
 across restarts, so nothing else needs to change on the tailnet side.
 
+**If something's stuck** (a stray manually-started `lmeals serve` is holding
+the port, `tailscaled` itself got stopped, or `tailscale serve` lost its
+config), use the more defensive `bazel run //:relaunch` instead: it stops the
+service *and* kills any `lmeals serve` process still holding port 8765,
+reinstalls, starts the service back up, checks `tailscaled` is active
+(starting it via `sudo systemctl start tailscaled` if not — see the note
+below on passwordless sudo), and re-points `tailscale serve` at port 8765 if
+`tailscale serve status` shows no config for it. Safe to reach for any time
+`//:deploy` would also work; it just does a bit more. Every step is
+non-interactive, so it's safe to run from a remote Claude Code session (e.g.
+via Claude Remote Control) with nobody at the keyboard.
+
+Starting `tailscaled` needs root. If `sudo` on this host requires a password,
+`//:relaunch` will print a warning rather than hang waiting for one — grant
+passwordless `sudo systemctl start tailscaled` (e.g. a `visudo` NOPASSWD rule
+scoped to that one command) if you want a remote relaunch to be able to fix a
+stopped `tailscaled` on its own; otherwise start it manually when needed.
+
+Re-pointing `tailscale serve`, by contrast, does *not* need root, as long as
+you've run `sudo tailscale set --operator=<you>` once (a one-time host
+setup step — makes your user the operator of the local `tailscaled`, so
+`tailscale serve`/`funnel` never need `sudo` again). Without that, a lost
+`tailscale serve` config will fail to auto-heal and `//:relaunch` will print
+a warning instead.
+
 ## Troubleshooting
 
 | Symptom | Likely cause |
