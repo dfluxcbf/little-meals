@@ -50,9 +50,10 @@ def test_recipes_list_contains_stored_recipe_name(store, sample_recipe):
 
 
 @pytest.mark.requirement("REQ-000000016")
-def test_recipe_detail_renders_steps_then_ingredients_in_order(store, sample_recipe):
-    # Steps are shown first, with ingredients tucked behind the fridge-door
-    # toggle below them - see docs/ui_design.md's recipe detail screen.
+def test_recipe_detail_renders_ingredients_then_steps_in_order(store, sample_recipe):
+    # Ingredients are shown first, open by default behind the fridge-door
+    # toggle, with steps below them - see docs/ui_design.md's recipe detail
+    # screen.
     created = store.create(sample_recipe)
     ui = _make_client(store)
 
@@ -64,14 +65,14 @@ def test_recipe_detail_renders_steps_then_ingredients_in_order(store, sample_rec
     # since an ingredient name (e.g. "garlic") can also appear inside the
     # recipe title higher up the page.
     last_index = -1
-    for step in created.steps:
-        index = text.find(step, last_index + 1)
+    for ingredient in created.ingredients:
+        index = text.find(ingredient.name, last_index + 1)
         assert index != -1
         assert index > last_index
         last_index = index
 
-    for ingredient in created.ingredients:
-        index = text.find(ingredient.name, last_index + 1)
+    for step in created.steps:
+        index = text.find(step, last_index + 1)
         assert index != -1
         assert index > last_index
         last_index = index

@@ -708,27 +708,116 @@ form button {
 
 /* ---------------------------------------------------------- weekly plan */
 
-.cookbook {
+.plan-flipbook {
   position: relative;
-  background: var(--paper);
-  border: 1px solid var(--line);
-  border-radius: 22px 22px 10px 10px;
-  box-shadow: 0 8px 24px oklch(30% 0.02 50 / 0.12);
-  overflow: hidden;
-  padding: 18px 18px 18px 30px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
+  margin-left: 16px;
 }
 
-.cookbook::before {
-  content: "";
+.flipbook-spine {
   position: absolute;
-  left: 20px;
-  top: 0;
-  bottom: 0;
-  width: 1px;
-  background: oklch(85% 0.02 60);
+  left: -16px;
+  top: 14px;
+  bottom: 14px;
+  width: 16px;
+  background: var(--paper-alt);
+  border: 1px solid var(--line);
+  border-right: none;
+  border-radius: 10px 0 0 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-evenly;
+  z-index: 0;
+}
+
+.flipbook-hole {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--cream);
+  border: 1px solid var(--line);
+}
+
+.flipbook-track {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  gap: 14px;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.flipbook-track::-webkit-scrollbar {
+  display: none;
+}
+
+.flipbook-page {
+  flex: 0 0 100%;
+  min-width: 0;
+  scroll-snap-align: center;
+  scroll-snap-stop: always;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 10px 22px 22px 10px;
+  box-shadow: 0 8px 24px oklch(30% 0.02 50 / 0.12);
+  padding: 18px;
+}
+
+.flipbook-dots {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.flipbook-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--line);
+}
+
+.flipbook-dot-active {
+  background: var(--terracotta);
+}
+
+.plan-actions-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: var(--tabbar-height);
+  z-index: 15;
+  display: flex;
+  gap: 10px;
+  padding: 12px 20px calc(12px + env(safe-area-inset-bottom, 0px));
+  background: var(--paper);
+  border-top: 1px solid var(--line);
+}
+
+.plan-actions-bar form {
+  flex: 1;
+  display: flex;
+}
+
+.plan-actions-bar .btn {
+  flex: 1;
+}
+
+main.content:has(+ .plan-actions-bar) {
+  padding-bottom: calc(var(--tabbar-height) + 78px + env(safe-area-inset-bottom, 0px));
+}
+
+@media (min-width: 900px) {
+  .plan-actions-bar {
+    left: var(--rail-width);
+    bottom: 0;
+  }
+
+  main.content:has(+ .plan-actions-bar) {
+    padding-bottom: calc(78px + env(safe-area-inset-bottom, 0px));
+  }
 }
 
 .plan-meal {
@@ -1128,7 +1217,39 @@ form button {
 .cook-ingredients-list {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 8px;
+}
+
+.cook-ingredient-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 13px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--paper);
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--font-body);
+  font-size: 13.5px;
+  color: var(--ink);
+}
+
+.cook-ingredient-name {
+  flex: 1;
+}
+
+.cook-ingredient-row-checked {
+  background: var(--sage-soft);
+  border-color: var(--sage);
+}
+
+.cook-ingredient-row-checked .cook-ingredient-name,
+.cook-ingredient-row-checked .fridge-qty {
+  color: var(--ink-faint);
+  text-decoration: line-through;
 }
 
 .cook-step-number {

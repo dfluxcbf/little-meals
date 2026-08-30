@@ -23,6 +23,7 @@
     <main class="content">
       {% block content %}{% endblock %}
     </main>
+    {% block bottom_bar %}{% endblock %}
     <nav class="tabbar" aria-label="Primary">
       <a href="/recipes" class="tab {% if nav_active == 'library' %}tab-active{% endif %}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -55,5 +56,6 @@
       </a>
     </nav>
   </div>
+  {% block extra_scripts %}{% endblock %}
 </body>
 </html>

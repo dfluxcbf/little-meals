@@ -12,32 +12,56 @@
   <p class="subtitle">Pick what you're making this week, in any order.</p>
   {% if plan.finalized %}
     <p class="badge badge-liked" style="margin-bottom: 16px;">Finalized</p>
-  {% else %}
-    <form method="post" action="/plan/reroll" style="margin-bottom: 16px;">
-      <button type="submit" class="btn btn-secondary">Reroll whole plan</button>
-    </form>
   {% endif %}
 
   {% if not meals %}
     <p>No recipes in the cookbook yet to fill a plan. <a href="/recipes/new">Add one</a>, then generate again.</p>
   {% else %}
-    <div class="cookbook">
-      {% for item in meals %}
-        {% set meal = item.meal %}
-        {% set recipe = item.recipe %}
-        {% include "partials/_plan_meal.html" %}
-      {% endfor %}
+    <div class="plan-flipbook">
+      <div class="flipbook-spine" aria-hidden="true">
+        <span class="flipbook-hole"></span>
+        <span class="flipbook-hole"></span>
+        <span class="flipbook-hole"></span>
+      </div>
+      <div class="flipbook-track">
+        {% for item in meals %}
+          {% set meal = item.meal %}
+          {% set recipe = item.recipe %}
+          <div class="flipbook-page">
+            {% include "partials/_plan_meal.html" %}
+          </div>
+        {% endfor %}
+      </div>
     </div>
+    {% if meals|length > 1 %}
+      <div class="flipbook-dots" aria-hidden="true">
+        {% for item in meals %}<span class="flipbook-dot"></span>{% endfor %}
+      </div>
+    {% endif %}
   {% endif %}
+{% endif %}
+{% endblock %}
 
-  {% if not plan.finalized and meals %}
-    <form method="post" action="/plan/finalize">
-      <button type="submit" class="btn btn-primary">Finalize plan</button>
+{% block extra_scripts %}
+<script src="/static/js/plan-flipbook.js" defer></script>
+{% endblock %}
+
+{% block bottom_bar %}
+{% if plan is not none %}
+<div class="plan-actions-bar">
+  {% if not plan.finalized %}
+    <form method="post" action="/plan/reroll">
+      <button type="submit" class="btn btn-secondary">Reroll Plan</button>
     </form>
   {% endif %}
-
-  <form method="post" action="/plan/cancel" onsubmit="return confirm('Cancel this week\'s plan? This deletes all planned meals and the shopping list. This cannot be undone.');" style="margin-top: 16px;">
-    <button type="submit" class="btn btn-danger">Cancel week's plans</button>
+  {% if not plan.finalized and meals %}
+    <form method="post" action="/plan/finalize">
+      <button type="submit" class="btn btn-primary">Confirm Plan</button>
+    </form>
+  {% endif %}
+  <form method="post" action="/plan/cancel" onsubmit="return confirm('Cancel this week\'s plan? This deletes all planned meals and the shopping list. This cannot be undone.');">
+    <button type="submit" class="btn btn-danger">Cancel Plan</button>
   </form>
+</div>
 {% endif %}
 {% endblock %}
