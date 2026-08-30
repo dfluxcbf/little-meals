@@ -87,20 +87,6 @@ def test_get_unknown_recipe_returns_error_envelope(store: RecipeStore):
     assert "details" in body
 
 
-def test_preference_filter(store: RecipeStore):
-    api = _make_client(store)
-    first = api.post("/api/recipes", json=RECIPE_CREATE_PAYLOAD).json()
-    second = api.post("/api/recipes", json=dict(RECIPE_CREATE_PAYLOAD, name="Other Pasta")).json()
-
-    api.patch(f"/api/recipes/{second['id']}/preference", json={"preference": "disliked"})
-
-    liked = api.get("/api/recipes", params={"preference": "liked"}).json()
-    disliked = api.get("/api/recipes", params={"preference": "disliked"}).json()
-
-    assert [r["id"] for r in liked] == [first["id"]]
-    assert [r["id"] for r in disliked] == [second["id"]]
-
-
 def test_extract_success(store: RecipeStore):
     api = _make_client(store)
     response = api.post("/api/recipes/extract", json={"text": "a nice tomato soup"})

@@ -4,13 +4,13 @@ from datetime import datetime, time, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Form, Request
+from fastapi.datastructures import FormData
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
-from little_meals.llm.extraction import ExtractionError, RecipeExtractionService
-from little_meals.llm.ollama_client import OllamaUnavailable
-from little_meals.models import DayOfWeek, HouseholdPreferencesUpdate, MealPlan, Preference, Recipe
+from little_meals.llm.extraction import RecipeExtractionService
+from little_meals.models import Classification, DayOfWeek, HouseholdPreferencesUpdate, Ingredient, MealPlan, Recipe, RecipeCreate, RecipeUpdate
 from little_meals.planning.plan_builder import build_meal_specs, generate_single_replacement, list_controlled_reroll_candidates
 from little_meals.planning.shopping_list import build_shopping_list_items
 from little_meals.store.cook_along_store import CookAlongStore
@@ -43,10 +43,19 @@ def build_ui_router(
                 except RecipeNotFound:
                     continue
                 meals.append({"meal": meal, "recipe": recipe})
+        all_cooked = bool(plan is not None and plan.finalized and meals and all(item["meal"].cooked for item in meals))
+        library_has_recipes = bool(store.list(extractor)) if plan is not None and not meals else True
         return templates.TemplateResponse(
             request,
             "plan.html",
-            {"plan": plan, "meals": meals, "nav_active": "plan", "notification_pending": notification_store.is_pending()},
+            {
+                "plan": plan,
+                "meals": meals,
+                "all_cooked": all_cooked,
+                "library_has_recipes": library_has_recipes,
+                "nav_active": "plan",
+                "notification_pending": notification_store.is_pending(),
+            },
         )
 
     @router.get("/", include_in_schema=False)
@@ -64,20 +73,91 @@ def build_ui_router(
 
     @router.get("/recipes/new", response_class=HTMLResponse, include_in_schema=False)
     def recipe_new_form(request: Request) -> HTMLResponse:
-        return templates.TemplateResponse(request, "recipe_new.html", {"error": None, "nav_active": "library"})
+        return templates.TemplateResponse(
+            request, "recipe_edit.html", _recipe_edit_context(mode="new", values=_empty_recipe_values())
+        )
 
-    @router.post("/recipes", include_in_schema=False)
-    def recipe_new_submit(request: Request, text: str = Form(...)):
+    @router.post("/recipes/new", response_class=HTMLResponse, include_in_schema=False)
+    async def recipe_new_submit(request: Request) -> HTMLResponse:
+        form = await request.form()
         try:
-            extracted = extractor.extract(text)
-        except (OllamaUnavailable, ExtractionError) as exc:
+            payload = _parse_recipe_form(form, RecipeCreate)
+        except (ValidationError, ValueError) as exc:
             return templates.TemplateResponse(
-                request, "recipe_new.html", {"error": str(exc), "nav_active": "library"}, status_code=422
+                request,
+                "recipe_edit.html",
+                _recipe_edit_context(mode="new", values=_recipe_values_from_form(form), error=str(exc)),
+                status_code=422,
             )
 
-        recipe = Recipe.from_extracted(extracted, id="", source_text=text, now=datetime.now(timezone.utc))
+        now = datetime.now(timezone.utc)
+        recipe = Recipe(
+            id="",
+            source_text=None,
+            created_at=now,
+            updated_at=now,
+            **payload.model_dump(),
+        )
         stored = store.create(recipe)
         return RedirectResponse(url=f"/recipes/{stored.id}", status_code=303)
+
+    @router.get("/recipes/{recipe_id}/edit", response_class=HTMLResponse, include_in_schema=False)
+    def recipe_edit_form(request: Request, recipe_id: str) -> HTMLResponse:
+        try:
+            recipe = store.get(recipe_id)
+        except RecipeNotFound:
+            return templates.TemplateResponse(
+                request, "recipe_not_found.html", {"recipe_id": recipe_id, "nav_active": "library"}, status_code=404
+            )
+        return templates.TemplateResponse(
+            request,
+            "recipe_edit.html",
+            _recipe_edit_context(mode="edit", values=_recipe_values_from_recipe(recipe), recipe_id=recipe_id),
+        )
+
+    @router.post("/recipes/{recipe_id}/edit", response_class=HTMLResponse, include_in_schema=False)
+    async def recipe_edit_submit(request: Request, recipe_id: str) -> HTMLResponse:
+        form = await request.form()
+        try:
+            payload = _parse_recipe_form(form, RecipeUpdate)
+        except (ValidationError, ValueError) as exc:
+            return templates.TemplateResponse(
+                request,
+                "recipe_edit.html",
+                _recipe_edit_context(
+                    mode="edit", values=_recipe_values_from_form(form), error=str(exc), recipe_id=recipe_id
+                ),
+                status_code=422,
+            )
+
+        now = datetime.now(timezone.utc)
+        recipe = Recipe(
+            id=recipe_id,
+            source_text=None,
+            created_at=now,
+            updated_at=now,
+            **payload.model_dump(),
+        )
+        try:
+            store.update(recipe_id, recipe)
+        except RecipeNotFound:
+            return templates.TemplateResponse(
+                request, "recipe_not_found.html", {"recipe_id": recipe_id, "nav_active": "library"}, status_code=404
+            )
+        return RedirectResponse(url=f"/recipes/{recipe_id}", status_code=303)
+
+    @router.post("/recipes/{recipe_id}/duplicate", include_in_schema=False)
+    def recipe_duplicate(recipe_id: str) -> RedirectResponse:
+        try:
+            original = store.get(recipe_id)
+        except RecipeNotFound:
+            return RedirectResponse(url="/recipes", status_code=303)
+        now = datetime.now(timezone.utc)
+        duplicate = original.model_copy(
+            update={"id": "", "name": f"{original.name} (copy)", "created_at": now, "updated_at": now}
+        )
+        stored = store.create(duplicate)
+        return RedirectResponse(url=f"/recipes/{stored.id}/edit", status_code=303)
 
     @router.get("/recipes/{recipe_id}", response_class=HTMLResponse, include_in_schema=False)
     def recipe_detail(request: Request, recipe_id: str) -> HTMLResponse:
@@ -189,11 +269,6 @@ def build_ui_router(
         cook_along_store.delete(recipe_id)
         return templates.TemplateResponse(request, "cook_finish.html", {"recipe": recipe, "result": action})
 
-    @router.post("/recipes/{recipe_id}/preference", response_class=HTMLResponse, include_in_schema=False)
-    def recipe_preference_toggle(request: Request, recipe_id: str, preference: str = Form(...)) -> HTMLResponse:
-        recipe = store.set_preference(recipe_id, Preference(preference))
-        return templates.TemplateResponse(request, "partials/_recipe_row.html", {"recipe": recipe})
-
     @router.post("/recipes/{recipe_id}/delete", include_in_schema=False)
     def recipe_delete(recipe_id: str) -> RedirectResponse:
         try:
@@ -225,15 +300,23 @@ def build_ui_router(
     def settings_submit(
         request: Request,
         recipes_per_week: int = Form(...),
+        recommendation_enabled: Optional[str] = Form(None),
         recommendation_day: str = Form(...),
         recommendation_time: str = Form(...),
+        auto_confirm_enabled: Optional[str] = Form(None),
+        auto_confirm_day: str = Form(...),
+        auto_confirm_time: str = Form(...),
         default_servings: str = Form(...),
     ) -> HTMLResponse:
         try:
             update = HouseholdPreferencesUpdate(
                 recipes_per_week=recipes_per_week,
+                recommendation_enabled=recommendation_enabled is not None,
                 recommendation_day=DayOfWeek(recommendation_day),
                 recommendation_time=time.fromisoformat(recommendation_time),
+                auto_confirm_enabled=auto_confirm_enabled is not None,
+                auto_confirm_day=DayOfWeek(auto_confirm_day),
+                auto_confirm_time=time.fromisoformat(auto_confirm_time),
                 default_servings=default_servings,
             )
         except (ValidationError, ValueError) as exc:
@@ -265,6 +348,27 @@ def build_ui_router(
             plan_store.replace_meals(plan.id, build_meal_specs(store, household_store, extractor))
         return RedirectResponse(url="/plan", status_code=303)
 
+    @router.post("/plan/meals/add", include_in_schema=False)
+    def plan_meal_add() -> RedirectResponse:
+        plan = plan_store.get_current()
+        if plan is not None and not plan.finalized:
+            recipes = store.list(extractor)
+            excluded = {meal.recipe_id for meal in plan.meals}
+            replacement = generate_single_replacement(excluded, recipes)
+            if replacement is not None:
+                plan_store.add_meal(plan.id, replacement.recipe.id, replacement.servings)
+        return RedirectResponse(url="/plan", status_code=303)
+
+    @router.post("/plan/meals/{meal_id}/remove", include_in_schema=False)
+    def plan_meal_remove(meal_id: str) -> RedirectResponse:
+        plan = plan_store.get_current()
+        if plan is not None and not plan.finalized:
+            try:
+                plan_store.remove_meal(plan.id, meal_id)
+            except (PlanNotFound, PlanMealNotFound):
+                pass
+        return RedirectResponse(url="/plan", status_code=303)
+
     @router.post("/plan/meals/{meal_id}/servings", response_class=HTMLResponse, include_in_schema=False)
     def plan_meal_servings(request: Request, meal_id: str, servings: int = Form(...)) -> HTMLResponse:
         plan = plan_store.get_current()
@@ -279,23 +383,12 @@ def build_ui_router(
     @router.post("/plan/meals/{meal_id}/cooked", response_class=HTMLResponse, include_in_schema=False)
     def plan_meal_cooked(request: Request, meal_id: str, cooked: str = Form(...)) -> HTMLResponse:
         plan = plan_store.get_current()
-        if plan is None:
+        if plan is None or not plan.finalized:
             return RedirectResponse(url="/plan", status_code=303)
         try:
             plan = plan_store.set_cooked(plan.id, meal_id, cooked == "true")
         except (PlanNotFound, PlanMealNotFound):
             return RedirectResponse(url="/plan", status_code=303)
-        return _render_plan_meal(request, templates, plan, meal_id, store)
-
-    @router.post("/plan/meals/{meal_id}/preference", response_class=HTMLResponse, include_in_schema=False)
-    def plan_meal_preference(request: Request, meal_id: str, preference: str = Form(...)) -> HTMLResponse:
-        plan = plan_store.get_current()
-        if plan is None:
-            return RedirectResponse(url="/plan", status_code=303)
-        meal = next((m for m in plan.meals if m.id == meal_id), None)
-        if meal is None:
-            return RedirectResponse(url="/plan", status_code=303)
-        store.set_preference(meal.recipe_id, Preference(preference))
         return _render_plan_meal(request, templates, plan, meal_id, store)
 
     @router.post("/plan/meals/{meal_id}/reroll", response_class=HTMLResponse, include_in_schema=False)
@@ -423,3 +516,119 @@ def _render_plan_meal(
     meal = next(m for m in plan.meals if m.id == meal_id)
     recipe = store.get(meal.recipe_id)
     return templates.TemplateResponse(request, "partials/_plan_meal.html", {"plan": plan, "meal": meal, "recipe": recipe})
+
+
+def _empty_recipe_values() -> dict:
+    return {
+        "name": "",
+        "cook_time_minutes": "",
+        "servings": 2,
+        "classification": Classification.OTHER.value,
+        "calories_per_serving": "",
+        "protein_g": "",
+        "fiber_g": "",
+        "ingredients": [{"name": "", "quantity": ""}],
+        "steps": [""],
+    }
+
+
+def _format_ingredient_quantity(ingredient: Ingredient) -> str:
+    parts = []
+    if ingredient.quantity is not None:
+        quantity = ingredient.quantity
+        if quantity == int(quantity):
+            quantity = int(quantity)
+        parts.append(str(quantity))
+    if ingredient.unit:
+        parts.append(ingredient.unit)
+    return " ".join(parts)
+
+
+def _recipe_values_from_recipe(recipe: Recipe) -> dict:
+    return {
+        "name": recipe.name,
+        "cook_time_minutes": recipe.cook_time_minutes,
+        "servings": recipe.servings,
+        "classification": recipe.classification.value,
+        "calories_per_serving": recipe.nutrition.calories_per_serving if recipe.nutrition.calories_per_serving is not None else "",
+        "protein_g": recipe.nutrition.protein_g if recipe.nutrition.protein_g is not None else "",
+        "fiber_g": recipe.nutrition.fiber_g if recipe.nutrition.fiber_g is not None else "",
+        "ingredients": [
+            {"name": ingredient.name, "quantity": _format_ingredient_quantity(ingredient)}
+            for ingredient in recipe.ingredients
+        ]
+        or [{"name": "", "quantity": ""}],
+        "steps": list(recipe.steps) or [""],
+    }
+
+
+def _recipe_values_from_form(form: FormData) -> dict:
+    names = form.getlist("ingredient_name")
+    quantities = form.getlist("ingredient_quantity")
+    steps = list(form.getlist("step"))
+    return {
+        "name": form.get("name", ""),
+        "cook_time_minutes": form.get("cook_time_minutes", ""),
+        "servings": form.get("servings", ""),
+        "classification": form.get("classification", ""),
+        "calories_per_serving": form.get("calories_per_serving", ""),
+        "protein_g": form.get("protein_g", ""),
+        "fiber_g": form.get("fiber_g", ""),
+        "ingredients": [{"name": name, "quantity": quantity} for name, quantity in zip(names, quantities)]
+        or [{"name": "", "quantity": ""}],
+        "steps": steps or [""],
+    }
+
+
+def _recipe_edit_context(
+    *, mode: str, values: dict, error: Optional[str] = None, recipe_id: Optional[str] = None
+) -> dict:
+    return {
+        "mode": mode,
+        "values": values,
+        "error": error,
+        "classifications": list(Classification),
+        "form_action": "/recipes/new" if mode == "new" else f"/recipes/{recipe_id}/edit",
+        "cancel_url": "/recipes" if mode == "new" else f"/recipes/{recipe_id}",
+        "recipe_id": recipe_id,
+        "nav_active": "library",
+    }
+
+
+def _parse_recipe_form(form: FormData, model_cls: type[BaseModel]) -> BaseModel:
+    names = form.getlist("ingredient_name")
+    quantities = form.getlist("ingredient_quantity")
+    ingredients = []
+    for name, quantity_text in zip(names, quantities):
+        name = name.strip()
+        if not name:
+            continue
+        ingredients.append(Ingredient(name=name, unit=quantity_text.strip() or None))
+    steps = [step.strip() for step in form.getlist("step") if step.strip()]
+
+    def _optional_float(key: str) -> Optional[float]:
+        raw = str(form.get(key) or "").strip()
+        return float(raw) if raw else None
+
+    def _optional_int(key: str) -> Optional[int]:
+        raw = str(form.get(key) or "").strip()
+        return int(raw) if raw else None
+
+    name = str(form.get("name") or "").strip()
+    if not name:
+        raise ValueError("Name is required")
+
+    data = {
+        "name": name,
+        "cook_time_minutes": int(str(form.get("cook_time_minutes") or "").strip()),
+        "classification": str(form.get("classification") or ""),
+        "nutrition": {
+            "calories_per_serving": _optional_int("calories_per_serving"),
+            "protein_g": _optional_float("protein_g"),
+            "fiber_g": _optional_float("fiber_g"),
+        },
+        "servings": int(str(form.get("servings") or "").strip()),
+        "ingredients": ingredients,
+        "steps": steps,
+    }
+    return model_cls(**data)

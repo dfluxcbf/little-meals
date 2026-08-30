@@ -5,8 +5,12 @@ from fastapi.testclient import TestClient
 
 VALID_UPDATE_PAYLOAD = {
     "recipes_per_week": 6,
+    "recommendation_enabled": True,
     "recommendation_day": "wednesday",
     "recommendation_time": "18:30",
+    "auto_confirm_enabled": False,
+    "auto_confirm_day": "sunday",
+    "auto_confirm_time": "09:00",
     "default_servings": "2 adults + 1 child",
 }
 

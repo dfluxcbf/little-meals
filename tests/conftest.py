@@ -12,7 +12,7 @@ from little_meals.api.app import create_app
 from little_meals.config import Settings
 from little_meals.llm.extraction import RecipeExtractionService
 from little_meals.llm.ollama_client import OllamaClient
-from little_meals.models import Classification, Ingredient, Nutrition, Preference, Recipe
+from little_meals.models import Classification, Ingredient, Nutrition, Recipe
 from little_meals.store.cook_along_store import CookAlongStore
 from little_meals.store.household_store import HouseholdPreferencesStore
 from little_meals.store.notification_store import NotificationStore
@@ -81,7 +81,6 @@ def sample_recipe() -> Recipe:
             Ingredient(name="garlic", quantity=3, unit="cloves"),
         ],
         steps=["Season the chicken.", "Sear until golden.", "Add lemon and garlic, simmer 10 minutes."],
-        preference=Preference.LIKED,
         source_text="chicken with lemon and garlic",
         created_at=now,
         updated_at=now,

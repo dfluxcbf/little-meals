@@ -66,9 +66,13 @@ def create_app(
             notification_store,
             generate_fn=lambda: plan_store.create(build_meal_specs(store, household_store, extractor)),
         )
+        def _check_weekly_plan() -> None:
+            weekly_scheduler.check_and_maybe_generate()
+            weekly_scheduler.check_and_maybe_confirm()
+
         background_scheduler = BackgroundScheduler()
         background_scheduler.add_job(
-            weekly_scheduler.check_and_maybe_generate,
+            _check_weekly_plan,
             "interval",
             seconds=60,
             id="weekly-plan-check",

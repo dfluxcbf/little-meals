@@ -1,15 +1,14 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Optional
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter
 
 from little_meals.api.errors import ApiError
 from little_meals.config import Settings
 from little_meals.llm.extraction import ExtractionError, RecipeExtractionService
 from little_meals.llm.ollama_client import OllamaUnavailable
-from little_meals.models import ExtractRequest, Preference, PreferenceUpdate, Recipe, RecipeCreate, RecipeUpdate
+from little_meals.models import ExtractRequest, Recipe, RecipeCreate, RecipeUpdate
 from little_meals.store.recipe_store import RecipeNotFound, RecipeStore
 
 
@@ -23,11 +22,8 @@ def build_recipes_router(store: RecipeStore, extractor: RecipeExtractionService,
             raise ApiError(404, "NOT_FOUND", str(exc)) from exc
 
     @router.get("/recipes", response_model=list[Recipe])
-    def list_recipes(preference: Optional[Preference] = Query(default=None)) -> list[Recipe]:
-        recipes = store.list(extractor)
-        if preference is not None:
-            recipes = [recipe for recipe in recipes if recipe.preference == preference]
-        return recipes
+    def list_recipes() -> list[Recipe]:
+        return store.list(extractor)
 
     @router.get("/recipes/{recipe_id}", response_model=Recipe)
     def get_recipe(recipe_id: str) -> Recipe:
@@ -45,7 +41,6 @@ def build_recipes_router(store: RecipeStore, extractor: RecipeExtractionService,
             servings=payload.servings,
             ingredients=payload.ingredients,
             steps=payload.steps,
-            preference=Preference.LIKED,
             source_text=None,
             created_at=now,
             updated_at=now,
@@ -77,20 +72,12 @@ def build_recipes_router(store: RecipeStore, extractor: RecipeExtractionService,
             servings=payload.servings,
             ingredients=payload.ingredients,
             steps=payload.steps,
-            preference=Preference.LIKED,
             source_text=None,
             created_at=now,
             updated_at=now,
         )
         try:
             return store.update(recipe_id, recipe)
-        except RecipeNotFound as exc:
-            raise ApiError(404, "NOT_FOUND", str(exc)) from exc
-
-    @router.patch("/recipes/{recipe_id}/preference", response_model=Recipe)
-    def update_preference(recipe_id: str, payload: PreferenceUpdate) -> Recipe:
-        try:
-            return store.set_preference(recipe_id, payload.preference)
         except RecipeNotFound as exc:
             raise ApiError(404, "NOT_FOUND", str(exc)) from exc
 

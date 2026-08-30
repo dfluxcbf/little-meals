@@ -123,6 +123,70 @@ def test_replace_meals_unknown_plan_raises(plan_store: MealPlanStore):
         plan_store.replace_meals("does-not-exist", [MealSpec("recipe-a", 2)])
 
 
+@pytest.mark.requirement("REQ-000000047")
+def test_add_meal_appends_after_existing_meals(plan_store: MealPlanStore):
+    plan = plan_store.create([MealSpec("recipe-a", 2)])
+
+    updated = plan_store.add_meal(plan.id, "recipe-b", 3)
+
+    assert [m.recipe_id for m in updated.meals] == ["recipe-a", "recipe-b"]
+    added = updated.meals[1]
+    assert added.servings == 3
+    assert added.cooked is False
+
+
+@pytest.mark.requirement("REQ-000000047")
+def test_add_meal_unknown_plan_raises(plan_store: MealPlanStore):
+    with pytest.raises(PlanNotFound):
+        plan_store.add_meal("does-not-exist", "recipe-a", 2)
+
+
+@pytest.mark.requirement("REQ-000000047")
+def test_add_meal_after_removal_does_not_collide_with_a_remaining_meal_id(plan_store: MealPlanStore):
+    # m1, m2, m3 - remove the highest-positioned one (m3), then add a new
+    # meal. Its meal_id may cosmetically reuse "m3" (positions only ever
+    # increase, so this can't collide with a row still present).
+    plan = plan_store.create([MealSpec("recipe-a", 2), MealSpec("recipe-b", 2), MealSpec("recipe-c", 2)])
+    plan_store.remove_meal(plan.id, "m3")
+
+    updated = plan_store.add_meal(plan.id, "recipe-d", 2)
+
+    assert [m.id for m in updated.meals] == ["m1", "m2", "m3"]
+    assert [m.recipe_id for m in updated.meals] == ["recipe-a", "recipe-b", "recipe-d"]
+
+
+@pytest.mark.requirement("REQ-000000047")
+def test_remove_meal_deletes_only_the_targeted_meal(plan_store: MealPlanStore):
+    plan = plan_store.create([MealSpec("recipe-a", 2), MealSpec("recipe-b", 4)])
+
+    updated = plan_store.remove_meal(plan.id, "m1")
+
+    assert [m.id for m in updated.meals] == ["m2"]
+    assert [m.recipe_id for m in updated.meals] == ["recipe-b"]
+
+
+@pytest.mark.requirement("REQ-000000047")
+def test_remove_meal_down_to_zero_meals_is_allowed(plan_store: MealPlanStore):
+    plan = plan_store.create([MealSpec("recipe-a", 2)])
+
+    updated = plan_store.remove_meal(plan.id, "m1")
+
+    assert updated.meals == []
+
+
+@pytest.mark.requirement("REQ-000000047")
+def test_remove_meal_unknown_meal_raises(plan_store: MealPlanStore):
+    plan = plan_store.create([MealSpec("recipe-a", 2)])
+    with pytest.raises(PlanMealNotFound):
+        plan_store.remove_meal(plan.id, "does-not-exist")
+
+
+@pytest.mark.requirement("REQ-000000047")
+def test_remove_meal_unknown_plan_raises(plan_store: MealPlanStore):
+    with pytest.raises(PlanNotFound):
+        plan_store.remove_meal("does-not-exist", "m1")
+
+
 @pytest.mark.requirement("REQ-000000019")
 def test_finalize_marks_plan_finalized(plan_store: MealPlanStore):
     plan = plan_store.create([MealSpec("recipe-a", 2)])

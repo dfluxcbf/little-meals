@@ -175,6 +175,44 @@ class MealPlanStore:
                 raise PlanMealNotFound(plan_id, meal_id)
         return self.get(plan_id)
 
+    def add_meal(self, plan_id: str, recipe_id: str, servings: int) -> MealPlan:
+        """Adds one more meal to an existing (draft) plan, for the
+        odd-week "select the meal count directly on the plan" adjustment -
+        see docs/milestones.md's M14 entry. Appended after the highest
+        position ever used in this plan, so its meal_id can never collide
+        with one still present, even if a higher-positioned meal was
+        previously removed."""
+        with self._connection() as conn:
+            if conn.execute("SELECT 1 FROM meal_plans WHERE id = ?", (plan_id,)).fetchone() is None:
+                raise PlanNotFound(plan_id)
+            max_position = conn.execute(
+                "SELECT COALESCE(MAX(position), -1) FROM plan_meals WHERE plan_id = ?", (plan_id,)
+            ).fetchone()[0]
+            position = max_position + 1
+            meal_id = f"m{position + 1}"
+            conn.execute(
+                """
+                INSERT INTO plan_meals (plan_id, meal_id, recipe_id, servings, cooked, position)
+                VALUES (?, ?, ?, ?, 0, ?)
+                """,
+                (plan_id, meal_id, recipe_id, servings, position),
+            )
+        return self.get(plan_id)
+
+    def remove_meal(self, plan_id: str, meal_id: str) -> MealPlan:
+        """Removes one meal from a plan - the other half of the odd-week
+        meal-count adjustment. `position` gaps left behind are harmless
+        (ORDER BY position ASC still yields the right relative order)."""
+        with self._connection() as conn:
+            cursor = conn.execute(
+                "DELETE FROM plan_meals WHERE plan_id = ? AND meal_id = ?", (plan_id, meal_id)
+            )
+            if cursor.rowcount == 0:
+                if conn.execute("SELECT 1 FROM meal_plans WHERE id = ?", (plan_id,)).fetchone() is None:
+                    raise PlanNotFound(plan_id)
+                raise PlanMealNotFound(plan_id, meal_id)
+        return self.get(plan_id)
+
     def _update_meal(self, plan_id: str, meal_id: str, column: str, value) -> None:
         with self._connection() as conn:
             cursor = conn.execute(

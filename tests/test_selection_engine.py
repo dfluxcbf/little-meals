@@ -5,11 +5,11 @@ import pytest
 import random
 from datetime import datetime, timezone
 
-from little_meals.models import Classification, Ingredient, Nutrition, Preference, Recipe
+from little_meals.models import Classification, Ingredient, Nutrition, Recipe
 from little_meals.planning.selection import select_recipes_for_plan
 
 
-def _recipe(name: str, preference: Preference = Preference.LIKED) -> Recipe:
+def _recipe(name: str) -> Recipe:
     now = datetime(2026, 1, 1, tzinfo=timezone.utc)
     return Recipe(
         id=name.lower().replace(" ", "-"),
@@ -20,19 +20,9 @@ def _recipe(name: str, preference: Preference = Preference.LIKED) -> Recipe:
         servings=2,
         ingredients=[Ingredient(name="something", quantity=1, unit="cup")],
         steps=["Cook it."],
-        preference=preference,
         created_at=now,
         updated_at=now,
     )
-
-
-@pytest.mark.requirement("REQ-000000018")
-def test_excludes_disliked_recipes():
-    recipes = [_recipe("Liked One"), _recipe("Disliked One", Preference.DISLIKED)]
-
-    selected = select_recipes_for_plan(recipes, recipes_per_week=5)
-
-    assert [r.name for r in selected] == ["Liked One"]
 
 
 @pytest.mark.requirement("REQ-000000018")
@@ -42,12 +32,12 @@ def test_caps_at_recipes_per_week():
     selected = select_recipes_for_plan(recipes, recipes_per_week=3, rng=random.Random(0))
 
     assert len(selected) == 3
-    # Every selected recipe actually came from the liked pool.
+    # Every selected recipe actually came from the library.
     assert set(r.id for r in selected) <= set(r.id for r in recipes)
 
 
 @pytest.mark.requirement("REQ-000000018")
-def test_returns_all_liked_recipes_when_fewer_than_recipes_per_week():
+def test_returns_all_recipes_when_fewer_than_recipes_per_week():
     recipes = [_recipe("Only One")]
 
     selected = select_recipes_for_plan(recipes, recipes_per_week=5)

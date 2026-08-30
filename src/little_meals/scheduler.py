@@ -66,6 +66,9 @@ class WeeklyScheduler:
         this call - mainly useful for tests; production callers don't need
         the return value."""
         preferences = self._household_store.get()
+        if not preferences.recommendation_enabled:
+            return False
+
         now = self._now_fn()
         scheduled_at = last_scheduled_occurrence(now, preferences.recommendation_day, preferences.recommendation_time)
 
@@ -73,7 +76,36 @@ class WeeklyScheduler:
         if current is not None and current.created_at >= scheduled_at:
             return False
 
+        if current is not None and not current.finalized:
+            # The household never got around to confirming it - force it
+            # through rather than leaving it stuck as an un-finalized orphan
+            # once it's superseded below.
+            self._plan_store.finalize(current.id)
+
         logger.info("Auto-generating this week's plan (scheduled for %s)", scheduled_at.isoformat())
         self._generate_fn()
         self._notification_store.mark_new_plan_ready()
+        return True
+
+    def check_and_maybe_confirm(self) -> bool:
+        """Called periodically alongside `check_and_maybe_generate`.
+        Auto-confirm is a separate, independently-scheduled automation: on
+        its own day/time, whatever plan is currently a draft gets finalized
+        automatically, so the household never has to click "Confirm Plan"
+        themselves. Returns True if it finalized a plan on this call."""
+        preferences = self._household_store.get()
+        if not preferences.auto_confirm_enabled:
+            return False
+
+        current = self._plan_store.get_current()
+        if current is None or current.finalized:
+            return False
+
+        now = self._now_fn()
+        scheduled_at = last_scheduled_occurrence(now, preferences.auto_confirm_day, preferences.auto_confirm_time)
+        if current.created_at >= scheduled_at:
+            return False
+
+        logger.info("Auto-confirming the current plan (scheduled for %s)", scheduled_at.isoformat())
+        self._plan_store.finalize(current.id)
         return True

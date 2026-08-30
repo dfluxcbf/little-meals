@@ -88,11 +88,11 @@ The recipe library starts empty. A sensible first pass:
    any of them here, or open one to check the parsed ingredients/steps.
 
 4. **`/plan`** — generate a weekly plan. It draws recipes from the library
-   you just built, up to your configured `recipes_per_week` count.
-   Like/dislike each meal, adjust servings, or reroll (whole plan, one meal,
-   or a controlled reroll offering ten alternatives for a single slot,
-   always among your own liked recipes) if something doesn't land. Finalize
-   the plan once you're happy — this locks it and unblocks the shopping list.
+   you just built, up to your configured `recipes_per_week` count. Adjust
+   servings, or reroll (whole plan, one meal, or a controlled reroll offering
+   ten alternatives for a single slot, always among your own library recipes)
+   if something doesn't land. Finalize the plan once you're happy — this
+   locks it and unblocks the shopping list.
 
 5. **`/shopping`** — generate the shopping list for the finalized plan.
    Ingredients are merged and scaled across all the week's recipes. Check
@@ -100,8 +100,8 @@ The recipe library starts empty. A sensible first pass:
 
 6. **`/recipes/{id}/cook`** (a "Cook along" link from a recipe page or a plan
    meal) — walk through a recipe step by step. Finishing prompts you to
-   like/dislike based on how it actually turned out, and marks the meal
-   cooked if it's in the current plan.
+   mark it cooked or leave it uncooked, and marks the meal cooked in the
+   current plan if it's in it.
 
 ## Running it day to day
 
@@ -182,6 +182,6 @@ a warning instead.
 | `bazel run //:install` stops at "local LLM runtime" | Ollama isn't installed/reachable — see step 2. |
 | `lmeals: command not found` after install | pipx's bin dir isn't on `PATH` in this shell — check `pipx list` shows `little-meals`, then add `~/.local/bin` to `PATH` (or open a new shell). |
 | Recipe extraction hangs or times out | Ollama isn't actually serving, or the configured model isn't pulled — recheck step 2. `LITTLE_MEALS_OLLAMA_TIMEOUT` (seconds, default 120) if it's just slow on your hardware. |
-| A plan generates with fewer meals than configured | Not enough liked recipes in the library yet — see step 4.2. Not a bug: a short plan beats a failed one, and meal planning only ever draws from recipes already saved. |
+| A plan generates with fewer meals than configured | Not enough recipes in the library yet — see step 4.2. Not a bug: a short plan beats a failed one, and meal planning only ever draws from recipes already saved. |
 | A recipe file you hand-edited (or dropped in from elsewhere) doesn't show up in the library | It's likely not valid Markdown+YAML-frontmatter — `RecipeStore.list()` normalizes it through the same LLM extraction pipeline automatically (see `architecture.md`'s "Recipe file normalization" row); if that also fails, it's skipped with a warning logged rather than crashing the page. |
 | `bazel run //:deploy` fails at `systemctl restart` with "Unit little-meals.service not found" | The systemd unit hasn't been installed yet — see the "Remote deployment" setup steps above. |

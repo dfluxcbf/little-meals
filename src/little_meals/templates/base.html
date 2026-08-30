@@ -20,7 +20,7 @@
       <a href="/recipes" class="brand">little meals</a>
       <a href="/recipes/new" class="btn btn-primary">+ New recipe</a>
     </header>
-    <main class="content">
+    <main class="content {% block content_class %}{% endblock %}">
       {% block content %}{% endblock %}
     </main>
     {% block bottom_bar %}{% endblock %}

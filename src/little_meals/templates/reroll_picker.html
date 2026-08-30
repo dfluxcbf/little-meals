@@ -6,7 +6,7 @@
 <p class="subtitle">for {{ current_recipe.name }}</p>
 
 {% if not candidates %}
-  <p>No other liked recipes in the cookbook to swap in right now. <a href="/recipes/new">Add one</a> or reroll this meal instead.</p>
+  <p>No other recipes in the cookbook to swap in right now. <a href="/recipes/new">Add one</a> or reroll this meal instead.</p>
 {% else %}
 <form method="post" action="/plan/meals/{{ meal_id }}/choose">
   <div class="alternatives-list">
@@ -17,7 +17,9 @@
           <strong style="font-family: var(--font-display); font-size: 14.5px;">{{ candidate.name }}</strong>
           <div style="display: flex; gap: 10px; font-size: 11.5px; color: var(--ink-soft); margin-top: 3px;">
             <span>{{ candidate.cook_time_minutes }} min</span>
-            <span>{{ candidate.nutrition.calories_per_serving }} kcal</span>
+            {% if candidate.nutrition.calories_per_serving is not none %}
+              <span>{{ candidate.nutrition.calories_per_serving }} kcal</span>
+            {% endif %}
             <span>{{ candidate.classification.value|capitalize }}</span>
           </div>
         </span>
