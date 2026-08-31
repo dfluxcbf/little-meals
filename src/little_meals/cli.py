@@ -29,13 +29,28 @@ def _cmd_settings(args: argparse.Namespace) -> int:
     from little_meals.store.plan_store import MealPlanStore
     from little_meals.store.shopping_list_store import ShoppingListStore
 
-    if not args.reset:
-        print("error: no action given (did you mean --reset?)", file=sys.stderr)
+    if not args.view and not args.reset:
+        print("error: no action given (did you mean --view or --reset?)", file=sys.stderr)
         return 1
 
     settings = Settings.from_env()
     if args.data_dir:
         settings = replace(settings, data_dir=Path(args.data_dir))
+
+    if args.view:
+        household_store = HouseholdPreferencesStore(settings.household_db_path)
+        preferences = household_store.get()
+        print(f"data_dir: {settings.data_dir}")
+        print(f"recipes_dir: {settings.recipes_dir}")
+        print(f"recipes_per_week: {preferences.recipes_per_week}")
+        print(f"recommendation_enabled: {preferences.recommendation_enabled}")
+        print(f"recommendation_day: {preferences.recommendation_day.value}")
+        print(f"recommendation_time: {preferences.recommendation_time.strftime('%H:%M')}")
+        print(f"auto_confirm_enabled: {preferences.auto_confirm_enabled}")
+        print(f"auto_confirm_day: {preferences.auto_confirm_day.value}")
+        print(f"auto_confirm_time: {preferences.auto_confirm_time.strftime('%H:%M')}")
+        print(f"default_servings: {preferences.default_servings}")
+        return 0
 
     plan_store = MealPlanStore(settings.plan_db_path)
     shopping_list_store = ShoppingListStore(settings.shopping_list_db_path)
@@ -91,6 +106,11 @@ def build_parser() -> argparse.ArgumentParser:
     preflight_parser.set_defaults(func=_cmd_preflight)
 
     settings_parser = subparsers.add_parser("settings", help="manage household settings")
+    settings_parser.add_argument(
+        "--view",
+        action="store_true",
+        help="print all settings and their current values",
+    )
     settings_parser.add_argument(
         "--reset",
         action="store_true",

@@ -26,6 +26,10 @@ bazel run //:install     # preflight-gated pipx install of the CLI
 lmeals serve              # or: bazel run //:serve
 ```
 
+`lmeals settings --view` prints the current data directory and household
+settings (recipes per week, recommendation/auto-confirm day/time, default
+servings) and their values.
+
 `lmeals settings --reset` resets the general household settings (recipes per
 week, recommendation day/time, default servings) back to their defaults, and
 permanently deletes every meal plan and shopping list - useful for starting a
