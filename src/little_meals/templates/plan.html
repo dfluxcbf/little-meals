@@ -49,11 +49,6 @@
         {% for item in meals %}<span class="flipbook-dot"></span>{% endfor %}
       </div>
     {% endif %}
-    {% if not plan.finalized %}
-      <form method="post" action="/plan/meals/add" class="btn-form-right" style="margin-top: 14px;">
-        <button type="submit" class="btn btn-secondary">+ Add a meal</button>
-      </form>
-    {% endif %}
   {% endif %}
 </div>
 {% endblock %}
@@ -85,5 +80,15 @@
     </form>
   {% endif %}
 </div>
+{% endif %}
+{% endblock %}
+
+{% block fab %}
+{% if plan is not none and meals and not plan.finalized %}
+<form method="post" action="/plan/meals/add">
+  <button type="submit" class="fab fab-add-meal" aria-label="Add a meal">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+  </button>
+</form>
 {% endif %}
 {% endblock %}

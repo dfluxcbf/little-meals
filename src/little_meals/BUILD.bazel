@@ -16,6 +16,8 @@ filegroup(
         "static/**/*.js",
         "static/**/*.md",
         "static/**/*.woff2",
+        "static/**/*.png",
+        "static/**/*.webmanifest",
     ]),
 )
 
