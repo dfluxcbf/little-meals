@@ -4,6 +4,16 @@ All notable changes to this project are documented in this file, grouped by
 release version. Versions follow the project's [version policy](docs/version_policy.md)
 and are managed exclusively through `lvx`.
 
+## [0.2.10] - 2026-08-31
+
+### Added
+- PWA installability: web app manifest and full icon set (favicon,
+  apple-touch, and maskable/standard 192/512 icons).
+
+### Improved
+- UI polish across cook-along step pages, the plan view, and recipe list
+  partials (styling and markup refinements).
+
 ## [0.1.12] - 2026-08-28
 
 ### Improved
