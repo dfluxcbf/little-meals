@@ -10,7 +10,17 @@ from pydantic import BaseModel, Field
 class Classification(str, Enum):
     VEGETARIAN = "vegetarian"
     PESCETARIAN = "pescetarian"
+    VEGAN = "vegan"
+    KETOGENIC = "ketogenic"
+    PALEO = "paleo"
     OTHER = "other"
+
+
+class Difficulty(str, Enum):
+    EASY = "easy"
+    MEDIUM = "medium"
+    HARD = "hard"
+    UNDEFINED = "undefined"
 
 
 class DayOfWeek(str, Enum):
@@ -55,6 +65,7 @@ class Recipe(BaseModel):
     name: str
     cook_time_minutes: int = Field(ge=1)
     classification: Classification
+    difficulty: Difficulty = Field(default=Difficulty.UNDEFINED)
     nutrition: Nutrition
     servings: int = Field(default=2, ge=1)
     ingredients: list[Ingredient] = Field(min_length=1)
@@ -84,6 +95,7 @@ class RecipeCreate(BaseModel):
     name: str
     cook_time_minutes: int = Field(ge=1)
     classification: Classification
+    difficulty: Difficulty = Field(default=Difficulty.UNDEFINED)
     nutrition: Nutrition
     servings: int = Field(default=2, ge=1)
     ingredients: list[Ingredient] = Field(min_length=1)
@@ -94,6 +106,7 @@ class RecipeUpdate(BaseModel):
     name: str
     cook_time_minutes: int = Field(ge=1)
     classification: Classification
+    difficulty: Difficulty = Field(default=Difficulty.UNDEFINED)
     nutrition: Nutrition
     servings: int = Field(default=2, ge=1)
     ingredients: list[Ingredient] = Field(min_length=1)

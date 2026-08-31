@@ -17,6 +17,10 @@
   --rose-soft: oklch(93% 0.02 20);
   --teal: oklch(55% 0.08 210);
   --teal-soft: oklch(93% 0.02 210);
+  --plum: oklch(50% 0.12 320);
+  --plum-soft: oklch(93% 0.02 320);
+  --gold: oklch(62% 0.13 85);
+  --gold-soft: oklch(93% 0.03 85);
   --fridge-bg: oklch(95% 0.015 220);
   --fridge-fg: oklch(45% 0.03 220);
   --font-display: "Fraunces", Georgia, serif;
@@ -389,9 +393,44 @@ nav.tabbar {
   color: var(--terracotta);
 }
 
+.badge-vegan {
+  background: var(--rose-soft);
+  color: var(--rose);
+}
+
+.badge-ketogenic {
+  background: var(--plum-soft);
+  color: var(--plum);
+}
+
+.badge-paleo {
+  background: var(--gold-soft);
+  color: var(--gold);
+}
+
 .badge-finalized {
   background: var(--sage-soft);
   color: var(--sage);
+}
+
+.badge-easy {
+  background: var(--sage-soft);
+  color: var(--sage);
+}
+
+.badge-medium {
+  background: var(--gold-soft);
+  color: var(--gold);
+}
+
+.badge-hard {
+  background: var(--terracotta-soft);
+  color: var(--terracotta);
+}
+
+.badge-undefined {
+  background: var(--line);
+  color: var(--ink-soft);
 }
 
 /* -------------------------------------------------------- recipe library */
@@ -1023,9 +1062,14 @@ main.content:has(+ .plan-actions-bar) {
   font-size: 16.5px;
 }
 
-.plan-meal-top + .badge {
+.plan-meal-badges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   margin-top: 8px;
-  align-self: flex-start;
+}
+
+.plan-meal-badges .badge {
   font-size: 13px;
   padding: 4px 12px;
 }

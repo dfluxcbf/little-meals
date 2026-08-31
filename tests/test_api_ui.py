@@ -11,6 +11,7 @@ from little_meals.api.app import create_app
 from little_meals.config import Settings
 from little_meals.llm.extraction import RecipeExtractionService
 from little_meals.llm.ollama_client import OllamaClient
+from little_meals.models import Difficulty
 from little_meals.store.recipe_store import RecipeStore
 
 VALID_EXTRACT_PAYLOAD = {
@@ -210,6 +211,95 @@ def test_edit_recipe_form_unknown_id_returns_404(store):
     ui = _make_client(store)
     response = ui.get("/recipes/does-not-exist/edit")
     assert response.status_code == 404
+
+
+@pytest.mark.requirement("REQ-000000051")
+def test_new_recipe_form_difficulty_pills_are_positioned_above_classification_below_servings(store):
+    ui = _make_client(store)
+    response = ui.get("/recipes/new")
+    assert response.status_code == 200
+    text = response.text
+
+    servings_index = text.index('id="servings"')
+    difficulty_index = text.index('id="difficulty-group"')
+    classification_index = text.index("<label>Classification</label>")
+    assert servings_index < difficulty_index < classification_index
+
+
+@pytest.mark.requirement("REQ-000000051")
+def test_new_recipe_form_submit_with_difficulty_creates_recipe_with_that_difficulty(store):
+    ui = _make_client(store)
+    data = dict(NEW_RECIPE_FORM_DATA, difficulty="hard")
+
+    response = ui.post("/recipes/new", data=data, follow_redirects=False)
+    assert response.status_code == 303
+
+    recipes = store.list()
+    assert len(recipes) == 1
+    assert recipes[0].difficulty.value == "hard"
+
+
+@pytest.mark.requirement("REQ-000000051")
+def test_new_recipe_form_submit_without_difficulty_defaults_to_undefined(store):
+    ui = _make_client(store)
+
+    response = ui.post("/recipes/new", data=NEW_RECIPE_FORM_DATA, follow_redirects=False)
+    assert response.status_code == 303
+
+    recipes = store.list()
+    assert len(recipes) == 1
+    assert recipes[0].difficulty.value == "undefined"
+
+
+@pytest.mark.requirement("REQ-000000052")
+def test_recipes_list_shows_difficulty_badge_below_classification_badge(store, sample_recipe):
+    created = store.create(sample_recipe.model_copy(update={"difficulty": Difficulty.MEDIUM}))
+    ui = _make_client(store)
+
+    response = ui.get("/recipes")
+    assert response.status_code == 200
+    text = response.text
+
+    classification_index = text.index(f"badge-{created.classification.value}")
+    difficulty_index = text.index("badge-medium")
+    assert classification_index < difficulty_index
+
+
+@pytest.mark.requirement("REQ-000000052")
+def test_recipe_detail_shows_difficulty_badge_after_classification_badge(store, sample_recipe):
+    created = store.create(sample_recipe.model_copy(update={"difficulty": Difficulty.EASY}))
+    ui = _make_client(store)
+
+    response = ui.get(f"/recipes/{created.id}")
+    assert response.status_code == 200
+    text = response.text
+
+    classification_index = text.index(f"badge-{created.classification.value}")
+    difficulty_index = text.index("badge-easy")
+    assert classification_index < difficulty_index
+
+
+@pytest.mark.requirement("REQ-000000053")
+@pytest.mark.parametrize("classification", ["vegan", "ketogenic", "paleo"])
+def test_new_recipe_form_offers_additional_food_type_classifications(store, classification: str):
+    ui = _make_client(store)
+    response = ui.get("/recipes/new")
+    assert response.status_code == 200
+    assert f'id="classification-{classification}"' in response.text
+
+
+@pytest.mark.requirement("REQ-000000053")
+@pytest.mark.parametrize("classification", ["vegan", "ketogenic", "paleo"])
+def test_new_recipe_form_submit_accepts_additional_food_type_classifications(store, classification: str):
+    ui = _make_client(store)
+    data = dict(NEW_RECIPE_FORM_DATA, classification=classification)
+
+    response = ui.post("/recipes/new", data=data, follow_redirects=False)
+    assert response.status_code == 303
+
+    recipes = store.list()
+    assert len(recipes) == 1
+    assert recipes[0].classification.value == classification
 
 
 def test_static_htmx_is_served(store):

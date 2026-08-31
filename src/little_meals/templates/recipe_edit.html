@@ -16,6 +16,14 @@
   <label for="servings">Servings</label>
   <input type="number" id="servings" name="servings" min="1" value="{{ values.servings }}" required>
 
+  <label>Difficulty</label>
+  <div class="pill-group" id="difficulty-group">
+    {% for d in difficulties %}
+      <input type="radio" class="pill-input pill-input-deselectable" id="difficulty-{{ d.value }}" name="difficulty" value="{{ d.value }}" {% if values.difficulty == d.value %}checked{% endif %}>
+      <label for="difficulty-{{ d.value }}" class="pill-label">{{ d.value|capitalize }}</label>
+    {% endfor %}
+  </div>
+
   <label>Classification</label>
   <div class="pill-group">
     {% for c in classifications %}
@@ -120,6 +128,20 @@
   });
   document.getElementById("add-step-btn").addEventListener("click", function () {
     addEditorRow("step-rows", "step-row-template");
+  });
+  document.querySelectorAll(".pill-input-deselectable").forEach(function (el) {
+    el.dataset.wasChecked = el.checked ? "true" : "false";
+    el.addEventListener("mousedown", function () {
+      el.dataset.wasChecked = el.checked ? "true" : "false";
+    });
+    el.addEventListener("click", function () {
+      if (el.dataset.wasChecked === "true") {
+        el.checked = false;
+      }
+      document.querySelectorAll(".pill-input-deselectable").forEach(function (other) {
+        other.dataset.wasChecked = other.checked ? "true" : "false";
+      });
+    });
   });
   document.querySelectorAll(".step-textarea").forEach(initStepTextarea);
   window.addEventListener("resize", resizeAllStepTextareas);

@@ -8,7 +8,7 @@ import pytest
 
 from little_meals.llm.extraction import RecipeExtractionService
 from little_meals.llm.ollama_client import OllamaClient
-from little_meals.models import Recipe
+from little_meals.models import Difficulty, Recipe
 from little_meals.store.recipe_store import RecipeNotFound, RecipeStore
 
 _NORMALIZED_PAYLOAD = {
@@ -96,6 +96,34 @@ def test_hand_edited_file_is_picked_up_on_next_read(store: RecipeStore, sample_r
 
     reread = store.get(created.id)
     assert reread.name == "Lime Garlic Chicken"
+
+
+@pytest.mark.requirement("REQ-000000050")
+def test_create_then_get_round_trips_difficulty(store: RecipeStore, sample_recipe: Recipe):
+    recipe = sample_recipe.model_copy(update={"difficulty": Difficulty.HARD})
+    created = store.create(recipe)
+
+    fetched = store.get(created.id)
+    assert fetched.difficulty == Difficulty.HARD
+
+
+@pytest.mark.requirement("REQ-000000050")
+def test_recipe_defaults_to_undefined_difficulty(sample_recipe: Recipe):
+    assert sample_recipe.difficulty == Difficulty.UNDEFINED
+
+
+@pytest.mark.requirement("REQ-000000050")
+def test_recipe_file_written_before_difficulty_existed_reads_as_undefined(
+    store: RecipeStore, sample_recipe: Recipe, tmp_recipes_dir: Path
+):
+    created = store.create(sample_recipe.model_copy(update={"difficulty": Difficulty.EASY}))
+    path = tmp_recipes_dir / f"{created.id}.md"
+    text = path.read_text(encoding="utf-8")
+    text = "\n".join(line for line in text.splitlines() if not line.startswith("difficulty:")) + "\n"
+    path.write_text(text, encoding="utf-8")
+
+    reread = store.get(created.id)
+    assert reread.difficulty == Difficulty.UNDEFINED
 
 
 def test_list_skips_corrupt_files_without_failing(store: RecipeStore, sample_recipe: Recipe, tmp_recipes_dir: Path):
