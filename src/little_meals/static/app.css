@@ -651,6 +651,16 @@ form button {
 
 .editor-row-step {
   grid-template-columns: 1fr auto;
+  align-items: start;
+}
+
+.step-textarea {
+  resize: none;
+  overflow: hidden;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  min-height: 40px;
+  line-height: 1.4;
 }
 
 .row-remove-btn {
