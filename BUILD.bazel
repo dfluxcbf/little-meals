@@ -6,7 +6,7 @@ load("@rules_python//python:pip.bzl", "compile_pip_requirements")
 #
 #   bazel build //:all                 → every artifact
 #   bazel build //:wheel                → the Python wheel
-#   bazel run   //:preflight            → system-dependency check (ollama, pipx, ...)
+#   bazel run   //:preflight            → system-dependency check (python3, pipx, ...)
 #   bazel run   //:install              → preflight, then pipx-install the wheel
 #   bazel run   //:serve                → run the web app (uvicorn)
 #   bazel run   //:deploy               → rebuild+reinstall, then restart the

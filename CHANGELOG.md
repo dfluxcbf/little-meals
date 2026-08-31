@@ -4,6 +4,18 @@ All notable changes to this project are documented in this file, grouped by
 release version. Versions follow the project's [version policy](docs/version_policy.md)
 and are managed exclusively through `lvx`.
 
+## [0.3.3] - 2026-08-31
+
+### Removed
+- Complete removal of the Ollama/LLM recipe-extraction integration (M16):
+  the `llm/` package, the `POST /api/recipes/extract` endpoint,
+  `ExtractedRecipe`/`ExtractRequest`, the `ollama_*` Settings/env vars, and
+  preflight's "local LLM runtime" dependency tier. Every feature is now
+  purely user-driven: recipes are entered directly (M12's edit form) and
+  plans are drawn purely from the cookbook on a schedule (M3). An
+  unparseable recipe file is simply skipped with a logged warning, same as
+  the pre-existing no-extractor fallback.
+
 ## [0.2.10] - 2026-08-31
 
 ### Added

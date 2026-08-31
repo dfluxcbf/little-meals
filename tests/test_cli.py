@@ -114,7 +114,7 @@ def test_preflight_subcommand_matches_preflight_main(monkeypatch, capsys):
     monkeypatch.setattr(
         preflight_module,
         "check",
-        lambda: preflight_module.PreflightResult(missing=[], stopped_at_tier=None, warnings=[]),
+        lambda: preflight_module.PreflightResult(missing=[], stopped_at_tier=None),
     )
     exit_code = cli_module.main(["preflight"])
     assert exit_code == 0

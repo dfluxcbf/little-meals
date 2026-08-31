@@ -1,42 +1,17 @@
 from __future__ import annotations
 
-import json
-from typing import Callable, Optional
-
-import httpx
 import pytest
 from fastapi.testclient import TestClient
 
 from little_meals.api.app import create_app
 from little_meals.config import Settings
-from little_meals.llm.extraction import RecipeExtractionService
-from little_meals.llm.ollama_client import OllamaClient
 from little_meals.models import Difficulty
 from little_meals.store.recipe_store import RecipeStore
 
-VALID_EXTRACT_PAYLOAD = {
-    "name": "Tomato Soup",
-    "cook_time_minutes": 20,
-    "classification": "vegetarian",
-    "nutrition": {"calories_per_serving": 180},
-    "servings": 4,
-    "ingredients": [{"name": "tomato", "quantity": 4, "unit": "pieces"}],
-    "steps": ["Simmer the tomatoes.", "Blend until smooth."],
-}
 
-
-def _make_client(store: RecipeStore, handler: Optional[Callable[[httpx.Request], httpx.Response]] = None) -> TestClient:
+def _make_client(store: RecipeStore) -> TestClient:
     settings = Settings(data_dir=store._dir.parent)
-    if handler is None:
-
-        def handler(request: httpx.Request) -> httpx.Response:
-            return httpx.Response(200, json={"response": json.dumps(VALID_EXTRACT_PAYLOAD)})
-
-    ollama_client = OllamaClient(
-        settings.ollama_base_url, settings.ollama_model, 5.0, client=httpx.Client(transport=httpx.MockTransport(handler))
-    )
-    extractor = RecipeExtractionService(ollama_client)
-    app = create_app(settings=settings, store=store, extractor=extractor)
+    app = create_app(settings=settings, store=store)
     return TestClient(app)
 
 

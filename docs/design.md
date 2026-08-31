@@ -21,9 +21,9 @@ already saved.
 
 ## Goals
 
-- Let the user save recipes they like, with the tedious parts (cook time,
-  classification, nutrition/calorie estimate, ingredient list, steps) extracted
-  automatically by a local LLM rather than typed by hand.
+- Let the user save recipes they like by entering them directly - name, cook
+  time, classification, nutrition, ingredient list, and steps - through the
+  recipe edit form.
 - Produce a weekly meal plan sized to the user's configured recipe count, drawn
   from the recipes already in the library.
 - Let the user ask for different recipes when the current ones don't land: reroll

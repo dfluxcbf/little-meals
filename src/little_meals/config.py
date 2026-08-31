@@ -17,9 +17,6 @@ def _default_data_dir() -> Path:
 @dataclass(frozen=True)
 class Settings:
     data_dir: Path = field(default_factory=_default_data_dir)
-    ollama_base_url: str = "http://127.0.0.1:11434"
-    ollama_model: str = "qwen2.5-coder:14b"
-    ollama_timeout_s: float = 120.0
     host: str = "127.0.0.1"
     port: int = 8765
 
@@ -49,9 +46,4 @@ class Settings:
 
     @classmethod
     def from_env(cls) -> "Settings":
-        return cls(
-            data_dir=_default_data_dir(),
-            ollama_base_url=os.environ.get("LITTLE_MEALS_OLLAMA_URL", cls.ollama_base_url),
-            ollama_model=os.environ.get("LITTLE_MEALS_OLLAMA_MODEL", cls.ollama_model),
-            ollama_timeout_s=float(os.environ.get("LITTLE_MEALS_OLLAMA_TIMEOUT", cls.ollama_timeout_s)),
-        )
+        return cls(data_dir=_default_data_dir())

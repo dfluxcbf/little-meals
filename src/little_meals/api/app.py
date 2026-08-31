@@ -20,8 +20,6 @@ from little_meals.api.routes_recipes import build_recipes_router
 from little_meals.api.routes_shopping import build_shopping_router
 from little_meals.api.routes_ui import build_ui_router
 from little_meals.config import Settings
-from little_meals.llm.extraction import RecipeExtractionService
-from little_meals.llm.ollama_client import OllamaClient
 from little_meals.planning.plan_builder import build_meal_specs
 from little_meals.scheduler import WeeklyScheduler
 from little_meals.store.cook_along_store import CookAlongStore
@@ -37,7 +35,6 @@ logger = logging.getLogger(__name__)
 def create_app(
     settings: Optional[Settings] = None,
     store: Optional[RecipeStore] = None,
-    extractor: Optional[RecipeExtractionService] = None,
     household_store: Optional[HouseholdPreferencesStore] = None,
     plan_store: Optional[MealPlanStore] = None,
     shopping_list_store: Optional[ShoppingListStore] = None,
@@ -52,9 +49,6 @@ def create_app(
     shopping_list_store = shopping_list_store or ShoppingListStore(settings.shopping_list_db_path)
     notification_store = notification_store or NotificationStore(settings.notification_db_path)
     cook_along_store = cook_along_store or CookAlongStore(settings.cook_along_db_path)
-    if extractor is None:
-        client = OllamaClient(settings.ollama_base_url, settings.ollama_model, settings.ollama_timeout_s)
-        extractor = RecipeExtractionService(client)
 
     background_scheduler = None
     if enable_scheduler:
@@ -64,7 +58,7 @@ def create_app(
             household_store,
             plan_store,
             notification_store,
-            generate_fn=lambda: plan_store.create(build_meal_specs(store, household_store, extractor)),
+            generate_fn=lambda: plan_store.create(build_meal_specs(store, household_store)),
         )
         def _check_weekly_plan() -> None:
             weekly_scheduler.check_and_maybe_generate()
@@ -126,14 +120,13 @@ def create_app(
             content={"error": "Internal server error", "code": "INTERNAL_ERROR", "details": {}},
         )
 
-    app.include_router(build_recipes_router(store, extractor, settings))
+    app.include_router(build_recipes_router(store, settings))
     app.include_router(build_household_router(household_store))
-    app.include_router(build_plan_router(plan_store, store, household_store, extractor))
+    app.include_router(build_plan_router(plan_store, store, household_store))
     app.include_router(build_shopping_router(shopping_list_store, plan_store, store))
     app.include_router(
         build_ui_router(
             store,
-            extractor,
             household_store,
             plan_store,
             shopping_list_store,

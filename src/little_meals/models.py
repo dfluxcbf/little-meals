@@ -46,20 +46,6 @@ class Nutrition(BaseModel):
     fiber_g: Optional[float] = None
 
 
-class ExtractedRecipe(BaseModel):
-    """The LLM-facing subset of a Recipe: everything the extraction service
-    is responsible for producing. Deliberately excludes id and timestamps so
-    the LLM can never invent an id."""
-
-    name: str
-    cook_time_minutes: int = Field(ge=1)
-    classification: Classification
-    nutrition: Nutrition
-    servings: int = Field(default=2, ge=1)
-    ingredients: list[Ingredient] = Field(min_length=1)
-    steps: list[str] = Field(min_length=1)
-
-
 class Recipe(BaseModel):
     id: str
     name: str
@@ -73,22 +59,6 @@ class Recipe(BaseModel):
     source_text: Optional[str] = None
     created_at: datetime
     updated_at: datetime
-
-    @classmethod
-    def from_extracted(cls, extracted: ExtractedRecipe, *, id: str, source_text: Optional[str], now: datetime) -> "Recipe":
-        return cls(
-            id=id,
-            name=extracted.name,
-            cook_time_minutes=extracted.cook_time_minutes,
-            classification=extracted.classification,
-            nutrition=extracted.nutrition,
-            servings=extracted.servings,
-            ingredients=extracted.ingredients,
-            steps=extracted.steps,
-            source_text=source_text,
-            created_at=now,
-            updated_at=now,
-        )
 
 
 class RecipeCreate(BaseModel):
@@ -111,10 +81,6 @@ class RecipeUpdate(BaseModel):
     servings: int = Field(default=2, ge=1)
     ingredients: list[Ingredient] = Field(min_length=1)
     steps: list[str] = Field(min_length=1)
-
-
-class ExtractRequest(BaseModel):
-    text: str
 
 
 class PlanMeal(BaseModel):
