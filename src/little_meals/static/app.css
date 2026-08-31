@@ -80,10 +80,18 @@ h2 {
 
 /* ---------------------------------------------------------------- shell */
 
+/* The shell is pinned exactly to the visual viewport (not sized via vh/dvh
+   math, which can lag the address bar showing/hiding) and never scrolls
+   itself - header and tabbar/action-bar are fixed in place, and only
+   main.content scrolls internally when its content doesn't fit. This is
+   what keeps a short page (e.g. an empty shopping list) from picking up a
+   phantom scroll with the header dragged along with it. */
 .app-shell {
-  min-height: 100vh;
+  position: fixed;
+  inset: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .notification-banner {
@@ -110,8 +118,7 @@ h2 {
 }
 
 header.topbar {
-  position: sticky;
-  top: 0;
+  flex-shrink: 0;
   z-index: 10;
   display: flex;
   align-items: center;
@@ -135,22 +142,20 @@ header.topbar {
 
 main.content {
   flex: 1;
+  min-height: 0;
   width: 100%;
   max-width: 640px;
   margin: 0 auto;
   padding: 24px 20px calc(var(--tabbar-height) + 24px + env(safe-area-inset-bottom, 0px));
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* This week's plan: the whole page fits one screen, no scrolling - the
-   meal card centers in whatever vertical space is left over once the
-   title/subtitle and the fixed header/tabbar/action-bar are accounted
-   for. app-shell's height is capped to the viewport (rather than just
-   min-height) only while this page is showing, via :has(). */
-.app-shell:has(main.content-plan) {
-  height: 100dvh;
-  overflow: hidden;
-}
-
+   meal card fills whatever vertical space is left over once the
+   title/subtitle and the fixed header/tabbar/action-bar are accounted for.
+   Unlike other pages, main.content itself must not scroll here (the
+   flipbook swipes horizontally instead), so it clips rather than scrolls. */
 main.content.content-plan {
   display: flex;
   flex-direction: column;
@@ -169,6 +174,10 @@ main.content.content-plan > .badge {
   display: flex;
   flex-direction: column;
   justify-content: center;
+}
+
+.plan-center:has(.plan-flipbook) {
+  justify-content: stretch;
 }
 
 nav.tabbar {
@@ -310,6 +319,50 @@ nav.tabbar {
   cursor: not-allowed;
 }
 
+/* ----------------------------------------------------- floating actions */
+
+.fab {
+  position: fixed;
+  right: 20px;
+  bottom: calc(var(--tabbar-height) + 20px + env(safe-area-inset-bottom, 0px));
+  z-index: 15;
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  background: var(--terracotta);
+  color: white;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 20px oklch(30% 0.02 50 / 0.28);
+  cursor: pointer;
+}
+
+.fab:hover {
+  background: var(--terracotta-dark);
+  color: white;
+}
+
+.fab svg {
+  width: 24px;
+  height: 24px;
+}
+
+.fab-add-meal {
+  bottom: calc(var(--tabbar-height) + 78px + 16px + env(safe-area-inset-bottom, 0px));
+}
+
+@media (min-width: 900px) {
+  .fab {
+    bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .fab-add-meal {
+    bottom: calc(78px + 16px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
 /* ----------------------------------------------------------------- misc */
 
 .badge {
@@ -395,12 +448,25 @@ nav.tabbar {
   line-height: 1.25;
 }
 
-.recipe-card-meta {
+.recipe-card-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.stat-row-sm {
   display: flex;
   align-items: center;
-  gap: 10px;
-  font-size: 12px;
+  gap: 5px;
+  font-size: 11.5px;
   color: var(--ink-soft);
+}
+
+.stat-row-sm svg {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+  color: var(--terracotta);
 }
 
 /* --------------------------------------------------------- recipe detail */
@@ -807,6 +873,10 @@ form button {
 .plan-flipbook {
   position: relative;
   margin-left: 16px;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .flipbook-spine {
@@ -837,8 +907,11 @@ form button {
 .flipbook-track {
   position: relative;
   z-index: 1;
+  flex: 1;
+  min-height: 0;
   display: flex;
   overflow-x: auto;
+  overflow-y: hidden;
   scroll-snap-type: x mandatory;
   gap: 14px;
   scrollbar-width: none;
@@ -852,8 +925,11 @@ form button {
 .flipbook-page {
   flex: 0 0 100%;
   min-width: 0;
+  min-height: 0;
   scroll-snap-align: center;
   scroll-snap-stop: always;
+  display: flex;
+  overflow: hidden;
   background: var(--paper);
   border: 1px solid var(--line);
   border-radius: 10px 22px 22px 10px;
@@ -917,13 +993,12 @@ main.content:has(+ .plan-actions-bar) {
 }
 
 .plan-meal {
-  border-bottom: 1px dashed var(--line);
-  padding-bottom: 14px;
-}
-
-.plan-meal:last-child {
-  border-bottom: none;
-  padding-bottom: 0;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .plan-meal-top {
@@ -938,13 +1013,55 @@ main.content:has(+ .plan-actions-bar) {
   font-size: 16.5px;
 }
 
-.plan-meal-meta {
+.plan-meal-top + .badge {
+  margin-top: 8px;
+  align-self: flex-start;
+  font-size: 13px;
+  padding: 4px 12px;
+}
+
+.plan-meal-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  margin: 16px 0;
+}
+
+.plan-meal-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: calc(100% - 58px);
+}
+
+.stat-row {
   display: flex;
   align-items: center;
-  gap: 10px;
-  font-size: 12px;
+  gap: 8px;
+  font-size: 13.5px;
   color: var(--ink-soft);
-  margin: 6px 0 10px;
+}
+
+.stat-row svg {
+  width: 17px;
+  height: 17px;
+  flex-shrink: 0;
+  color: var(--terracotta);
+}
+
+.cook-along-btn {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 9px 16px;
+  border-radius: 999px;
+  background: var(--terracotta-soft);
+  color: var(--terracotta-dark);
 }
 
 .pot-stamp {
@@ -979,35 +1096,74 @@ main.content:has(+ .plan-actions-bar) {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-shrink: 0;
 }
 
 .servings-row label {
   margin: 0;
+  line-height: 1;
   font-size: 12.5px;
   font-weight: 600;
   color: var(--ink-soft);
 }
 
-.servings-row input[type="number"] {
-  width: 72px;
-  padding: 6px 8px;
-}
-
-.plan-meal-actions {
+.stepper {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  margin-top: 10px;
+  gap: 12px;
+}
+
+.stepper form {
+  display: contents;
+}
+
+.stepper-btn {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  line-height: 1;
+  border-radius: 999px;
+  border: none;
+  background: var(--terracotta);
+  color: white;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stepper-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.stepper-btn:disabled {
+  background: var(--line);
+  color: var(--ink-faint);
+  cursor: not-allowed;
+}
+
+.stepper-value {
+  min-width: 1.2em;
+  line-height: 1;
+  text-align: center;
+  font-weight: 700;
 }
 
 .reroll-actions {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
   display: flex;
-  gap: 6px;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
 }
 
 .reroll-btn {
-  width: 30px;
-  height: 30px;
+  width: 42px;
+  height: 42px;
   border-radius: 999px;
   border: 1.5px solid var(--line);
   background: var(--paper);
@@ -1019,8 +1175,8 @@ main.content:has(+ .plan-actions-bar) {
 }
 
 .reroll-btn svg {
-  width: 14px;
-  height: 14px;
+  width: 18px;
+  height: 18px;
 }
 
 .alternatives-list {
@@ -1283,7 +1439,7 @@ main.content:has(+ .plan-actions-bar) {
 .cook-ingredients-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 0;
 }
 
 .cook-ingredient-row {
@@ -1294,13 +1450,26 @@ main.content:has(+ .plan-actions-bar) {
   gap: 10px;
   padding: 13px 14px;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-top: none;
   background: var(--paper);
   cursor: pointer;
   text-align: left;
   font-family: var(--font-body);
   font-size: 13.5px;
   color: var(--ink);
+}
+
+.cook-ingredient-row:first-child {
+  border-top: 1px solid var(--line);
+  border-radius: 10px 10px 0 0;
+}
+
+.cook-ingredient-row:last-child {
+  border-radius: 0 0 10px 10px;
+}
+
+.cook-ingredient-row:first-child:last-child {
+  border-radius: 10px;
 }
 
 .cook-ingredient-name {

@@ -3,7 +3,15 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}little-meals{% endblock %}</title>
+  <title>{% block title %}Little Meals{% endblock %}</title>
+  <link rel="manifest" href="/static/manifest.webmanifest">
+  <meta name="theme-color" content="#c55123">
+  <link rel="icon" href="/static/icons/favicon-64.png">
+  <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Little Meals">
   <link rel="stylesheet" href="/static/fonts.css">
   <link rel="stylesheet" href="/static/app.css">
   <script src="/static/vendor/htmx.min.js"></script>
@@ -17,13 +25,13 @@
     </a>
     {% endif %}
     <header class="topbar">
-      <a href="/recipes" class="brand">little meals</a>
-      <a href="/recipes/new" class="btn btn-primary">+ New recipe</a>
+      <a href="/recipes" class="brand">Little Meals</a>
     </header>
     <main class="content {% block content_class %}{% endblock %}">
       {% block content %}{% endblock %}
     </main>
     {% block bottom_bar %}{% endblock %}
+    {% block fab %}{% endblock %}
     <nav class="tabbar" aria-label="Primary">
       <a href="/recipes" class="tab {% if nav_active == 'library' %}tab-active{% endif %}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
