@@ -1,27 +1,11 @@
 from __future__ import annotations
 
-import json
-from typing import Callable, Optional
-
-import httpx
 import pytest
 from fastapi.testclient import TestClient
 
 from little_meals.api.app import create_app
 from little_meals.config import Settings
-from little_meals.llm.extraction import RecipeExtractionService
-from little_meals.llm.ollama_client import OllamaClient
 from little_meals.store.recipe_store import RecipeStore
-
-VALID_EXTRACT_PAYLOAD = {
-    "name": "Tomato Soup",
-    "cook_time_minutes": 20,
-    "classification": "vegetarian",
-    "nutrition": {"calories_per_serving": 180},
-    "servings": 4,
-    "ingredients": [{"name": "tomato", "quantity": 4, "unit": "pieces"}],
-    "steps": ["Simmer the tomatoes.", "Blend until smooth."],
-}
 
 RECIPE_CREATE_PAYLOAD = {
     "name": "Pasta Aglio e Olio",
@@ -34,18 +18,9 @@ RECIPE_CREATE_PAYLOAD = {
 }
 
 
-def _make_client(store: RecipeStore, handler: Optional[Callable[[httpx.Request], httpx.Response]] = None) -> TestClient:
+def _make_client(store: RecipeStore) -> TestClient:
     settings = Settings(data_dir=store._dir.parent)
-    if handler is None:
-
-        def handler(request: httpx.Request) -> httpx.Response:
-            return httpx.Response(200, json={"response": json.dumps(VALID_EXTRACT_PAYLOAD)})
-
-    ollama_client = OllamaClient(
-        settings.ollama_base_url, settings.ollama_model, 5.0, client=httpx.Client(transport=httpx.MockTransport(handler))
-    )
-    extractor = RecipeExtractionService(ollama_client)
-    app = create_app(settings=settings, store=store, extractor=extractor)
+    app = create_app(settings=settings, store=store)
     return TestClient(app)
 
 
@@ -85,33 +60,6 @@ def test_get_unknown_recipe_returns_error_envelope(store: RecipeStore):
     assert body["code"] == "NOT_FOUND"
     assert "error" in body
     assert "details" in body
-
-
-def test_extract_success(store: RecipeStore):
-    api = _make_client(store)
-    response = api.post("/api/recipes/extract", json={"text": "a nice tomato soup"})
-    assert response.status_code == 201
-    assert response.json()["name"] == "Tomato Soup"
-
-
-def test_extract_failure_returns_422(store: RecipeStore):
-    def handler(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(200, json={"response": "not json at all {"})
-
-    api = _make_client(store, handler=handler)
-    response = api.post("/api/recipes/extract", json={"text": "garbled input"})
-    assert response.status_code == 422
-    assert response.json()["code"] == "EXTRACTION_FAILED"
-
-
-def test_extract_llm_unavailable_returns_503(store: RecipeStore):
-    def handler(request: httpx.Request) -> httpx.Response:
-        raise httpx.ConnectError("refused", request=request)
-
-    api = _make_client(store, handler=handler)
-    response = api.post("/api/recipes/extract", json={"text": "anything"})
-    assert response.status_code == 503
-    assert response.json()["code"] == "LLM_UNAVAILABLE"
 
 
 def test_malformed_create_body_returns_400(store: RecipeStore):
@@ -156,4 +104,3 @@ def test_health_endpoint(store: RecipeStore):
     assert response.status_code == 200
     body = response.json()
     assert body["status"] == "ok"
-    assert "ollama" in body

@@ -9,7 +9,6 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, ValidationError
 
-from little_meals.llm.extraction import RecipeExtractionService
 from little_meals.models import Classification, DayOfWeek, Difficulty, HouseholdPreferencesUpdate, Ingredient, MealPlan, Recipe, RecipeCreate, RecipeUpdate
 from little_meals.planning.plan_builder import build_meal_specs, generate_single_replacement, list_controlled_reroll_candidates
 from little_meals.planning.shopping_list import build_shopping_list_items
@@ -23,7 +22,6 @@ from little_meals.store.shopping_list_store import ShoppingListItemNotFound, Sho
 
 def build_ui_router(
     store: RecipeStore,
-    extractor: RecipeExtractionService,
     household_store: HouseholdPreferencesStore,
     plan_store: MealPlanStore,
     shopping_list_store: ShoppingListStore,
@@ -44,7 +42,7 @@ def build_ui_router(
                     continue
                 meals.append({"meal": meal, "recipe": recipe})
         all_cooked = bool(plan is not None and plan.finalized and meals and all(item["meal"].cooked for item in meals))
-        library_has_recipes = bool(store.list(extractor)) if plan is not None and not meals else True
+        library_has_recipes = bool(store.list()) if plan is not None and not meals else True
         return templates.TemplateResponse(
             request,
             "plan.html",
@@ -64,7 +62,7 @@ def build_ui_router(
 
     @router.get("/recipes", response_class=HTMLResponse, include_in_schema=False)
     def recipes_list(request: Request) -> HTMLResponse:
-        recipes = store.list(extractor)
+        recipes = store.list()
         return templates.TemplateResponse(
             request,
             "recipes_list.html",
@@ -338,21 +336,21 @@ def build_ui_router(
 
     @router.post("/plan/generate", include_in_schema=False)
     def plan_generate() -> RedirectResponse:
-        plan_store.create(build_meal_specs(store, household_store, extractor))
+        plan_store.create(build_meal_specs(store, household_store))
         return RedirectResponse(url="/plan", status_code=303)
 
     @router.post("/plan/reroll", include_in_schema=False)
     def plan_reroll_whole() -> RedirectResponse:
         plan = plan_store.get_current()
         if plan is not None and not plan.finalized:
-            plan_store.replace_meals(plan.id, build_meal_specs(store, household_store, extractor))
+            plan_store.replace_meals(plan.id, build_meal_specs(store, household_store))
         return RedirectResponse(url="/plan", status_code=303)
 
     @router.post("/plan/meals/add", include_in_schema=False)
     def plan_meal_add() -> RedirectResponse:
         plan = plan_store.get_current()
         if plan is not None and not plan.finalized:
-            recipes = store.list(extractor)
+            recipes = store.list()
             excluded = {meal.recipe_id for meal in plan.meals}
             replacement = generate_single_replacement(excluded, recipes)
             if replacement is not None:
@@ -396,7 +394,7 @@ def build_ui_router(
         plan = plan_store.get_current()
         if plan is None or plan.finalized:
             return RedirectResponse(url="/plan", status_code=303)
-        recipes = store.list(extractor)
+        recipes = store.list()
         excluded = {meal.recipe_id for meal in plan.meals}
         replacement = generate_single_replacement(excluded, recipes)
         if replacement is None:
@@ -416,7 +414,7 @@ def build_ui_router(
         if meal is None:
             return RedirectResponse(url="/plan", status_code=303)
         excluded = {m.recipe_id for m in plan.meals}
-        candidates = list_controlled_reroll_candidates(excluded, store.list(extractor))
+        candidates = list_controlled_reroll_candidates(excluded, store.list())
         current_recipe = store.get(meal.recipe_id)
         return templates.TemplateResponse(
             request,

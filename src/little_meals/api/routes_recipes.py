@@ -6,13 +6,11 @@ from fastapi import APIRouter
 
 from little_meals.api.errors import ApiError
 from little_meals.config import Settings
-from little_meals.llm.extraction import ExtractionError, RecipeExtractionService
-from little_meals.llm.ollama_client import OllamaUnavailable
-from little_meals.models import ExtractRequest, Recipe, RecipeCreate, RecipeUpdate
+from little_meals.models import Recipe, RecipeCreate, RecipeUpdate
 from little_meals.store.recipe_store import RecipeNotFound, RecipeStore
 
 
-def build_recipes_router(store: RecipeStore, extractor: RecipeExtractionService, settings: Settings) -> APIRouter:
+def build_recipes_router(store: RecipeStore, settings: Settings) -> APIRouter:
     router = APIRouter(prefix="/api")
 
     def _fetch(recipe_id: str) -> Recipe:
@@ -23,7 +21,7 @@ def build_recipes_router(store: RecipeStore, extractor: RecipeExtractionService,
 
     @router.get("/recipes", response_model=list[Recipe])
     def list_recipes() -> list[Recipe]:
-        return store.list(extractor)
+        return store.list()
 
     @router.get("/recipes/{recipe_id}", response_model=Recipe)
     def get_recipe(recipe_id: str) -> Recipe:
@@ -46,18 +44,6 @@ def build_recipes_router(store: RecipeStore, extractor: RecipeExtractionService,
             created_at=now,
             updated_at=now,
         )
-        return store.create(recipe)
-
-    @router.post("/recipes/extract", response_model=Recipe, status_code=201)
-    def extract_recipe(payload: ExtractRequest) -> Recipe:
-        try:
-            extracted = extractor.extract(payload.text)
-        except OllamaUnavailable as exc:
-            raise ApiError(503, "LLM_UNAVAILABLE", str(exc)) from exc
-        except ExtractionError as exc:
-            raise ApiError(422, "EXTRACTION_FAILED", str(exc), details=exc.details) from exc
-
-        recipe = Recipe.from_extracted(extracted, id="", source_text=payload.text, now=datetime.now(timezone.utc))
         return store.create(recipe)
 
     @router.put("/recipes/{recipe_id}", response_model=Recipe)
@@ -95,10 +81,6 @@ def build_recipes_router(store: RecipeStore, extractor: RecipeExtractionService,
         return {
             "status": "ok",
             "recipes_dir": str(settings.recipes_dir),
-            "ollama": {
-                "url": settings.ollama_base_url,
-                "model": settings.ollama_model,
-            },
         }
 
     return router
