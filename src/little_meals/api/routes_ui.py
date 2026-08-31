@@ -10,7 +10,7 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, ValidationError
 
 from little_meals.llm.extraction import RecipeExtractionService
-from little_meals.models import Classification, DayOfWeek, HouseholdPreferencesUpdate, Ingredient, MealPlan, Recipe, RecipeCreate, RecipeUpdate
+from little_meals.models import Classification, DayOfWeek, Difficulty, HouseholdPreferencesUpdate, Ingredient, MealPlan, Recipe, RecipeCreate, RecipeUpdate
 from little_meals.planning.plan_builder import build_meal_specs, generate_single_replacement, list_controlled_reroll_candidates
 from little_meals.planning.shopping_list import build_shopping_list_items
 from little_meals.store.cook_along_store import CookAlongStore
@@ -524,6 +524,7 @@ def _empty_recipe_values() -> dict:
         "cook_time_minutes": "",
         "servings": 2,
         "classification": Classification.OTHER.value,
+        "difficulty": Difficulty.UNDEFINED.value,
         "calories_per_serving": "",
         "protein_g": "",
         "fiber_g": "",
@@ -550,6 +551,7 @@ def _recipe_values_from_recipe(recipe: Recipe) -> dict:
         "cook_time_minutes": recipe.cook_time_minutes,
         "servings": recipe.servings,
         "classification": recipe.classification.value,
+        "difficulty": recipe.difficulty.value,
         "calories_per_serving": recipe.nutrition.calories_per_serving if recipe.nutrition.calories_per_serving is not None else "",
         "protein_g": recipe.nutrition.protein_g if recipe.nutrition.protein_g is not None else "",
         "fiber_g": recipe.nutrition.fiber_g if recipe.nutrition.fiber_g is not None else "",
@@ -571,6 +573,7 @@ def _recipe_values_from_form(form: FormData) -> dict:
         "cook_time_minutes": form.get("cook_time_minutes", ""),
         "servings": form.get("servings", ""),
         "classification": form.get("classification", ""),
+        "difficulty": form.get("difficulty", ""),
         "calories_per_serving": form.get("calories_per_serving", ""),
         "protein_g": form.get("protein_g", ""),
         "fiber_g": form.get("fiber_g", ""),
@@ -588,6 +591,7 @@ def _recipe_edit_context(
         "values": values,
         "error": error,
         "classifications": list(Classification),
+        "difficulties": [d for d in Difficulty if d != Difficulty.UNDEFINED],
         "form_action": "/recipes/new" if mode == "new" else f"/recipes/{recipe_id}/edit",
         "cancel_url": "/recipes" if mode == "new" else f"/recipes/{recipe_id}",
         "recipe_id": recipe_id,
@@ -622,6 +626,7 @@ def _parse_recipe_form(form: FormData, model_cls: type[BaseModel]) -> BaseModel:
         "name": name,
         "cook_time_minutes": int(str(form.get("cook_time_minutes") or "").strip()),
         "classification": str(form.get("classification") or ""),
+        "difficulty": str(form.get("difficulty") or Difficulty.UNDEFINED.value),
         "nutrition": {
             "calories_per_serving": _optional_int("calories_per_serving"),
             "protein_g": _optional_float("protein_g"),

@@ -121,6 +121,35 @@ def test_malformed_create_body_returns_400(store: RecipeStore):
     assert response.json()["code"] == "VALIDATION_ERROR"
 
 
+@pytest.mark.requirement("REQ-000000050")
+def test_create_recipe_with_difficulty(store: RecipeStore):
+    api = _make_client(store)
+    payload = dict(RECIPE_CREATE_PAYLOAD, difficulty="hard")
+
+    response = api.post("/api/recipes", json=payload)
+    assert response.status_code == 201
+    assert response.json()["difficulty"] == "hard"
+
+
+@pytest.mark.requirement("REQ-000000050")
+def test_create_recipe_without_difficulty_defaults_to_undefined(store: RecipeStore):
+    api = _make_client(store)
+    response = api.post("/api/recipes", json=RECIPE_CREATE_PAYLOAD)
+    assert response.status_code == 201
+    assert response.json()["difficulty"] == "undefined"
+
+
+@pytest.mark.requirement("REQ-000000053")
+@pytest.mark.parametrize("classification", ["vegan", "ketogenic", "paleo"])
+def test_create_recipe_accepts_additional_food_type_classifications(store: RecipeStore, classification: str):
+    api = _make_client(store)
+    payload = dict(RECIPE_CREATE_PAYLOAD, classification=classification)
+
+    response = api.post("/api/recipes", json=payload)
+    assert response.status_code == 201
+    assert response.json()["classification"] == classification
+
+
 def test_health_endpoint(store: RecipeStore):
     api = _make_client(store)
     response = api.get("/api/health")

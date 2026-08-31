@@ -179,3 +179,11 @@ test coverage are tracked exclusively through **little-requirements**
   installer assumes `.git` is a directory, and a submodule's `.git` is a file.
   Use `lreq workspace download` instead (as above), which doesn't install hooks
   and isn't affected.
+- Milestone 15 (`m15-difficulty-and-food-types` suite) created four
+  requirements, REQ-000000050 to REQ-000000053, covering recipe difficulty
+  persistence, the add/edit form's deselectable difficulty pill-group, the
+  difficulty badge across the cookbook list/recipe detail/plan meal card, and
+  the three additional food-type classifications (see `milestones.md`'s M15
+  entry) - tagged across `tests/test_recipe_store.py`,
+  `tests/test_api_recipes.py`, `tests/test_api_ui.py`, and
+  `tests/test_plan_ui.py`.
