@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import argparse
-import getpass
 import sys
 from dataclasses import replace
+from pathlib import Path
 from typing import Optional, Sequence
 
 from little_meals import __version__
@@ -17,24 +17,52 @@ def _cmd_serve(args: argparse.Namespace) -> int:
 
     settings = Settings.from_env()
     if args.data_dir:
-        settings = replace(settings, data_dir=args.data_dir)
-
-    if settings.spoonacular_key_file:
-        from little_meals.vault import VaultError, decrypt_key_file
-
-        passphrase = getpass.getpass("Spoonacular vault passphrase: ")
-        try:
-            api_key = decrypt_key_file(settings.spoonacular_key_file, passphrase)
-        except VaultError as exc:
-            print(f"error: {exc}", file=sys.stderr)
-            return 1
-        finally:
-            del passphrase
-        settings = replace(settings, spoonacular_api_key=api_key)
-        del api_key
+        settings = replace(settings, data_dir=Path(args.data_dir))
 
     app = create_app(settings, enable_scheduler=True)
     uvicorn.run(app, host=args.host, port=args.port, reload=args.reload, log_level="info")
+    return 0
+
+
+def _cmd_settings(args: argparse.Namespace) -> int:
+    from little_meals.store.household_store import HouseholdPreferencesStore
+    from little_meals.store.plan_store import MealPlanStore
+    from little_meals.store.shopping_list_store import ShoppingListStore
+
+    if not args.reset:
+        print("error: no action given (did you mean --reset?)", file=sys.stderr)
+        return 1
+
+    settings = Settings.from_env()
+    if args.data_dir:
+        settings = replace(settings, data_dir=Path(args.data_dir))
+
+    plan_store = MealPlanStore(settings.plan_db_path)
+    shopping_list_store = ShoppingListStore(settings.shopping_list_db_path)
+
+    plan_count = plan_store.count()
+    shopping_list_count = shopping_list_store.count()
+
+    if not args.yes:
+        answer = input(
+            "This will reset your general settings (recipes per week, recommendation "
+            "day/time, default servings) to their defaults, and permanently delete all "
+            f"{plan_count} meal plan(s) and {shopping_list_count} shopping list(s). Your "
+            "saved recipes are kept. Continue? [y/N] "
+        )
+        if answer.strip().lower() not in ("y", "yes"):
+            print("Aborted - nothing was reset.", file=sys.stderr)
+            return 1
+
+    household_store = HouseholdPreferencesStore(settings.household_db_path)
+    household_store.reset_general_settings()
+    deleted_plans = plan_store.delete_all()
+    deleted_shopping_lists = shopping_list_store.delete_all()
+
+    print(
+        "Settings reset to defaults (recipes kept). "
+        f"Deleted {deleted_plans} meal plan(s) and {deleted_shopping_lists} shopping list(s)."
+    )
     return 0
 
 
@@ -61,6 +89,20 @@ def build_parser() -> argparse.ArgumentParser:
 
     preflight_parser = subparsers.add_parser("preflight", help="check system dependencies")
     preflight_parser.set_defaults(func=_cmd_preflight)
+
+    settings_parser = subparsers.add_parser("settings", help="manage household settings")
+    settings_parser.add_argument(
+        "--reset",
+        action="store_true",
+        help=(
+            "reset general settings (recipes per week, recommendation day/time, default "
+            "servings) to defaults, and delete all meal plans and shopping lists - keeps "
+            "saved recipes (asks to confirm)"
+        ),
+    )
+    settings_parser.add_argument("--yes", "-y", action="store_true", help="skip the --reset confirmation prompt")
+    settings_parser.add_argument("--data-dir", default=None)
+    settings_parser.set_defaults(func=_cmd_settings)
 
     return parser
 

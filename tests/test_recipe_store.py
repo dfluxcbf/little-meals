@@ -8,7 +8,7 @@ import pytest
 
 from little_meals.llm.extraction import RecipeExtractionService
 from little_meals.llm.ollama_client import OllamaClient
-from little_meals.models import Preference, Recipe
+from little_meals.models import Recipe
 from little_meals.store.recipe_store import RecipeNotFound, RecipeStore
 
 _NORMALIZED_PAYLOAD = {
@@ -40,7 +40,6 @@ def test_create_then_get_round_trips(store: RecipeStore, sample_recipe: Recipe):
     assert fetched.nutrition == sample_recipe.nutrition
     assert fetched.ingredients == sample_recipe.ingredients
     assert fetched.steps == sample_recipe.steps
-    assert fetched.preference == Preference.LIKED
     assert fetched.source_text == sample_recipe.source_text
 
 
@@ -69,22 +68,6 @@ def test_update_preserves_created_at_and_bumps_updated_at(store: RecipeStore, sa
     assert updated.name == "New Name"
     assert updated.created_at == created.created_at
     assert updated.updated_at >= created.updated_at
-
-
-@pytest.mark.requirement("REQ-000000002")
-def test_set_preference_persists_to_disk(store: RecipeStore, sample_recipe: Recipe):
-    created = store.create(sample_recipe)
-    assert created.preference == Preference.LIKED
-
-    disliked = store.set_preference(created.id, Preference.DISLIKED)
-    assert disliked.preference == Preference.DISLIKED
-
-    reread = store.get(created.id)
-    assert reread.preference == Preference.DISLIKED
-
-    liked_again = store.set_preference(created.id, Preference.LIKED)
-    assert liked_again.preference == Preference.LIKED
-    assert store.get(created.id).preference == Preference.LIKED
 
 
 def test_delete_removes_the_file(store: RecipeStore, sample_recipe: Recipe):

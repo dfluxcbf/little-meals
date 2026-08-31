@@ -23,8 +23,8 @@ from little_meals.config import Settings
 from little_meals.llm.extraction import RecipeExtractionService
 from little_meals.llm.ollama_client import OllamaClient
 from little_meals.planning.plan_builder import build_meal_specs
-from little_meals.planning.suggestion import NullSearchProvider, SearchProvider, SpoonacularSearchProvider
 from little_meals.scheduler import WeeklyScheduler
+from little_meals.store.cook_along_store import CookAlongStore
 from little_meals.store.household_store import HouseholdPreferencesStore
 from little_meals.store.notification_store import NotificationStore
 from little_meals.store.plan_store import MealPlanStore
@@ -40,26 +40,18 @@ def create_app(
     extractor: Optional[RecipeExtractionService] = None,
     household_store: Optional[HouseholdPreferencesStore] = None,
     plan_store: Optional[MealPlanStore] = None,
-    search_provider: Optional[SearchProvider] = None,
     shopping_list_store: Optional[ShoppingListStore] = None,
     notification_store: Optional[NotificationStore] = None,
+    cook_along_store: Optional[CookAlongStore] = None,
     enable_scheduler: bool = False,
 ) -> FastAPI:
     settings = settings or Settings.from_env()
     store = store or RecipeStore(settings.recipes_dir)
     household_store = household_store or HouseholdPreferencesStore(settings.household_db_path)
     plan_store = plan_store or MealPlanStore(settings.plan_db_path)
-    if search_provider is None:
-        if settings.spoonacular_api_key:
-            search_provider = SpoonacularSearchProvider(
-                settings.spoonacular_api_key,
-                base_url=settings.spoonacular_base_url,
-                timeout_s=settings.spoonacular_timeout_s,
-            )
-        else:
-            search_provider = NullSearchProvider()
     shopping_list_store = shopping_list_store or ShoppingListStore(settings.shopping_list_db_path)
     notification_store = notification_store or NotificationStore(settings.notification_db_path)
+    cook_along_store = cook_along_store or CookAlongStore(settings.cook_along_db_path)
     if extractor is None:
         client = OllamaClient(settings.ollama_base_url, settings.ollama_model, settings.ollama_timeout_s)
         extractor = RecipeExtractionService(client)
@@ -72,11 +64,15 @@ def create_app(
             household_store,
             plan_store,
             notification_store,
-            generate_fn=lambda: plan_store.create(build_meal_specs(store, household_store, extractor, search_provider)),
+            generate_fn=lambda: plan_store.create(build_meal_specs(store, household_store, extractor)),
         )
+        def _check_weekly_plan() -> None:
+            weekly_scheduler.check_and_maybe_generate()
+            weekly_scheduler.check_and_maybe_confirm()
+
         background_scheduler = BackgroundScheduler()
         background_scheduler.add_job(
-            weekly_scheduler.check_and_maybe_generate,
+            _check_weekly_plan,
             "interval",
             seconds=60,
             id="weekly-plan-check",
@@ -98,7 +94,7 @@ def create_app(
     app.state.plan_store = plan_store
     app.state.shopping_list_store = shopping_list_store
     app.state.notification_store = notification_store
-    app.state.search_provider = search_provider
+    app.state.cook_along_store = cook_along_store
     app.state.scheduler = background_scheduler
 
     package_root = importlib.resources.files("little_meals")
@@ -132,11 +128,18 @@ def create_app(
 
     app.include_router(build_recipes_router(store, extractor, settings))
     app.include_router(build_household_router(household_store))
-    app.include_router(build_plan_router(plan_store, store, household_store, extractor, search_provider))
+    app.include_router(build_plan_router(plan_store, store, household_store, extractor))
     app.include_router(build_shopping_router(shopping_list_store, plan_store, store))
     app.include_router(
         build_ui_router(
-            store, extractor, household_store, plan_store, search_provider, shopping_list_store, notification_store, templates
+            store,
+            extractor,
+            household_store,
+            plan_store,
+            shopping_list_store,
+            notification_store,
+            cook_along_store,
+            templates,
         )
     )
 

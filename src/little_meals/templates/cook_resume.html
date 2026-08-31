@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ recipe.name }} - little-meals</title>
+  <link rel="manifest" href="/static/manifest.webmanifest">
+  <meta name="theme-color" content="#c55123">
+  <link rel="icon" href="/static/icons/favicon-64.png">
+  <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Little Meals">
+  <link rel="stylesheet" href="/static/fonts.css">
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <div class="cook-shell cook-finish">
+    <h1>Pick up where you left off?</h1>
+    <p>You were partway through cooking {{ recipe.name }}.</p>
+    <div class="cook-feedback-actions">
+      <a href="/recipes/{{ recipe.id }}/cook/{{ session.current_step }}" class="btn btn-primary">Continue</a>
+      <form method="post" action="/recipes/{{ recipe.id }}/cook/start-over">
+        <button type="submit" class="btn btn-secondary">Start Over</button>
+      </form>
+    </div>
+  </div>
+</body>
+</html>

@@ -50,9 +50,10 @@ def test_recipes_list_contains_stored_recipe_name(store, sample_recipe):
 
 
 @pytest.mark.requirement("REQ-000000016")
-def test_recipe_detail_renders_steps_then_ingredients_in_order(store, sample_recipe):
-    # Steps are shown first, with ingredients tucked behind the fridge-door
-    # toggle below them - see docs/ui_design.md's recipe detail screen.
+def test_recipe_detail_renders_ingredients_then_steps_in_order(store, sample_recipe):
+    # Ingredients are shown first, open by default behind the fridge-door
+    # toggle, with steps below them - see docs/ui_design.md's recipe detail
+    # screen.
     created = store.create(sample_recipe)
     ui = _make_client(store)
 
@@ -64,14 +65,14 @@ def test_recipe_detail_renders_steps_then_ingredients_in_order(store, sample_rec
     # since an ingredient name (e.g. "garlic") can also appear inside the
     # recipe title higher up the page.
     last_index = -1
-    for step in created.steps:
-        index = text.find(step, last_index + 1)
+    for ingredient in created.ingredients:
+        index = text.find(ingredient.name, last_index + 1)
         assert index != -1
         assert index > last_index
         last_index = index
 
-    for ingredient in created.ingredients:
-        index = text.find(ingredient.name, last_index + 1)
+    for step in created.steps:
+        index = text.find(step, last_index + 1)
         assert index != -1
         assert index > last_index
         last_index = index
@@ -93,9 +94,22 @@ def test_recipe_detail_unknown_id_returns_404(store):
     assert response.status_code == 404
 
 
+NEW_RECIPE_FORM_DATA = {
+    "name": "Tomato Soup",
+    "cook_time_minutes": "20",
+    "classification": "vegetarian",
+    "servings": "4",
+    "calories_per_serving": "180",
+    "ingredient_name": ["tomato"],
+    "ingredient_quantity": ["4 pieces"],
+    "step": ["Simmer the tomatoes.", "Blend until smooth."],
+}
+
+
+@pytest.mark.requirement("REQ-000000045")
 def test_new_recipe_form_submit_creates_recipe_and_redirects(store):
     ui = _make_client(store)
-    response = ui.post("/recipes", data={"text": "a nice tomato soup"}, follow_redirects=False)
+    response = ui.post("/recipes/new", data=NEW_RECIPE_FORM_DATA, follow_redirects=False)
 
     assert response.status_code == 303
     assert response.headers["location"].startswith("/recipes/")
@@ -103,18 +117,99 @@ def test_new_recipe_form_submit_creates_recipe_and_redirects(store):
     recipes = store.list()
     assert len(recipes) == 1
     assert recipes[0].name == "Tomato Soup"
+    assert recipes[0].ingredients[0].name == "tomato"
 
 
-def test_preference_toggle_returns_row_fragment_not_full_page(store, sample_recipe):
+@pytest.mark.requirement("REQ-000000045")
+def test_new_recipe_form_submit_without_nutrition_creates_recipe(store):
+    ui = _make_client(store)
+    data = dict(NEW_RECIPE_FORM_DATA)
+    del data["calories_per_serving"]
+    response = ui.post("/recipes/new", data=data, follow_redirects=False)
+
+    assert response.status_code == 303
+    recipes = store.list()
+    assert len(recipes) == 1
+    assert recipes[0].nutrition.calories_per_serving is None
+    assert recipes[0].nutrition.protein_g is None
+    assert recipes[0].nutrition.fiber_g is None
+
+
+@pytest.mark.requirement("REQ-000000045")
+def test_new_recipe_form_submit_missing_name_reshows_form_with_error(store):
+    ui = _make_client(store)
+    data = dict(NEW_RECIPE_FORM_DATA)
+    data["name"] = ""
+    response = ui.post("/recipes/new", data=data)
+
+    assert response.status_code == 422
+    assert "Could not save recipe" in response.text
+    assert store.list() == []
+
+
+@pytest.mark.requirement("REQ-000000045")
+def test_edit_recipe_form_prefills_existing_values(store, sample_recipe):
     created = store.create(sample_recipe)
     ui = _make_client(store)
 
-    response = ui.post(f"/recipes/{created.id}/preference", data={"preference": "disliked"})
+    response = ui.get(f"/recipes/{created.id}/edit")
     assert response.status_code == 200
-    assert "<html" not in response.text.lower()
-    assert f'id="recipe-row-{created.id}"' in response.text
+    assert created.name in response.text
 
-    assert store.get(created.id).preference.value == "disliked"
+
+@pytest.mark.requirement("REQ-000000045")
+def test_edit_recipe_form_submit_updates_recipe_and_redirects(store, sample_recipe):
+    created = store.create(sample_recipe)
+    ui = _make_client(store)
+
+    data = dict(NEW_RECIPE_FORM_DATA)
+    data["name"] = "Updated Soup"
+    response = ui.post(f"/recipes/{created.id}/edit", data=data, follow_redirects=False)
+
+    assert response.status_code == 303
+    assert response.headers["location"] == f"/recipes/{created.id}"
+
+    updated = store.get(created.id)
+    assert updated.name == "Updated Soup"
+    assert updated.created_at == created.created_at
+
+
+@pytest.mark.requirement("REQ-000000045")
+def test_duplicate_recipe_creates_copy_and_redirects_to_its_edit_page(store, sample_recipe):
+    created = store.create(sample_recipe)
+    ui = _make_client(store)
+
+    response = ui.post(f"/recipes/{created.id}/duplicate", follow_redirects=False)
+
+    assert response.status_code == 303
+    location = response.headers["location"]
+    assert location.startswith("/recipes/")
+    assert location.endswith("/edit")
+
+    recipes = {recipe.id: recipe for recipe in store.list()}
+    assert len(recipes) == 2
+    duplicate_id = location.removeprefix("/recipes/").removesuffix("/edit")
+    duplicate = recipes[duplicate_id]
+    assert duplicate.id != created.id
+    assert duplicate.name == f"{created.name} (copy)"
+    assert duplicate.ingredients == created.ingredients
+    assert duplicate.steps == created.steps
+
+
+@pytest.mark.requirement("REQ-000000045")
+def test_duplicate_recipe_unknown_id_redirects_to_library(store):
+    ui = _make_client(store)
+    response = ui.post("/recipes/does-not-exist/duplicate", follow_redirects=False)
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/recipes"
+
+
+@pytest.mark.requirement("REQ-000000045")
+def test_edit_recipe_form_unknown_id_returns_404(store):
+    ui = _make_client(store)
+    response = ui.get("/recipes/does-not-exist/edit")
+    assert response.status_code == 404
 
 
 def test_static_htmx_is_served(store):

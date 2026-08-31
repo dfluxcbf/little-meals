@@ -93,6 +93,7 @@ def test_shopping_item_checked_returns_fragment_and_persists(client: TestClient,
     assert refreshed["items"][0]["checked"] is True
 
 
+
 @pytest.mark.requirement("REQ-000000032")
 def test_shopping_item_checked_redirects_when_no_plan(client: TestClient):
     response = client.post("/shopping/items/i1/checked", data={"checked": "true"}, follow_redirects=False)
@@ -141,6 +142,34 @@ def test_shopping_cost_form_saves(client: TestClient, sample_recipe):
 def test_shopping_cost_form_is_a_no_op_with_no_list(client: TestClient):
     response = client.post("/shopping/cost", data={"actual_cost": "10.00"}, follow_redirects=False)
     assert response.status_code == 303
+
+
+def test_shopping_cost_form_blank_submission_does_not_error(client: TestClient, sample_recipe):
+    # Leaving the cost field empty is a normal "haven't bought it yet" state,
+    # not a validation error - regression test for a 422 on blank submit.
+    _create_recipe(client, sample_recipe)
+    client.post("/plan/generate", follow_redirects=False)
+    client.post("/plan/finalize", follow_redirects=False)
+    client.post("/shopping/generate", follow_redirects=False)
+
+    response = client.post("/shopping/cost", data={"actual_cost": ""}, follow_redirects=False)
+    assert response.status_code == 303
+
+    shopping_list = client.get("/api/shopping-list/current").json()
+    assert shopping_list["actual_cost"] is None
+
+
+def test_shopping_cost_form_rejects_negative_without_erroring(client: TestClient, sample_recipe):
+    _create_recipe(client, sample_recipe)
+    client.post("/plan/generate", follow_redirects=False)
+    client.post("/plan/finalize", follow_redirects=False)
+    client.post("/shopping/generate", follow_redirects=False)
+
+    response = client.post("/shopping/cost", data={"actual_cost": "-5"}, follow_redirects=False)
+    assert response.status_code == 303
+
+    shopping_list = client.get("/api/shopping-list/current").json()
+    assert shopping_list["actual_cost"] is None
 
 
 @pytest.mark.requirement("REQ-000000032")

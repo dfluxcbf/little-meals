@@ -13,11 +13,6 @@ class Classification(str, Enum):
     OTHER = "other"
 
 
-class Preference(str, Enum):
-    LIKED = "liked"
-    DISLIKED = "disliked"
-
-
 class DayOfWeek(str, Enum):
     MONDAY = "monday"
     TUESDAY = "tuesday"
@@ -36,16 +31,15 @@ class Ingredient(BaseModel):
 
 
 class Nutrition(BaseModel):
-    calories_per_serving: int = Field(ge=0)
+    calories_per_serving: Optional[int] = Field(default=None, ge=0)
     protein_g: Optional[float] = None
-    carbs_g: Optional[float] = None
-    fat_g: Optional[float] = None
+    fiber_g: Optional[float] = None
 
 
 class ExtractedRecipe(BaseModel):
     """The LLM-facing subset of a Recipe: everything the extraction service
-    is responsible for producing. Deliberately excludes id, preference, and
-    timestamps so the LLM can never invent an id or a preference state."""
+    is responsible for producing. Deliberately excludes id and timestamps so
+    the LLM can never invent an id."""
 
     name: str
     cook_time_minutes: int = Field(ge=1)
@@ -65,7 +59,6 @@ class Recipe(BaseModel):
     servings: int = Field(default=2, ge=1)
     ingredients: list[Ingredient] = Field(min_length=1)
     steps: list[str] = Field(min_length=1)
-    preference: Preference = Preference.LIKED
     source_text: Optional[str] = None
     created_at: datetime
     updated_at: datetime
@@ -81,7 +74,6 @@ class Recipe(BaseModel):
             servings=extracted.servings,
             ingredients=extracted.ingredients,
             steps=extracted.steps,
-            preference=Preference.LIKED,
             source_text=source_text,
             created_at=now,
             updated_at=now,
@@ -108,10 +100,6 @@ class RecipeUpdate(BaseModel):
     steps: list[str] = Field(min_length=1)
 
 
-class PreferenceUpdate(BaseModel):
-    preference: Preference
-
-
 class ExtractRequest(BaseModel):
     text: str
 
@@ -128,11 +116,6 @@ class PlanMeal(BaseModel):
     recipe_id: str
     servings: int = Field(ge=1)
     cooked: bool = False
-    is_suggestion: bool = False
-    """True if this slot was filled by the AI suggestion engine (Milestone 4)
-    rather than drawn from the existing library (Milestone 3) - drives the
-    "NEW" badge in the UI. Purely presentational: once created, a suggestion
-    is a normal Recipe like any other (see planning/suggestion.py)."""
 
 
 class MealPlan(BaseModel):
@@ -140,6 +123,20 @@ class MealPlan(BaseModel):
     created_at: datetime
     finalized: bool = False
     meals: list[PlanMeal] = Field(default_factory=list)
+
+
+class CookAlongSession(BaseModel):
+    """An in-progress cook-along's position, keyed by recipe_id - a
+    household only ever has one active cook-along per recipe. A row's
+    existence means the household left mid-session (resumable via
+    "Continue"); finishing (cooked or not) always deletes it, so the next
+    cook-along for that recipe starts fresh."""
+
+    recipe_id: str
+    current_step: int = 0
+    checked_ingredients: list[int] = Field(default_factory=list)
+    started_at: datetime
+    updated_at: datetime
 
 
 class ServingsUpdate(BaseModel):
@@ -184,18 +181,22 @@ class HouseholdPreferences(BaseModel):
     collection: there is exactly one of these per installation."""
 
     recipes_per_week: int = Field(default=5, ge=1)
+    recommendation_enabled: bool = True
     recommendation_day: DayOfWeek = DayOfWeek.SUNDAY
     recommendation_time: time = time(9, 0)
-    food_preferences: list[str] = Field(default_factory=list)
-    ai_suggestions_per_plan: int = Field(default=2, ge=0)
+    auto_confirm_enabled: bool = False
+    auto_confirm_day: DayOfWeek = DayOfWeek.SUNDAY
+    auto_confirm_time: time = time(9, 0)
     default_servings: str = "2 adults"
     updated_at: Optional[datetime] = None
 
 
 class HouseholdPreferencesUpdate(BaseModel):
     recipes_per_week: int = Field(ge=1)
+    recommendation_enabled: bool
     recommendation_day: DayOfWeek
     recommendation_time: time
-    food_preferences: list[str] = Field(default_factory=list)
-    ai_suggestions_per_plan: int = Field(ge=0)
+    auto_confirm_enabled: bool
+    auto_confirm_day: DayOfWeek
+    auto_confirm_time: time
     default_servings: str

@@ -6,34 +6,13 @@ Invoked by: bazel run //:install
 from __future__ import annotations
 
 import os
-import subprocess
 import sys
 from pathlib import Path
 
-from little_meals.preflight import check, format_report
+sys.path.insert(0, str(Path(os.path.abspath(__file__)).parent))
 
-
-def _runfiles_root() -> Path:
-    explicit = os.environ.get("RUNFILES_DIR")
-    if explicit:
-        return Path(explicit)
-    p = Path(os.path.abspath(__file__))
-    for parent in p.parents:
-        if parent.name.endswith(".runfiles"):
-            return parent
-    raise RuntimeError(
-        f"Cannot locate .runfiles directory starting from {__file__}. "
-        "Make sure you invoke this via 'bazel run //:install'."
-    )
-
-
-def _find_wheel(runfiles_dir: Path) -> Path:
-    candidates = list(runfiles_dir.glob("_main/src/little_meals/*.whl"))
-    if not candidates:
-        raise FileNotFoundError(
-            f"No wheel found under {runfiles_dir}/_main/src/little_meals/. Run 'bazel build //:wheel' first."
-        )
-    return sorted(candidates)[-1]
+from deploy_common import pipx_install_wheel  # noqa: E402
+from little_meals.preflight import check, format_report  # noqa: E402
 
 
 def main() -> int:
@@ -42,21 +21,9 @@ def main() -> int:
     if not result.ok:
         return 1
 
-    if not os.environ.get("BUILD_WORKSPACE_DIRECTORY"):
-        print(
-            "ERROR: $BUILD_WORKSPACE_DIRECTORY not set. Run this via 'bazel run //:install'.",
-            file=sys.stderr,
-        )
-        return 1
-
-    runfiles_dir = _runfiles_root()
-    wheel = _find_wheel(runfiles_dir)
-
-    print(f"==> [install] pipx installing wheel: {wheel.name}")
-    result_proc = subprocess.run(["pipx", "install", "--force", str(wheel)], check=False)
-    if result_proc.returncode != 0:
-        print("ERROR: pipx install failed.", file=sys.stderr)
-        return result_proc.returncode
+    returncode = pipx_install_wheel("//:install", "install")
+    if returncode != 0:
+        return returncode
 
     print("==> [install] Done.")
     return 0

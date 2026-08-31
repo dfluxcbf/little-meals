@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 import little_meals.cli as cli_module
 from little_meals import __version__
 from little_meals.config import Settings
@@ -14,12 +16,13 @@ def test_version_flag_prints_version(capsys):
     assert __version__ in captured.out
 
 
-def test_serve_calls_uvicorn_run_with_host_and_port(monkeypatch):
-    # Isolate from whatever the developer's own shell has exported (e.g. a
-    # real vault key file) - otherwise this test would try to prompt for a
-    # real passphrase via getpass and fail under pytest's captured stdin.
-    monkeypatch.delenv("LITTLE_MEALS_SPOONACULAR_KEY_FILE", raising=False)
-    monkeypatch.delenv("LITTLE_MEALS_SPOONACULAR_API_KEY", raising=False)
+def test_serve_calls_uvicorn_run_with_host_and_port(monkeypatch, tmp_path):
+    # Isolate from the developer's real data directory - this reaches a
+    # genuine create_app()/HouseholdPreferencesStore construction (unlike
+    # the other `serve` tests below, which mock create_app or error out
+    # before reaching it), so without this it reads/writes real household.db
+    # and friends under ~/.local/share/little-meals.
+    monkeypatch.setenv("LITTLE_MEALS_DATA_DIR", str(tmp_path))
 
     calls = {}
 
@@ -39,23 +42,13 @@ def test_serve_calls_uvicorn_run_with_host_and_port(monkeypatch):
     assert calls["reload"] is False
 
 
-def test_serve_decrypts_spoonacular_key_when_key_file_configured(monkeypatch, tmp_path):
-    key_file = tmp_path / "spoonacular.enc"
-    key_file.write_bytes(b"irrelevant - decrypt_key_file is mocked below")
-
-    monkeypatch.setattr(Settings, "from_env", classmethod(lambda cls: Settings(spoonacular_key_file=key_file)))
-    monkeypatch.setattr("getpass.getpass", lambda prompt="": "the-passphrase")
+def test_serve_data_dir_flag_is_converted_to_a_path(monkeypatch, tmp_path):
+    # Regression test: --data-dir used to be passed straight through as the
+    # raw CLI string, which crashed the first time anything did
+    # `settings.data_dir / "recipes"` (str / str isn't valid).
+    from little_meals.api import app as app_module
 
     captured = {}
-
-    def fake_decrypt_key_file(path, passphrase):
-        captured["path"] = path
-        captured["passphrase"] = passphrase
-        return "the-real-api-key"
-
-    monkeypatch.setattr("little_meals.vault.decrypt_key_file", fake_decrypt_key_file)
-
-    from little_meals.api import app as app_module
 
     def fake_create_app(settings, enable_scheduler=False, **kwargs):
         captured["settings"] = settings
@@ -67,32 +60,52 @@ def test_serve_decrypts_spoonacular_key_when_key_file_configured(monkeypatch, tm
 
     monkeypatch.setattr(uvicorn, "run", lambda *a, **k: None)
 
-    exit_code = cli_module.main(["serve"])
+    exit_code = cli_module.main(["serve", "--data-dir", str(tmp_path)])
 
     assert exit_code == 0
-    assert captured["path"] == key_file
-    assert captured["passphrase"] == "the-passphrase"
-    assert captured["settings"].spoonacular_api_key == "the-real-api-key"
+    from pathlib import Path
+
+    assert captured["settings"].data_dir == Path(tmp_path)
+    assert isinstance(captured["settings"].data_dir, Path)
 
 
-def test_serve_returns_error_on_wrong_vault_passphrase(monkeypatch, tmp_path, capsys):
-    from little_meals.vault import VaultDecryptionFailed
+def _seed_household_preferences(db_path, *, recipes_per_week):
+    from datetime import time
 
-    key_file = tmp_path / "spoonacular.enc"
-    key_file.write_bytes(b"irrelevant - decrypt_key_file is mocked below")
+    from little_meals.models import DayOfWeek, HouseholdPreferencesUpdate
+    from little_meals.store.household_store import HouseholdPreferencesStore
 
-    monkeypatch.setattr(Settings, "from_env", classmethod(lambda cls: Settings(spoonacular_key_file=key_file)))
-    monkeypatch.setattr("getpass.getpass", lambda prompt="": "wrong-passphrase")
+    HouseholdPreferencesStore(db_path).put(
+        HouseholdPreferencesUpdate(
+            recipes_per_week=recipes_per_week,
+            recommendation_enabled=True,
+            recommendation_day=DayOfWeek.SUNDAY,
+            recommendation_time=time(9, 0),
+            auto_confirm_enabled=False,
+            auto_confirm_day=DayOfWeek.SUNDAY,
+            auto_confirm_time=time(9, 0),
+            default_servings="2 adults",
+        )
+    )
 
-    def fake_decrypt_key_file(path, passphrase):
-        raise VaultDecryptionFailed("wrong passphrase")
 
-    monkeypatch.setattr("little_meals.vault.decrypt_key_file", fake_decrypt_key_file)
+def _seed_recipe(store, name: str = "Old Recipe"):
+    from little_meals.models import Classification, Ingredient, Nutrition, Recipe
 
-    exit_code = cli_module.main(["serve"])
-
-    assert exit_code == 1
-    assert "wrong passphrase" in capsys.readouterr().err
+    now = datetime.now(timezone.utc)
+    return store.create(
+        Recipe(
+            id="",
+            name=name,
+            cook_time_minutes=10,
+            classification=Classification.OTHER,
+            nutrition=Nutrition(calories_per_serving=100),
+            ingredients=[Ingredient(name="salt")],
+            steps=["Do it."],
+            created_at=now,
+            updated_at=now,
+        )
+    )
 
 
 def test_preflight_subcommand_matches_preflight_main(monkeypatch, capsys):
@@ -112,60 +125,98 @@ def test_no_subcommand_returns_nonzero(capsys):
     assert exit_code != 0
 
 
-def test_serve_decrypts_spoonacular_key_when_key_file_configured(monkeypatch, tmp_path):
-    from little_meals.config import Settings
+def _settings_store(tmp_path):
+    from little_meals.store.household_store import HouseholdPreferencesStore
 
-    key_file = tmp_path / "spoonacular.enc"
-    key_file.write_bytes(b"irrelevant - decrypt_key_file is mocked below")
+    return HouseholdPreferencesStore(tmp_path / "household.db")
 
-    monkeypatch.setattr(Settings, "from_env", classmethod(lambda cls: Settings(spoonacular_key_file=key_file)))
-    monkeypatch.setattr("getpass.getpass", lambda prompt="": "the-passphrase")
 
-    captured = {}
+def test_settings_without_reset_flag_errors(monkeypatch, tmp_path, capsys):
+    monkeypatch.setattr(Settings, "from_env", classmethod(lambda cls: Settings(data_dir=tmp_path)))
+    exit_code = cli_module.main(["settings"])
+    assert exit_code == 1
+    assert "--reset" in capsys.readouterr().err
 
-    def fake_decrypt_key_file(path, passphrase):
-        captured["path"] = path
-        captured["passphrase"] = passphrase
-        return "the-real-api-key"
 
-    monkeypatch.setattr("little_meals.vault.decrypt_key_file", fake_decrypt_key_file)
+def test_settings_reset_resets_settings_but_keeps_recipes(monkeypatch, tmp_path, capsys):
+    from datetime import time
 
-    from little_meals.api import app as app_module
+    from little_meals.models import DayOfWeek, HouseholdPreferencesUpdate
+    from little_meals.planning.shopping_list import MergedItem
+    from little_meals.store.plan_store import MealPlanStore, MealSpec
+    from little_meals.store.recipe_store import RecipeStore
+    from little_meals.store.shopping_list_store import ShoppingListStore
 
-    def fake_create_app(settings, enable_scheduler=False, **kwargs):
-        captured["settings"] = settings
-        return object()
+    monkeypatch.setattr(Settings, "from_env", classmethod(lambda cls: Settings(data_dir=tmp_path)))
 
-    monkeypatch.setattr(app_module, "create_app", fake_create_app)
+    household_store = _settings_store(tmp_path)
+    household_store.put(
+        HouseholdPreferencesUpdate(
+            recipes_per_week=7,
+            recommendation_enabled=True,
+            recommendation_day=DayOfWeek.SUNDAY,
+            recommendation_time=time(9, 0),
+            auto_confirm_enabled=False,
+            auto_confirm_day=DayOfWeek.SUNDAY,
+            auto_confirm_time=time(9, 0),
+            default_servings="2 adults",
+        )
+    )
 
-    import uvicorn
+    store = RecipeStore(tmp_path / "recipes")
+    _seed_recipe(store)
 
-    monkeypatch.setattr(uvicorn, "run", lambda *a, **k: None)
+    plan_store = MealPlanStore(tmp_path / "plan.db")
+    plan = plan_store.create([MealSpec("recipe-a", 2)])
+    shopping_store = ShoppingListStore(tmp_path / "shopping_list.db")
+    shopping_store.create(plan.id, [MergedItem("Onion", 1.0, "piece")])
 
-    exit_code = cli_module.main(["serve"])
+    monkeypatch.setattr("builtins.input", lambda prompt="": "y")
+
+    exit_code = cli_module.main(["settings", "--reset"])
 
     assert exit_code == 0
-    assert captured["path"] == key_file
-    assert captured["passphrase"] == "the-passphrase"
-    assert captured["settings"].spoonacular_api_key == "the-real-api-key"
+    preferences = household_store.get()
+    assert preferences.recipes_per_week == 5
+    assert len(store.list()) == 1
+    assert plan_store.count() == 0
+    assert shopping_store.count() == 0
+    out = capsys.readouterr().out
+    assert "Deleted 1 meal plan(s) and 1 shopping list(s)" in out
 
 
-def test_serve_returns_error_on_wrong_vault_passphrase(monkeypatch, tmp_path, capsys):
-    from little_meals.config import Settings
-    from little_meals.vault import VaultDecryptionFailed
+def test_settings_reset_with_yes_skips_prompt(monkeypatch, tmp_path):
+    monkeypatch.setattr(Settings, "from_env", classmethod(lambda cls: Settings(data_dir=tmp_path)))
 
-    key_file = tmp_path / "spoonacular.enc"
-    key_file.write_bytes(b"irrelevant - decrypt_key_file is mocked below")
+    def fail_if_called(prompt=""):
+        raise AssertionError("should not prompt when --yes is given")
 
-    monkeypatch.setattr(Settings, "from_env", classmethod(lambda cls: Settings(spoonacular_key_file=key_file)))
-    monkeypatch.setattr("getpass.getpass", lambda prompt="": "wrong-passphrase")
+    monkeypatch.setattr("builtins.input", fail_if_called)
 
-    def fake_decrypt_key_file(path, passphrase):
-        raise VaultDecryptionFailed("wrong passphrase")
+    exit_code = cli_module.main(["settings", "--reset", "--yes"])
+    assert exit_code == 0
 
-    monkeypatch.setattr("little_meals.vault.decrypt_key_file", fake_decrypt_key_file)
 
-    exit_code = cli_module.main(["serve"])
+def test_settings_reset_without_yes_aborts_on_no(monkeypatch, tmp_path, capsys):
+    from little_meals.store.plan_store import MealPlanStore, MealSpec
+
+    monkeypatch.setattr(Settings, "from_env", classmethod(lambda cls: Settings(data_dir=tmp_path)))
+    _seed_household_preferences(tmp_path / "household.db", recipes_per_week=7)
+    plan_store = MealPlanStore(tmp_path / "plan.db")
+    plan_store.create([MealSpec("recipe-a", 2)])
+
+    monkeypatch.setattr("builtins.input", lambda prompt="": "n")
+
+    exit_code = cli_module.main(["settings", "--reset"])
 
     assert exit_code == 1
-    assert "wrong passphrase" in capsys.readouterr().err
+    assert "Aborted" in capsys.readouterr().err
+    assert plan_store.count() == 1
+    assert _settings_store(tmp_path).get().recipes_per_week == 7
+
+
+def test_settings_reset_data_dir_flag_is_converted_to_a_path(monkeypatch, tmp_path):
+    monkeypatch.setattr(Settings, "from_env", classmethod(lambda cls: Settings()))
+    exit_code = cli_module.main(["settings", "--reset", "--yes", "--data-dir", str(tmp_path)])
+    assert exit_code == 0
+    assert (tmp_path / "household.db").exists()

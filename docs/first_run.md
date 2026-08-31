@@ -11,9 +11,6 @@ this way — this doc is just the "how do I get it up" walkthrough.
 - [Ollama](https://ollama.com) installed, with a model pulled (default:
   `qwen2.5-coder:14b`). This is the only hard dependency `bazel run
   //:install` checks for — see `preflight.py`.
-- Optionally, a [Spoonacular](https://spoonacular.com/food-api) API key, if
-  you want AI suggestions to pull from a real recipe search instead of just
-  recombining recipes already in your library. Not required to run the app.
 
 ## 1. Build and install
 
@@ -50,36 +47,12 @@ ollama pull qwen2.5-coder:14b       # pull the default model, if you haven't
 If you want a different model, set `LITTLE_MEALS_OLLAMA_MODEL` before
 starting the server (step 4).
 
-## 3. (Optional) Configure Spoonacular
-
-Skip this the first time through — the app works fully without it, just
-without one of the two AI-suggestion sources (see `architecture.md`'s
-"Online recipe search" row). Come back to it once you want that.
-
-Two ways to configure the key, pick one:
-
-- **Quick, for testing**: `export LITTLE_MEALS_SPOONACULAR_API_KEY=<your key>`
-- **Recommended, for actual use**: encrypt it once, decrypt at server
-  startup:
-
-  ```
-  openssl enc -aes-256-cbc -pbkdf2 -salt -in key.txt -out spoonacular.enc
-  chmod 600 spoonacular.enc
-  export LITTLE_MEALS_SPOONACULAR_KEY_FILE=~/.vault/spoonacular.enc  # wherever you put it
-  ```
-
-  `lmeals serve` will prompt for the passphrase on startup and hold the
-  decrypted key in memory only — see `architecture.md`'s "Spoonacular API key
-  storage" row for why.
-
-## 4. Start the server
+## 3. Start the server
 
 ```
 lmeals serve
 ```
 
-- Prompts for the vault passphrase first, if `LITTLE_MEALS_SPOONACULAR_KEY_FILE`
-  is set.
 - Once you see `Uvicorn running on http://127.0.0.1:8765`, open that URL in a
   browser. On WSL2, this is normally reachable from a Windows browser at the
   same address without any extra port-forwarding.
@@ -92,37 +65,34 @@ lmeals serve
 Leave this running in its own terminal — it's the whole app (frontend and
 API in one process). `Ctrl+C` to stop it.
 
-## 5. Walk through the app once
+## 4. Walk through the app once
 
 The recipe library starts empty. A sensible first pass:
 
-1. **`/settings`** — review the household preferences (recipes per week, AI
-   suggestions per plan, recommendation day/time, food preferences, default
-   servings). Sane defaults are already in effect even if you skip this —
-   5 recipes/week, 2 of them AI-suggested, Sundays at 09:00 — but it's worth
-   a look before your first plan generates.
+1. **`/settings`** — review the household preferences (recipes per week,
+   recommendation day/time, default servings). Sane defaults are already in
+   effect even if you skip this — 5 recipes/week, Sundays at 09:00 — but
+   it's worth a look before your first plan generates.
 
-2. **`/recipes/new`** — add 2-3 recipes by pasting in free text (a copied
-   recipe, or just plain description of how you make something). Each
-   submission goes through the local LLM for extraction (cook time,
+2. **`/recipes/new`** — add a handful of recipes by pasting in free text (a
+   copied recipe, or just plain description of how you make something).
+   Each submission goes through the local LLM for extraction (cook time,
    classification, nutrition estimate, ingredients, steps) — this is the
-   slowest step in the app, give it a few seconds. Add at least two you'd
-   mark "liked" (the default) — the AI suggestion engine needs at least two
-   liked recipes in the library to generate a combination suggestion if
-   Spoonacular isn't configured, so a plan generated against an empty
-   library will come back short (see `plan_builder.py`: "a shorter plan
-   beats no plan," it won't error, just skip what it can't fill).
+   slowest step in the app, give it a few seconds. A plan can only be built
+   from recipes already in the library, so add at least as many as your
+   `recipes_per_week` setting if you want a full plan on the first try -
+   a smaller library just yields a shorter plan rather than an error (see
+   `plan_builder.py`: "a shorter plan beats no plan").
 
 3. **`/recipes`** — confirm they extracted sensibly. You can edit or delete
    any of them here, or open one to check the parsed ingredients/steps.
 
-4. **`/plan`** — generate a weekly plan. It fills the library-drawn slots
-   from what you just added, then tops up with AI suggestions (search, if
-   configured, else combining two liked recipes). Like/dislike each meal,
-   adjust servings, or reroll (whole plan, one meal, or a controlled reroll
-   offering ten alternatives for a single slot) if something doesn't land.
-   Finalize the plan once you're happy — this locks it and unblocks the
-   shopping list.
+4. **`/plan`** — generate a weekly plan. It draws recipes from the library
+   you just built, up to your configured `recipes_per_week` count. Adjust
+   servings, or reroll (whole plan, one meal, or a controlled reroll offering
+   ten alternatives for a single slot, always among your own library recipes)
+   if something doesn't land. Finalize the plan once you're happy — this
+   locks it and unblocks the shopping list.
 
 5. **`/shopping`** — generate the shopping list for the finalized plan.
    Ingredients are merged and scaled across all the week's recipes. Check
@@ -130,8 +100,8 @@ The recipe library starts empty. A sensible first pass:
 
 6. **`/recipes/{id}/cook`** (a "Cook along" link from a recipe page or a plan
    meal) — walk through a recipe step by step. Finishing prompts you to
-   like/dislike based on how it actually turned out, and marks the meal
-   cooked if it's in the current plan.
+   mark it cooked or leave it uncooked, and marks the meal cooked in the
+   current plan if it's in it.
 
 ## Running it day to day
 
@@ -143,6 +113,68 @@ whether it's past your configured recommendation day/time and the current
 plan predates it, auto-generating a fresh one and flagging an in-app
 notification banner when it does — no cron job or separate process needed.
 
+## Remote deployment (Milestone 11)
+
+If you're developing by sending prompts to a Claude Code session running
+directly on the home server (e.g. via Claude Remote Control), you'll want
+`lmeals serve` running as a background service you can redeploy in one
+command, rather than a foreground process tied to a terminal session. This
+is one-time setup; after it's done, every later change is just `bazel run
+//:deploy`.
+
+**One-time setup:**
+
+```
+mkdir -p ~/.config/systemd/user
+cp tools/little-meals.service ~/.config/systemd/user/little-meals.service
+systemctl --user daemon-reload
+systemctl --user enable --now little-meals.service
+loginctl enable-linger $(whoami)   # keeps it running after you log out
+```
+
+`enable --now` starts it immediately in addition to enabling it at boot. If
+something (e.g. a manually-started `lmeals serve`) is already holding port
+8765, stop that first (`kill <pid>`) or the service will fail to bind and
+sit in an auto-restart loop — check with `systemctl --user status
+little-meals.service`.
+
+**Every later deploy**, once a change looks good:
+
+```
+bazel run //:deploy   # rebuild + pipx reinstall + systemctl --user restart
+```
+
+This is the same preflight-gated rebuild `//:install` does, followed by
+`systemctl --user restart little-meals.service` — see `architecture.md`'s
+"Deployment" section for why it's structured this way. It doesn't touch
+`tailscale serve` (Milestone 8) — that keeps pointing at the same local port
+across restarts, so nothing else needs to change on the tailnet side.
+
+**If something's stuck** (a stray manually-started `lmeals serve` is holding
+the port, `tailscaled` itself got stopped, or `tailscale serve` lost its
+config), use the more defensive `bazel run //:relaunch` instead: it stops the
+service *and* kills any `lmeals serve` process still holding port 8765,
+reinstalls, starts the service back up, checks `tailscaled` is active
+(starting it via `sudo systemctl start tailscaled` if not — see the note
+below on passwordless sudo), and re-points `tailscale serve` at port 8765 if
+`tailscale serve status` shows no config for it. Safe to reach for any time
+`//:deploy` would also work; it just does a bit more. Every step is
+non-interactive, so it's safe to run from a remote Claude Code session (e.g.
+via Claude Remote Control) with nobody at the keyboard.
+
+Starting `tailscaled` needs root. If `sudo` on this host requires a password,
+`//:relaunch` will print a warning rather than hang waiting for one — grant
+passwordless `sudo systemctl start tailscaled` (e.g. a `visudo` NOPASSWD rule
+scoped to that one command) if you want a remote relaunch to be able to fix a
+stopped `tailscaled` on its own; otherwise start it manually when needed.
+
+Re-pointing `tailscale serve`, by contrast, does *not* need root, as long as
+you've run `sudo tailscale set --operator=<you>` once (a one-time host
+setup step — makes your user the operator of the local `tailscaled`, so
+`tailscale serve`/`funnel` never need `sudo` again). Without that, a lost
+`tailscale serve` config will fail to auto-heal and `//:relaunch` will print
+a warning instead.
+
 ## Troubleshooting
 
 | Symptom | Likely cause |
@@ -150,6 +182,6 @@ notification banner when it does — no cron job or separate process needed.
 | `bazel run //:install` stops at "local LLM runtime" | Ollama isn't installed/reachable — see step 2. |
 | `lmeals: command not found` after install | pipx's bin dir isn't on `PATH` in this shell — check `pipx list` shows `little-meals`, then add `~/.local/bin` to `PATH` (or open a new shell). |
 | Recipe extraction hangs or times out | Ollama isn't actually serving, or the configured model isn't pulled — recheck step 2. `LITTLE_MEALS_OLLAMA_TIMEOUT` (seconds, default 120) if it's just slow on your hardware. |
-| A plan generates with fewer meals than configured | Not enough liked library recipes and no search provider configured — see step 5.2. Not a bug: a short plan beats a failed one. |
-| Server prompts for a vault passphrase you don't want to enter right now | Unset `LITTLE_MEALS_SPOONACULAR_KEY_FILE` for that run, or set an empty `LITTLE_MEALS_SPOONACULAR_API_KEY`-free environment — Spoonacular is optional. |
+| A plan generates with fewer meals than configured | Not enough recipes in the library yet — see step 4.2. Not a bug: a short plan beats a failed one, and meal planning only ever draws from recipes already saved. |
 | A recipe file you hand-edited (or dropped in from elsewhere) doesn't show up in the library | It's likely not valid Markdown+YAML-frontmatter — `RecipeStore.list()` normalizes it through the same LLM extraction pipeline automatically (see `architecture.md`'s "Recipe file normalization" row); if that also fails, it's skipped with a warning logged rather than crashing the page. |
+| `bazel run //:deploy` fails at `systemctl restart` with "Unit little-meals.service not found" | The systemd unit hasn't been installed yet — see the "Remote deployment" setup steps above. |

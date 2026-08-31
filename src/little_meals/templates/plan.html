@@ -1,39 +1,94 @@
 {% extends "base.html" %}
 {% block title %}This week - little-meals{% endblock %}
+{% block content_class %}content-plan{% endblock %}
 {% block content %}
 <h1>This week's plan</h1>
 
 {% if plan is none %}
   <p class="subtitle">No plan yet - the household picks meals from the cookbook whenever suits them, no day-to-day schedule.</p>
-  <form method="post" action="/plan/generate">
-    <button type="submit" class="btn btn-primary">Generate this week's plan</button>
-  </form>
 {% else %}
   <p class="subtitle">Pick what you're making this week, in any order.</p>
   {% if plan.finalized %}
-    <p class="badge badge-liked" style="margin-bottom: 16px;">Finalized</p>
+    <p class="badge badge-finalized" style="margin-bottom: 16px;">Finalized</p>
+  {% endif %}
+{% endif %}
+
+<div class="plan-center">
+  {% if plan is none %}
+    <form method="post" action="/plan/generate" class="btn-form-right">
+      <button type="submit" class="btn btn-primary">Generate this week's plan</button>
+    </form>
+  {% elif not meals %}
+    {% if library_has_recipes %}
+      <p>No meals in this plan yet.</p>
+      <form method="post" action="/plan/meals/add" class="btn-form-right">
+        <button type="submit" class="btn btn-primary">+ Add a meal</button>
+      </form>
+    {% else %}
+      <p>No recipes in the cookbook yet to fill a plan. <a href="/recipes/new">Add one</a>, then generate again.</p>
+    {% endif %}
   {% else %}
-    <form method="post" action="/plan/reroll" style="margin-bottom: 16px;">
-      <button type="submit" class="btn btn-secondary">Reroll whole plan</button>
+    <div class="plan-flipbook">
+      <div class="flipbook-spine" aria-hidden="true">
+        <span class="flipbook-hole"></span>
+        <span class="flipbook-hole"></span>
+        <span class="flipbook-hole"></span>
+      </div>
+      <div class="flipbook-track">
+        {% for item in meals %}
+          {% set meal = item.meal %}
+          {% set recipe = item.recipe %}
+          <div class="flipbook-page">
+            {% include "partials/_plan_meal.html" %}
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% if meals|length > 1 %}
+      <div class="flipbook-dots" aria-hidden="true">
+        {% for item in meals %}<span class="flipbook-dot"></span>{% endfor %}
+      </div>
+    {% endif %}
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/plan-flipbook.js" defer></script>
+{% endblock %}
+
+{% block bottom_bar %}
+{% if plan is not none %}
+<div class="plan-actions-bar">
+  {% if not plan.finalized %}
+    <form method="post" action="/plan/reroll">
+      <button type="submit" class="btn btn-secondary">Reroll Plan</button>
     </form>
   {% endif %}
-
-  {% if not meals %}
-    <p>No recipes in the cookbook yet to fill a plan. <a href="/recipes/new">Add one</a>, then generate again.</p>
-  {% else %}
-    <div class="cookbook">
-      {% for item in meals %}
-        {% set meal = item.meal %}
-        {% set recipe = item.recipe %}
-        {% include "partials/_plan_meal.html" %}
-      {% endfor %}
-    </div>
-  {% endif %}
-
   {% if not plan.finalized and meals %}
     <form method="post" action="/plan/finalize">
-      <button type="submit" class="btn btn-primary">Finalize plan</button>
+      <button type="submit" class="btn btn-primary">Confirm Plan</button>
     </form>
   {% endif %}
+  {% if all_cooked %}
+    <form method="post" action="/plan/generate">
+      <button type="submit" class="btn btn-primary">Plan Ahead</button>
+    </form>
+  {% else %}
+    <form method="post" action="/plan/cancel" onsubmit="return confirm('Cancel this week\'s plan? This deletes all planned meals and the shopping list. This cannot be undone.');">
+      <button type="submit" class="btn btn-danger">Cancel Plan</button>
+    </form>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}
+
+{% block fab %}
+{% if plan is not none and meals and not plan.finalized %}
+<form method="post" action="/plan/meals/add">
+  <button type="submit" class="fab fab-add-meal" aria-label="Add a meal">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+  </button>
+</form>
 {% endif %}
 {% endblock %}

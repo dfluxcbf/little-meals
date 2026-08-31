@@ -106,6 +106,74 @@ test coverage are tracked exclusively through **little-requirements**
   install into `.venv` (gitignored), never added to `requirements.in`/`pip.parse`,
   consistent with the project-structure policy's "installed working version,
   not a source dependency" rule.
+- The `spoonacular-bulk-import` branch added one more requirement,
+  REQ-000000041, linked to the same `m4-ai-suggestions-and-reroll` suite as
+  REQ-000000038 since it extends `SpoonacularSearchProvider` — covering the
+  new `lmeals import-spoonacular` CLI command, `SpoonacularSearchProvider.
+  search_many` (bulk `complexSearch` + `informationBulk`), and
+  `planning/spoonacular_import.py`'s orchestration — tagged in
+  `tests/test_spoonacular_provider.py` and `tests/test_spoonacular_import.py`.
+  A follow-up on the same branch added REQ-000000042 for the `--reset` flag
+  (`RecipeStore.count`/`delete_all`, plus the CLI's confirm-before-delete
+  prompt) — tagged in `tests/test_recipe_store.py` and `tests/test_cli.py`.
+- Milestone 10 (`m10-remove-spoonacular-and-suggestions` suite) removed
+  Spoonacular and the entire AI-suggestion/recipe-recommendation system added
+  in Milestone 4 - see `milestones.md`'s M10 entry. Deleted requirements:
+  REQ-000000022, REQ-000000023, REQ-000000024, REQ-000000038, REQ-000000041,
+  REQ-000000042 (all M4-suite, Spoonacular/AI-suggestion-specific), and
+  REQ-000000043 (M2-suite, the Spoonacular recipe-search-preferences page).
+  Edited in place rather than deleted, since the underlying behavior survives
+  in a library-only form: REQ-000000010/REQ-000000012 (household preferences
+  store/UI, dropped the food-preferences/AI-suggestions wording),
+  REQ-000000025 (whole-plan reroll), REQ-000000026 (single-meal reroll, now
+  library-only with no generation fallback), REQ-000000027 (controlled
+  reroll), and REQ-000000028 (plan review like/dislike, dropped the NEW-badge
+  clause). Created REQ-000000044, tagged in `tests/test_plan_builder.py`, for
+  the library-only plan-generation behavior this milestone left in place of
+  M4's generation path.
+- Known issue: `lreq` aggregates a requirement's pass/fail verdict across
+  every test-case hash ever reported against it, with no CLI/MCP affordance
+  to unlink a stale one - deleting a test that was tagged with
+  `@pytest.mark.requirement(...)` (as M10 did for the old "NEW badge" test
+  under REQ-000000028) or renaming one (as M10 did for
+  `test_plan_store.py`'s `is_suggestion`-migration regression test, under
+  REQ-000000019 - a rename changes the reported test-case hash) leaves that
+  test's last-recorded verdict permanently mixed into the aggregate, even
+  though the live suite no longer runs it and every currently-tagged test for
+  that requirement passes. `lreq requirement set-verdict` only adds another
+  test-case record rather than clearing the stale one, so it doesn't fix this
+  either. REQ-000000028 and REQ-000000019 will keep reporting "Fail" in
+  `lreq` output/reports despite every one of their live test cases passing -
+  confirmed via `lreq inspect` against
+  `requirement_test_table`/`test_cases_table` (one stale `verdict=0` row each,
+  outnumbered by passing live ones). If this needs to show clean, the only
+  known fix is deleting and recreating the requirement (which reassigns its
+  ID and requires retagging every test and doc reference to it).
+- Milestone 12 (`m12-recipe-add-edit` suite) created one requirement,
+  REQ-000000045, covering the shared recipe edit page (new/edit) — tagged
+  across the `test_new_recipe_form_*`/`test_edit_recipe_form_*` cases in
+  `tests/test_api_ui.py`. The M1 free-text/Ollama-extraction "New recipe"
+  flow and its `recipe_new.html` template were removed as part of this
+  milestone (the JSON API's `POST /api/recipes/extract` endpoint was left
+  as-is, out of scope - it isn't the UI flow M12 replaces).
+- Milestone 13 (`m13-remove-like-dislike` suite) removed the liked/disliked
+  recipe-preference feature entirely (see `milestones.md`'s M13 entry).
+  Deleted requirements: REQ-000000002 (preference persistence in the recipe
+  store) and REQ-000000028 (plan-review like/dislike UI). Edited in place:
+  REQ-000000006 (recipe CRUD JSON API - dropped the preference filter/toggle
+  clauses), REQ-000000018 (selection engine - no longer liked-only),
+  REQ-000000025 to REQ-000000027 (whole-plan/single-meal/controlled reroll -
+  no longer liked-only). No new requirements were created, since this
+  milestone only removes behavior other requirements already covered more
+  broadly.
+- Milestone 14 (`m14-plan-lifecycle-automation` suite) created four
+  requirements, REQ-000000046 to REQ-000000049, covering mark-cooked
+  visibility + the "Plan Ahead" button, per-plan add/remove-meal, the
+  recommendation-day enable toggle + force-finalize-on-generate, and the new
+  independent auto-confirm-plan schedule (see `milestones.md`'s M14 entry) -
+  tagged across `tests/test_plan_store.py`, `tests/test_scheduler.py`,
+  `tests/test_plan_ui.py`, `tests/test_api_plan.py`, and
+  `tests/test_settings_ui.py`.
 - Known issue: `lreq update` (what the Bazel genrule invokes) cannot run inside
   this submodule checkout — `little-requirements`' managed pre-commit-hook
   installer assumes `.git` is a directory, and a submodule's `.git` is a file.

@@ -5,10 +5,12 @@ from fastapi.testclient import TestClient
 
 VALID_UPDATE_PAYLOAD = {
     "recipes_per_week": 6,
+    "recommendation_enabled": True,
     "recommendation_day": "wednesday",
     "recommendation_time": "18:30",
-    "food_preferences": ["vegetarian-friendly", "low-carb"],
-    "ai_suggestions_per_plan": 3,
+    "auto_confirm_enabled": False,
+    "auto_confirm_day": "sunday",
+    "auto_confirm_time": "09:00",
     "default_servings": "2 adults + 1 child",
 }
 
@@ -30,8 +32,6 @@ def test_put_then_get_round_trip(client: TestClient):
     assert body["recipes_per_week"] == 6
     assert body["recommendation_day"] == "wednesday"
     assert body["recommendation_time"] == "18:30:00"
-    assert body["food_preferences"] == ["vegetarian-friendly", "low-carb"]
-    assert body["ai_suggestions_per_plan"] == 3
     assert body["default_servings"] == "2 adults + 1 child"
     assert body["updated_at"] is not None
 

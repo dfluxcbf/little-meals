@@ -1,0 +1,26 @@
+query: dinner
+instructionsRequired: true
+addRecipeInstructions: true
+addRecipeNutrition: true
+diet: ""
+cuisine:
+  - Italian
+  - Mexican
+  - Asian
+  - Latin American
+  - Nordic
+  - Thai
+  - Japanese
+intolerances:
+  - Peanut
+  - Seafood
+exclude_ingredients: []
+include_ingredients: []
+min_calories: null
+max_calories: 850
+min_protein: null
+max_protein: null
+min_carbs: null
+max_carbs: null
+min_fiber: null
+max_fiber: 25

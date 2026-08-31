@@ -140,6 +140,34 @@ class ShoppingListStore:
                 raise ShoppingListNotFound(list_id)
         return self.get(list_id)
 
+    def count(self) -> int:
+        """Number of stored shopping lists - used by `lmeals settings
+        --reset` to report how many will be deleted before asking for
+        confirmation."""
+        with self._connection() as conn:
+            return conn.execute("SELECT COUNT(*) FROM shopping_lists").fetchone()[0]
+
+    def delete_for_plan(self, plan_id: str) -> None:
+        """Deletes the shopping list (and items) for one plan, if any exists -
+        used by POST /plan/cancel. No-op if the plan was never finalized /
+        has no list, not an error."""
+        with self._connection() as conn:
+            row = conn.execute("SELECT id FROM shopping_lists WHERE plan_id = ?", (plan_id,)).fetchone()
+            if row is None:
+                return
+            list_id = row[0]
+            conn.execute("DELETE FROM shopping_list_items WHERE list_id = ?", (list_id,))
+            conn.execute("DELETE FROM shopping_lists WHERE id = ?", (list_id,))
+
+    def delete_all(self) -> int:
+        """Deletes every shopping list (and its items) - used by `lmeals
+        settings --reset`. Returns the number of lists removed."""
+        with self._connection() as conn:
+            removed = conn.execute("SELECT COUNT(*) FROM shopping_lists").fetchone()[0]
+            conn.execute("DELETE FROM shopping_list_items")
+            conn.execute("DELETE FROM shopping_lists")
+        return removed
+
 
 def _row_to_list(list_row: tuple, item_rows: list[tuple]) -> ShoppingList:
     list_id, plan_id, created_at, actual_cost = list_row

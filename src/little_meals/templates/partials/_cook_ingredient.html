@@ -1,0 +1,21 @@
+<form
+  id="cook-ingredient-{{ index }}"
+  hx-post="/recipes/{{ recipe.id }}/cook/ingredients/{{ index }}/checked"
+  hx-target="#cook-ingredient-{{ index }}"
+  hx-swap="outerHTML"
+>
+  <button
+    type="submit"
+    class="cook-ingredient-row {% if checked %}cook-ingredient-row-checked{% endif %}"
+    aria-pressed="{{ 'true' if checked else 'false' }}"
+    aria-label="{{ 'Mark ' + ingredient.name + ' unchecked' if checked else 'Mark ' + ingredient.name + ' checked' }}"
+  >
+    <span class="cook-ingredient-name">
+      {{ ingredient.name }}
+      {% if ingredient.note %}<span class="fridge-qty">({{ ingredient.note }})</span>{% endif %}
+    </span>
+    <span class="fridge-qty">
+      {% if ingredient.quantity is not none %}{{ ingredient.quantity }} {% endif %}{% if ingredient.unit %}{{ ingredient.unit }}{% endif %}
+    </span>
+  </button>
+</form>

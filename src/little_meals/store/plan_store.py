@@ -34,7 +34,6 @@ class MealSpec(NamedTuple):
 
     recipe_id: str
     servings: int
-    is_suggestion: bool = False
 
 
 class MealPlanStore:
@@ -64,15 +63,26 @@ class MealPlanStore:
                     recipe_id TEXT NOT NULL,
                     servings INTEGER NOT NULL,
                     cooked INTEGER NOT NULL DEFAULT 0,
-                    is_suggestion INTEGER NOT NULL DEFAULT 0,
                     position INTEGER NOT NULL,
                     PRIMARY KEY (plan_id, meal_id)
                 )
                 """
             )
-            existing_columns = {row[1] for row in conn.execute("PRAGMA table_info(plan_meals)")}
-            if "is_suggestion" not in existing_columns:
-                conn.execute("ALTER TABLE plan_meals ADD COLUMN is_suggestion INTEGER NOT NULL DEFAULT 0")
+            self._migrate_legacy_schema(conn)
+
+    def _migrate_legacy_schema(self, conn: sqlite3.Connection) -> None:
+        """Drops the AI-suggestion-era `is_suggestion` column and the
+        `plan_meal_candidates` table now that recipe suggestions have been
+        removed entirely - see docs/milestones.md's removal milestone. A
+        brand-new database never had either, so this is a no-op there."""
+        existing_columns = {row[1] for row in conn.execute("PRAGMA table_info(plan_meals)")}
+        if "is_suggestion" in existing_columns:
+            try:
+                conn.execute("ALTER TABLE plan_meals DROP COLUMN is_suggestion")
+            except sqlite3.OperationalError as exc:
+                if "no such column" not in str(exc):
+                    raise
+        conn.execute("DROP TABLE IF EXISTS plan_meal_candidates")
 
     @contextlib.contextmanager
     def _connection(self) -> Iterator[sqlite3.Connection]:
@@ -109,12 +119,13 @@ class MealPlanStore:
 
     def _insert_meals(self, conn: sqlite3.Connection, plan_id: str, meals: list[MealSpec]) -> None:
         for position, meal in enumerate(meals):
+            meal_id = f"m{position + 1}"
             conn.execute(
                 """
-                INSERT INTO plan_meals (plan_id, meal_id, recipe_id, servings, cooked, is_suggestion, position)
-                VALUES (?, ?, ?, ?, 0, ?, ?)
+                INSERT INTO plan_meals (plan_id, meal_id, recipe_id, servings, cooked, position)
+                VALUES (?, ?, ?, ?, 0, ?)
                 """,
-                (plan_id, f"m{position + 1}", meal.recipe_id, meal.servings, int(meal.is_suggestion), position),
+                (plan_id, meal_id, meal.recipe_id, meal.servings, position),
             )
 
     def get_current(self) -> Optional[MealPlan]:
@@ -134,7 +145,7 @@ class MealPlanStore:
                 raise PlanNotFound(plan_id)
             meal_rows = conn.execute(
                 """
-                SELECT meal_id, recipe_id, servings, cooked, is_suggestion FROM plan_meals
+                SELECT meal_id, recipe_id, servings, cooked FROM plan_meals
                 WHERE plan_id = ? ORDER BY position ASC
                 """,
                 (plan_id,),
@@ -149,17 +160,52 @@ class MealPlanStore:
         self._update_meal(plan_id, meal_id, "cooked", int(cooked))
         return self.get(plan_id)
 
-    def set_recipe(self, plan_id: str, meal_id: str, recipe_id: str, servings: int, is_suggestion: bool = False) -> MealPlan:
-        """Reroll one meal (single-meal or controlled reroll): swap in a
-        different recipe for an existing slot, resetting its cooked state
-        (it hasn't been cooked yet - it's a different dish now)."""
+    def set_recipe(self, plan_id: str, meal_id: str, recipe_id: str, servings: int) -> MealPlan:
+        """Reroll one meal (single-meal reroll or controlled reroll): swap
+        in a different recipe for an existing slot, resetting its cooked
+        state (it hasn't been cooked yet - it's a different dish now)."""
         with self._connection() as conn:
             cursor = conn.execute(
+                "UPDATE plan_meals SET recipe_id = ?, servings = ?, cooked = 0 WHERE plan_id = ? AND meal_id = ?",
+                (recipe_id, servings, plan_id, meal_id),
+            )
+            if cursor.rowcount == 0:
+                if conn.execute("SELECT 1 FROM meal_plans WHERE id = ?", (plan_id,)).fetchone() is None:
+                    raise PlanNotFound(plan_id)
+                raise PlanMealNotFound(plan_id, meal_id)
+        return self.get(plan_id)
+
+    def add_meal(self, plan_id: str, recipe_id: str, servings: int) -> MealPlan:
+        """Adds one more meal to an existing (draft) plan, for the
+        odd-week "select the meal count directly on the plan" adjustment -
+        see docs/milestones.md's M14 entry. Appended after the highest
+        position ever used in this plan, so its meal_id can never collide
+        with one still present, even if a higher-positioned meal was
+        previously removed."""
+        with self._connection() as conn:
+            if conn.execute("SELECT 1 FROM meal_plans WHERE id = ?", (plan_id,)).fetchone() is None:
+                raise PlanNotFound(plan_id)
+            max_position = conn.execute(
+                "SELECT COALESCE(MAX(position), -1) FROM plan_meals WHERE plan_id = ?", (plan_id,)
+            ).fetchone()[0]
+            position = max_position + 1
+            meal_id = f"m{position + 1}"
+            conn.execute(
                 """
-                UPDATE plan_meals SET recipe_id = ?, servings = ?, is_suggestion = ?, cooked = 0
-                WHERE plan_id = ? AND meal_id = ?
+                INSERT INTO plan_meals (plan_id, meal_id, recipe_id, servings, cooked, position)
+                VALUES (?, ?, ?, ?, 0, ?)
                 """,
-                (recipe_id, servings, int(is_suggestion), plan_id, meal_id),
+                (plan_id, meal_id, recipe_id, servings, position),
+            )
+        return self.get(plan_id)
+
+    def remove_meal(self, plan_id: str, meal_id: str) -> MealPlan:
+        """Removes one meal from a plan - the other half of the odd-week
+        meal-count adjustment. `position` gaps left behind are harmless
+        (ORDER BY position ASC still yields the right relative order)."""
+        with self._connection() as conn:
+            cursor = conn.execute(
+                "DELETE FROM plan_meals WHERE plan_id = ? AND meal_id = ?", (plan_id, meal_id)
             )
             if cursor.rowcount == 0:
                 if conn.execute("SELECT 1 FROM meal_plans WHERE id = ?", (plan_id,)).fetchone() is None:
@@ -178,6 +224,30 @@ class MealPlanStore:
                     raise PlanNotFound(plan_id)
                 raise PlanMealNotFound(plan_id, meal_id)
 
+    def count(self) -> int:
+        """Number of stored plans - used by `lmeals settings --reset` to
+        report how many will be deleted before asking for confirmation."""
+        with self._connection() as conn:
+            return conn.execute("SELECT COUNT(*) FROM meal_plans").fetchone()[0]
+
+    def delete(self, plan_id: str) -> None:
+        """Deletes one plan (and its meals) - used by POST /plan/cancel.
+        Raises PlanNotFound if the plan doesn't exist."""
+        with self._connection() as conn:
+            if conn.execute("SELECT 1 FROM meal_plans WHERE id = ?", (plan_id,)).fetchone() is None:
+                raise PlanNotFound(plan_id)
+            conn.execute("DELETE FROM plan_meals WHERE plan_id = ?", (plan_id,))
+            conn.execute("DELETE FROM meal_plans WHERE id = ?", (plan_id,))
+
+    def delete_all(self) -> int:
+        """Deletes every plan (and its meals) - used by `lmeals settings
+        --reset`. Returns the number of plans removed."""
+        with self._connection() as conn:
+            removed = conn.execute("SELECT COUNT(*) FROM meal_plans").fetchone()[0]
+            conn.execute("DELETE FROM plan_meals")
+            conn.execute("DELETE FROM meal_plans")
+        return removed
+
     def finalize(self, plan_id: str) -> MealPlan:
         with self._connection() as conn:
             cursor = conn.execute("UPDATE meal_plans SET finalized = 1 WHERE id = ?", (plan_id,))
@@ -189,7 +259,7 @@ class MealPlanStore:
 def _row_to_plan(plan_row: tuple, meal_rows: list[tuple]) -> MealPlan:
     plan_id, created_at, finalized = plan_row
     meals = [
-        PlanMeal(id=meal_id, recipe_id=recipe_id, servings=servings, cooked=bool(cooked), is_suggestion=bool(is_suggestion))
-        for meal_id, recipe_id, servings, cooked, is_suggestion in meal_rows
+        PlanMeal(id=meal_id, recipe_id=recipe_id, servings=servings, cooked=bool(cooked))
+        for meal_id, recipe_id, servings, cooked in meal_rows
     ]
     return MealPlan(id=plan_id, created_at=datetime.fromisoformat(created_at), finalized=bool(finalized), meals=meals)

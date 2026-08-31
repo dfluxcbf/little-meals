@@ -4,14 +4,25 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{ recipe.name }} - Step {{ step_number }} - little-meals</title>
+  <link rel="manifest" href="/static/manifest.webmanifest">
+  <meta name="theme-color" content="#c55123">
+  <link rel="icon" href="/static/icons/favicon-64.png">
+  <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Little Meals">
   <link rel="stylesheet" href="/static/fonts.css">
   <link rel="stylesheet" href="/static/app.css">
+  <script src="/static/vendor/htmx.min.js"></script>
+  <script src="/static/js/cook-swipe.js" defer></script>
 </head>
 <body>
-  <div class="cook-shell">
+  <div class="cook-shell" data-swipe-prev="/recipes/{{ recipe.id }}/cook/{{ step_number - 1 }}" data-swipe-next="/recipes/{{ recipe.id }}/cook/{{ step_number + 1 }}">
     <div class="cook-header">
-      <a href="/recipes/{{ recipe.id }}" class="cook-close" aria-label="Close cook-along">
+      <a href="/recipes/{{ recipe.id }}" class="cook-close" aria-label="Leave cook-along">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+        <span class="cook-close-label">Leave</span>
       </a>
       <span class="cook-title">{{ recipe.name }}</span>
       <span class="cook-step-label">Step {{ step_number }} of {{ total_steps }}</span>
@@ -29,11 +40,7 @@
     </div>
 
     <div class="cook-nav">
-      {% if step_number > 1 %}
-        <a href="/recipes/{{ recipe.id }}/cook/{{ step_number - 1 }}" class="btn btn-secondary cook-prev" aria-label="Previous step">&larr;</a>
-      {% else %}
-        <span class="btn btn-secondary cook-prev cook-prev-disabled" aria-hidden="true">&larr;</span>
-      {% endif %}
+      <a href="/recipes/{{ recipe.id }}/cook/{{ step_number - 1 }}" class="btn btn-secondary cook-prev" aria-label="Previous step">&larr;</a>
       <a href="/recipes/{{ recipe.id }}/cook/{{ step_number + 1 }}" class="btn btn-primary cook-next">
         {{ "Finish cooking" if step_number == total_steps else "Next step" }}
       </a>

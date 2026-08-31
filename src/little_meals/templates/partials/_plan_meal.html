@@ -2,51 +2,46 @@
   <div class="plan-meal-top">
     <h3><a href="/recipes/{{ recipe.id }}">{{ recipe.name }}</a></h3>
     <div style="display: flex; gap: 6px; align-items: center; flex-shrink: 0;">
-      {% if meal.is_suggestion %}<span class="badge badge-new">NEW</span>{% endif %}
-      <form hx-post="/plan/meals/{{ meal.id }}/cooked" hx-target="#plan-meal-{{ meal.id }}" hx-swap="outerHTML">
-        <input type="hidden" name="cooked" value="{{ 'false' if meal.cooked else 'true' }}">
-        <button type="submit" class="pot-stamp {% if meal.cooked %}pot-stamp-active{% endif %}">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11h16v3a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5v-3Z"></path><path d="M2 11h20"></path></svg>
-          {{ "Cooked" if meal.cooked else "Mark cooked" }}
-        </button>
-      </form>
+      {% if plan.finalized %}
+        <form hx-post="/plan/meals/{{ meal.id }}/cooked" hx-target="#plan-meal-{{ meal.id }}" hx-swap="outerHTML">
+          <input type="hidden" name="cooked" value="{{ 'false' if meal.cooked else 'true' }}">
+          <button type="submit" class="pot-stamp {% if meal.cooked %}pot-stamp-active{% endif %}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11h16v3a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5v-3Z"></path><path d="M2 11h20"></path></svg>
+            {{ "Cooked" if meal.cooked else "Mark cooked" }}
+          </button>
+        </form>
+      {% else %}
+        <form method="post" action="/plan/meals/{{ meal.id }}/remove">
+          <button type="submit" class="row-remove-btn" aria-label="Remove this meal from the plan" title="Remove this meal">&times;</button>
+        </form>
+      {% endif %}
     </div>
   </div>
-  <div class="plan-meal-meta">
-    <span>{{ recipe.cook_time_minutes }} min</span>
-    <span>{{ recipe.nutrition.calories_per_serving }} kcal</span>
-    <span class="badge badge-{{ recipe.classification.value }}">{{ recipe.classification.value|capitalize }}</span>
-    <a href="/recipes/{{ recipe.id }}/cook" style="margin-left: auto; font-size: 12px; font-weight: 600;">Cook along &rarr;</a>
-  </div>
-  <div class="servings-row">
-    <label for="servings-{{ meal.id }}">Servings</label>
-    <input
-      type="number"
-      id="servings-{{ meal.id }}"
-      name="servings"
-      min="1"
-      value="{{ meal.servings }}"
-      hx-post="/plan/meals/{{ meal.id }}/servings"
-      hx-trigger="change"
-      hx-target="#plan-meal-{{ meal.id }}"
-      hx-swap="outerHTML"
-    >
-  </div>
-  <div class="plan-meal-actions">
-    <div class="reroll-actions">
-      <form hx-post="/plan/meals/{{ meal.id }}/preference" hx-target="#plan-meal-{{ meal.id }}" hx-swap="outerHTML">
-        <input type="hidden" name="preference" value="liked">
-        <button type="submit" class="thumb-btn {% if recipe.preference.value == 'liked' %}thumb-liked{% endif %}" aria-label="Like this recipe">
-          <svg viewBox="0 0 24 24" fill="{{ 'currentColor' if recipe.preference.value == 'liked' else 'none' }}" stroke="currentColor" stroke-width="1.9"><path d="M7 10v11H3V10h4Zm0 0 4-7a2 2 0 0 1 2 2v4h5.3a2 2 0 0 1 1.9 2.6l-2 7A2 2 0 0 1 16.3 21H7"></path></svg>
-        </button>
-      </form>
-      <form hx-post="/plan/meals/{{ meal.id }}/preference" hx-target="#plan-meal-{{ meal.id }}" hx-swap="outerHTML">
-        <input type="hidden" name="preference" value="disliked">
-        <button type="submit" class="thumb-btn {% if recipe.preference.value == 'disliked' %}thumb-disliked{% endif %}" aria-label="Not for us">
-          <svg viewBox="0 0 24 24" fill="{{ 'currentColor' if recipe.preference.value == 'disliked' else 'none' }}" stroke="currentColor" stroke-width="1.9" style="transform: scaleY(-1);"><path d="M7 10v11H3V10h4Zm0 0 4-7a2 2 0 0 1 2 2v4h5.3a2 2 0 0 1 1.9 2.6l-2 7A2 2 0 0 1 16.3 21H7"></path></svg>
-        </button>
-      </form>
+
+  <span class="badge badge-{{ recipe.classification.value }}">{{ recipe.classification.value|capitalize }}</span>
+
+  <div class="plan-meal-body">
+    <div class="plan-meal-stats">
+      <div class="stat-row">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"></circle><path d="M12 8v4.5l3 2"></path></svg>
+        <span>{{ recipe.cook_time_minutes }} min</span>
+      </div>
+      <div class="stat-row">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3c-1 2-3 3.2-3 6a4 4 0 0 0 8 0c0-1.3-.7-2-1.2-2.8.4 1.6-.6 2.3-1 1.8-.6-.8.2-1.6-.4-3C10 3.8 8.6 3.4 8 3Z"></path><path d="M6.2 15h11.6c.4 0 .7.4.5.8l-1.4 4A2 2 0 0 1 15 21H9a2 2 0 0 1-1.9-1.2l-1.4-4c-.2-.4.1-.8.5-.8Z"></path></svg>
+        <span>{{ recipe.nutrition.calories_per_serving ~ " kcal" if recipe.nutrition.calories_per_serving is not none else "? kcal" }}</span>
+      </div>
+      <div class="stat-row">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-4.5-7-10.5A4.5 4.5 0 0 1 12 7a4.5 4.5 0 0 1 7 3.5C19 16.5 12 21 12 21Z"></path></svg>
+        <span>{{ recipe.nutrition.protein_g ~ "g protein" if recipe.nutrition.protein_g is not none else "? protein" }}</span>
+      </div>
+      <div class="stat-row">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4c8 0 15 7 15 15"></path><path d="M5 9c5.5 0 10 4.5 10 10"></path><path d="M5 14c2.8 0 5 2.2 5 5"></path></svg>
+        <span>{{ recipe.nutrition.fiber_g ~ "g fiber" if recipe.nutrition.fiber_g is not none else "? fiber" }}</span>
+      </div>
     </div>
+
+    <a href="/recipes/{{ recipe.id }}/cook" class="cook-along-btn">Cook along &rarr;</a>
+
     {% if not plan.finalized %}
     <div class="reroll-actions">
       <form hx-post="/plan/meals/{{ meal.id }}/reroll" hx-target="#plan-meal-{{ meal.id }}" hx-swap="outerHTML">
@@ -54,10 +49,29 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="4" y="4" width="16" height="16" rx="3"></rect><circle cx="9" cy="9" r="1.2" fill="currentColor"></circle><circle cx="15" cy="15" r="1.2" fill="currentColor"></circle></svg>
         </button>
       </form>
-      <a href="/plan/meals/{{ meal.id }}/alternatives" class="reroll-btn" title="See 10 alternatives" aria-label="See 10 alternatives">
+      <a href="/plan/meals/{{ meal.id }}/alternatives" class="reroll-btn" title="Select from cookbook" aria-label="Select from cookbook">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="12" height="12" rx="2"></rect><path d="M9 8h11v11H9z"></path></svg>
       </a>
     </div>
     {% endif %}
+  </div>
+
+  <div class="servings-row">
+    <label>Servings</label>
+    <div class="stepper">
+      <form hx-post="/plan/meals/{{ meal.id }}/servings" hx-target="#plan-meal-{{ meal.id }}" hx-swap="outerHTML">
+        <input type="hidden" name="servings" value="{{ meal.servings - 1 }}">
+        <button type="submit" class="stepper-btn" aria-label="Decrease servings" {% if meal.servings <= 1 %}disabled{% endif %}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"></path></svg>
+        </button>
+      </form>
+      <span class="stepper-value">{{ meal.servings }}</span>
+      <form hx-post="/plan/meals/{{ meal.id }}/servings" hx-target="#plan-meal-{{ meal.id }}" hx-swap="outerHTML">
+        <input type="hidden" name="servings" value="{{ meal.servings + 1 }}">
+        <button type="submit" class="stepper-btn" aria-label="Increase servings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+        </button>
+      </form>
+    </div>
   </div>
 </div>

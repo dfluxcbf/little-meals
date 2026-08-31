@@ -4,20 +4,20 @@
 <h1>{{ recipe.name }}</h1>
 <div class="meta-row">
   <span>{{ recipe.cook_time_minutes }} min</span>
-  <span>{{ recipe.nutrition.calories_per_serving }} kcal/serving</span>
+  {% if recipe.nutrition.calories_per_serving is not none %}
+    <span>{{ recipe.nutrition.calories_per_serving }} kcal/serving</span>
+  {% endif %}
   <span>serves {{ recipe.servings }}</span>
   <span class="badge badge-{{ recipe.classification.value }}">{{ recipe.classification.value|capitalize }}</span>
-  <span class="badge badge-{{ recipe.preference.value }}">{{ recipe.preference.value|capitalize }}</span>
 </div>
 
-<a href="/recipes/{{ recipe.id }}/cook" class="btn btn-primary" style="margin-bottom: 8px;">Cook along</a>
-
-<h2>Steps</h2>
-<ol class="steps-list">
-  {% for step in recipe.steps %}
-    <li>{{ step }}</li>
-  {% endfor %}
-</ol>
+<div class="detail-actions">
+  <a href="/recipes/{{ recipe.id }}/cook" class="btn btn-primary">Cook along</a>
+  <a href="/recipes/{{ recipe.id }}/edit" class="btn btn-secondary">Edit recipe</a>
+  <form method="post" action="/recipes/{{ recipe.id }}/duplicate">
+    <button type="submit" class="btn btn-secondary">Duplicate recipe</button>
+  </form>
+</div>
 
 <details class="fridge">
   <summary>
@@ -42,7 +42,14 @@
   </ul>
 </details>
 
-<form method="post" action="/recipes/{{ recipe.id }}/delete" onsubmit="return confirm('Delete this recipe?');" style="margin-top: 24px;">
+<h2>Steps</h2>
+<ol class="steps-list">
+  {% for step in recipe.steps %}
+    <li>{{ step }}</li>
+  {% endfor %}
+</ol>
+
+<form method="post" action="/recipes/{{ recipe.id }}/delete" onsubmit="return confirm('Delete this recipe?');" class="delete-recipe-form">
   <button type="submit" class="btn btn-secondary">Delete recipe</button>
 </form>
 {% endblock %}
