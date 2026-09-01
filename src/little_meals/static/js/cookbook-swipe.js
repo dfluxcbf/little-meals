@@ -5,16 +5,21 @@
   if (!grid) return;
 
   var LOCK_DISTANCE = 10; // px - travel before committing this gesture as horizontal vs. a vertical scroll
-  var MIN_DISTANCE = 60; // px - minimum horizontal travel to count as a swipe
+  var MIN_DISTANCE = 60; // px - minimum horizontal travel to count as a swipe on release
   var MAX_VERTICAL_RATIO = 0.5; // vertical movement must stay under half of horizontal, to tell a swipe from a scroll
-  var FLASH_DURATION = 220; // ms - matches the CSS animation below
+  var MAX_DRAG = 90; // px - visual clamp so a long drag doesn't fling the card off-card
 
   var startX = null;
   var startY = null;
   var startCard = null;
   var horizontalLock = false; // true once this gesture has committed to being a swipe, not a page scroll
 
-  function reset() {
+  function reset(card) {
+    if (card) {
+      card.classList.remove("swiping", "recipe-card-swipe-right-hint", "recipe-card-swipe-left-hint");
+      card.style.removeProperty("--swipe-x");
+      card.style.removeProperty("--swipe-progress");
+    }
     startCard = null;
     horizontalLock = false;
   }
@@ -23,14 +28,14 @@
     "touchstart",
     function (e) {
       if (e.touches.length !== 1) {
-        reset();
+        reset(startCard);
         return;
       }
       var card = e.target.closest(".recipe-card");
       // Ignore swipes starting on an interactive control (the recipe title
       // link) so a tap-drag there is never reinterpreted as an add/remove.
       if (!card || e.target.closest("a, button, input, form")) {
-        reset();
+        reset(startCard);
         return;
       }
       startCard = card;
@@ -61,13 +66,25 @@
         if (Math.abs(dy) > Math.abs(dx) * MAX_VERTICAL_RATIO) {
           // Reveals itself as a vertical scroll - stop tracking this
           // gesture as a swipe candidate and let the browser scroll.
-          reset();
+          reset(startCard);
           return;
         }
         horizontalLock = true;
+        startCard.classList.add("swiping");
       }
 
-      if (horizontalLock && e.cancelable) e.preventDefault();
+      if (e.cancelable) e.preventDefault();
+
+      // Live drag-follow: the card (and its add/remove color hint) tracks
+      // the finger directly, every touchmove, instead of only reacting
+      // once the gesture is released - see the --swipe-x/--swipe-progress
+      // custom properties in app.css.
+      var clamped = Math.max(-MAX_DRAG, Math.min(MAX_DRAG, dx));
+      var progress = Math.min(1, Math.abs(dx) / MIN_DISTANCE);
+      startCard.style.setProperty("--swipe-x", clamped + "px");
+      startCard.style.setProperty("--swipe-progress", String(progress));
+      startCard.classList.toggle("recipe-card-swipe-right-hint", dx > 0);
+      startCard.classList.toggle("recipe-card-swipe-left-hint", dx < 0);
     },
     { passive: false }
   );
@@ -80,24 +97,31 @@
       var touch = e.changedTouches[0];
       var dx = touch.clientX - startX;
       var dy = touch.clientY - startY;
-      reset();
+      var committed = horizontalLock && Math.abs(dx) >= MIN_DISTANCE && Math.abs(dy) <= Math.abs(dx) * MAX_VERTICAL_RATIO;
 
-      if (Math.abs(dx) < MIN_DISTANCE) return;
-      if (Math.abs(dy) > Math.abs(dx) * MAX_VERTICAL_RATIO) return;
+      // Always resets --swipe-x to 0 and re-enables the transition (by
+      // dropping .swiping), so a committed swipe's card springs the rest of
+      // the way over while the add/remove request is in flight, and an
+      // under-threshold release just springs straight back to resting.
+      reset(card);
+
+      if (!committed) return;
 
       var recipeId = card.getAttribute("data-recipe-id");
       if (!recipeId) return;
 
       var adding = dx > 0;
       var url = "/recipes/" + recipeId + (adding ? "/add-to-plan" : "/remove-from-plan");
-
-      card.classList.add(adding ? "recipe-card-swipe-right" : "recipe-card-swipe-left");
-      window.setTimeout(function () {
-        htmx.ajax("POST", url, { target: card, swap: "outerHTML" });
-      }, FLASH_DURATION);
+      htmx.ajax("POST", url, { target: card, swap: "outerHTML" });
     },
     { passive: true }
   );
 
-  grid.addEventListener("touchcancel", reset, { passive: true });
+  grid.addEventListener(
+    "touchcancel",
+    function () {
+      reset(startCard);
+    },
+    { passive: true }
+  );
 })();

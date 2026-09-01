@@ -99,15 +99,49 @@ def test_cook_step_negative_redirects_to_step_0(client: TestClient, sample_recip
 
 
 @pytest.mark.requirement("REQ-000000033")
-def test_cook_step_past_the_last_step_shows_finish_prompt(client: TestClient, sample_recipe):
+def test_cook_step_past_the_last_step_with_no_active_plan_shows_fallback_actions(client: TestClient, sample_recipe):
     created = _create_recipe(client, sample_recipe)
     total_steps = len(sample_recipe.steps)
 
     response = client.get(f"/recipes/{created['id']}/cook/{total_steps + 1}")
     assert response.status_code == 200
-    assert "Nicely done!" in response.text
+    assert sample_recipe.name in response.text
+    assert "Return to recipe" in response.text
+    assert "Finish recipe" in response.text
+    assert "Mark as cooked" not in response.text
+    assert "Leave uncooked" not in response.text
+
+
+@pytest.mark.requirement("REQ-000000033")
+def test_cook_step_past_the_last_step_with_finalized_plan_shows_cooked_buttons(
+    client: TestClient, sample_recipe, store, plan_store
+):
+    created = store.create(sample_recipe)
+    plan = plan_store.create([MealSpec(created.id, created.servings)])
+    plan_store.finalize(plan.id)
+    total_steps = len(created.steps)
+
+    response = client.get(f"/recipes/{created.id}/cook/{total_steps + 1}")
+    assert response.status_code == 200
     assert "Mark as cooked" in response.text
     assert "Leave uncooked" in response.text
+    # Return to recipe stays available alongside the cooked buttons.
+    assert "Return to recipe" in response.text
+
+
+@pytest.mark.requirement("REQ-000000033")
+def test_cook_step_past_the_last_step_with_draft_plan_shows_fallback_actions(
+    client: TestClient, sample_recipe, store, plan_store
+):
+    created = store.create(sample_recipe)
+    plan_store.create([MealSpec(created.id, created.servings)])  # left as a draft, not finalized
+    total_steps = len(created.steps)
+
+    response = client.get(f"/recipes/{created.id}/cook/{total_steps + 1}")
+    assert response.status_code == 200
+    assert "Mark as cooked" not in response.text
+    assert "Leave uncooked" not in response.text
+    assert "Finish recipe" in response.text
 
 
 @pytest.mark.requirement("REQ-000000033")
@@ -165,19 +199,22 @@ def test_leaving_and_returning_resumes_at_the_saved_step(client: TestClient, sam
 def test_cook_finish_marks_cooked(client: TestClient, sample_recipe):
     created = _create_recipe(client, sample_recipe)
 
-    response = client.post(f"/recipes/{created['id']}/cook/finish", data={"action": "cooked"})
-    assert response.status_code == 200
-    assert "Got it" in response.text
-    assert "Marked as cooked" in response.text
+    response = client.post(
+        f"/recipes/{created['id']}/cook/finish", data={"action": "cooked"}, follow_redirects=False
+    )
+    assert response.status_code == 303
+    assert response.headers["location"] == "/recipes"
 
 
 @pytest.mark.requirement("REQ-000000034")
 def test_cook_finish_leave_uncooked(client: TestClient, sample_recipe):
     created = _create_recipe(client, sample_recipe)
 
-    response = client.post(f"/recipes/{created['id']}/cook/finish", data={"action": "uncooked"})
-    assert response.status_code == 200
-    assert "Left uncooked" in response.text
+    response = client.post(
+        f"/recipes/{created['id']}/cook/finish", data={"action": "uncooked"}, follow_redirects=False
+    )
+    assert response.status_code == 303
+    assert response.headers["location"] == "/recipes"
 
 
 @pytest.mark.requirement("REQ-000000034")
@@ -190,12 +227,24 @@ def test_cook_finish_unknown_recipe_404(client: TestClient):
 def test_cook_finish_cooked_marks_matching_plan_meal_cooked(client: TestClient, sample_recipe, store, plan_store):
     created = store.create(sample_recipe)
     plan = plan_store.create([MealSpec(created.id, created.servings)])
+    plan_store.finalize(plan.id)
     assert plan.meals[0].cooked is False
 
     client.post(f"/recipes/{created.id}/cook/finish", data={"action": "cooked"})
 
     updated = plan_store.get(plan.id)
     assert updated.meals[0].cooked is True
+
+
+@pytest.mark.requirement("REQ-000000034")
+def test_cook_finish_cooked_is_a_no_op_when_plan_is_a_draft(client: TestClient, sample_recipe, store, plan_store):
+    created = store.create(sample_recipe)
+    plan = plan_store.create([MealSpec(created.id, created.servings)])  # left as a draft, not finalized
+
+    client.post(f"/recipes/{created.id}/cook/finish", data={"action": "cooked"})
+
+    updated = plan_store.get(plan.id)
+    assert updated.meals[0].cooked is False
 
 
 @pytest.mark.requirement("REQ-000000034")
@@ -226,8 +275,10 @@ def test_cook_finish_is_a_no_op_on_plan_state_when_recipe_not_in_current_plan(
 @pytest.mark.requirement("REQ-000000034")
 def test_cook_finish_with_no_current_plan_does_not_error(client: TestClient, sample_recipe):
     created = _create_recipe(client, sample_recipe)
-    response = client.post(f"/recipes/{created['id']}/cook/finish", data={"action": "cooked"})
-    assert response.status_code == 200
+    response = client.post(
+        f"/recipes/{created['id']}/cook/finish", data={"action": "cooked"}, follow_redirects=False
+    )
+    assert response.status_code == 303
 
 
 @pytest.mark.requirement("REQ-000000034")

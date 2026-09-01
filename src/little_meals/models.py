@@ -56,6 +56,13 @@ class Recipe(BaseModel):
     servings: int = Field(default=2, ge=1)
     ingredients: list[Ingredient] = Field(min_length=1)
     steps: list[str] = Field(min_length=1)
+    icon: Optional[str] = None
+    """Id of an icon under static/icons/ingredients/ (manifest.json), shown
+    on the recipe's cookbook card. None means no icon."""
+    step_icons: list[Optional[str]] = Field(default_factory=list)
+    """Per-step icon ids, same length as `steps` when set (index-aligned);
+    an empty list means no step has an icon. A None entry means that step
+    has no image, per-entry."""
     source_text: Optional[str] = None
     created_at: datetime
     updated_at: datetime
@@ -70,6 +77,8 @@ class RecipeCreate(BaseModel):
     servings: int = Field(default=2, ge=1)
     ingredients: list[Ingredient] = Field(min_length=1)
     steps: list[str] = Field(min_length=1)
+    icon: Optional[str] = None
+    step_icons: list[Optional[str]] = Field(default_factory=list)
 
 
 class RecipeUpdate(BaseModel):
@@ -81,6 +90,8 @@ class RecipeUpdate(BaseModel):
     servings: int = Field(default=2, ge=1)
     ingredients: list[Ingredient] = Field(min_length=1)
     steps: list[str] = Field(min_length=1)
+    icon: Optional[str] = None
+    step_icons: list[Optional[str]] = Field(default_factory=list)
 
 
 class PlanMeal(BaseModel):
