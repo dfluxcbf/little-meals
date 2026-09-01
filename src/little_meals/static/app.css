@@ -31,6 +31,7 @@
   --tabbar-height: 76px;
   --cook-header-height: 64px;
   --cook-nav-height: 84px;
+  --filter-bar-collapsed-height: 52px;
 }
 
 * {
@@ -191,6 +192,11 @@ nav.tabbar {
   bottom: 0;
   z-index: 20;
   display: flex;
+  /* Fixed to exactly --tabbar-height (content is centered within it) so
+     every other fixed element anchored via `bottom: var(--tabbar-height)`
+     (.fab, .plan-actions-bar, .filter-bar) sits flush against its top edge
+     with no gap - this is the single source of truth for that value. */
+  height: var(--tabbar-height);
   background: var(--paper);
   border-top: 1px solid var(--line);
   padding: 8px 8px calc(8px + env(safe-area-inset-bottom, 0px));
@@ -201,6 +207,7 @@ nav.tabbar {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 3px;
   padding: 6px 4px;
   color: var(--ink-soft);
@@ -236,6 +243,7 @@ nav.tabbar {
     left: 0;
     bottom: 0;
     right: auto;
+    height: auto;
     width: var(--rail-width);
     flex-direction: column;
     align-items: stretch;
@@ -354,7 +362,16 @@ nav.tabbar {
 }
 
 .fab-add-meal {
-  bottom: calc(var(--tabbar-height) + 78px + 16px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(var(--tabbar-height) + 108px + 16px + env(safe-area-inset-bottom, 0px));
+}
+
+.fab-cookbook {
+  bottom: calc(var(--tabbar-height) + var(--filter-bar-collapsed-height) + 16px + env(safe-area-inset-bottom, 0px));
+}
+
+/* Hidden rather than overlapped once the filter panel expands upward. */
+.app-shell:has(.filter-bar[open]) .fab-cookbook {
+  display: none;
 }
 
 @media (min-width: 900px) {
@@ -363,7 +380,11 @@ nav.tabbar {
   }
 
   .fab-add-meal {
-    bottom: calc(78px + 16px + env(safe-area-inset-bottom, 0px));
+    bottom: calc(108px + 16px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .fab-cookbook {
+    bottom: calc(var(--filter-bar-collapsed-height) + 16px + env(safe-area-inset-bottom, 0px));
   }
 }
 
@@ -433,6 +454,11 @@ nav.tabbar {
   color: var(--ink-soft);
 }
 
+.badge-added {
+  background: var(--sage-soft);
+  color: var(--sage);
+}
+
 /* -------------------------------------------------------- recipe library */
 
 .recipe-grid {
@@ -461,6 +487,44 @@ nav.tabbar {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+}
+
+/* Brief slide-and-flash confirming a swipe registered and which direction,
+   timed to finish right as cookbook-swipe.js fires the add/remove request -
+   the request's own response (a fresh element, no animation class) then
+   settles into its final state with nothing left mid-animation. */
+@keyframes recipe-card-swipe-right {
+  0% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(14px);
+    background: var(--sage-soft);
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+
+@keyframes recipe-card-swipe-left {
+  0% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(-14px);
+    background: var(--rose-soft);
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+
+.recipe-card-swipe-right {
+  animation: recipe-card-swipe-right 220ms ease;
+}
+
+.recipe-card-swipe-left {
+  animation: recipe-card-swipe-left 220ms ease;
 }
 
 .recipe-card-spine {
@@ -506,6 +570,13 @@ nav.tabbar {
   height: 13px;
   flex-shrink: 0;
   color: var(--terracotta);
+}
+
+.recipe-card-swipe-blocked {
+  margin: 0;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--rose);
 }
 
 /* --------------------------------------------------------- recipe detail */
@@ -648,6 +719,7 @@ form label {
 form input[type="text"],
 form input[type="time"],
 form input[type="number"],
+form select,
 form textarea {
   width: 100%;
   font-family: var(--font-body);
@@ -988,16 +1060,21 @@ form button {
 
 .flipbook-dots {
   display: flex;
+  flex-shrink: 0;
   justify-content: center;
-  gap: 6px;
-  margin-top: 12px;
+  gap: 8px;
+  padding: 10px 0;
 }
 
 .flipbook-dot {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
   border-radius: 999px;
-  background: var(--line);
+  /* --line is a near-background border tone, meant for hairlines against
+     paper - as a small dot on its own (no adjacent edge to contrast
+     against) it reads as barely-there. --ink-faint keeps the same "this
+     one isn't selected" tone but at a contrast that's actually visible. */
+  background: var(--ink-faint);
 }
 
 .flipbook-dot-active {
@@ -1026,8 +1103,14 @@ form button {
   flex: 1;
 }
 
+/* 108px, not the ~78px a single-line row of buttons would need: "Reroll
+   Plan"/"Confirm Plan"/"Cancel Plan" wrap to two lines at three-equal-column
+   width on a phone-sized viewport, making the bar ~101px tall - the old
+   78px assumption left it undersized, so the bar visually overlapped the
+   last ~23px of scrollable content above it (the flipbook's pagination
+   dots, in practice - they were being covered, not just low-contrast). */
 main.content:has(+ .plan-actions-bar) {
-  padding-bottom: calc(var(--tabbar-height) + 78px + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(var(--tabbar-height) + 108px + env(safe-area-inset-bottom, 0px));
 }
 
 @media (min-width: 900px) {
@@ -1037,7 +1120,186 @@ main.content:has(+ .plan-actions-bar) {
   }
 
   main.content:has(+ .plan-actions-bar) {
-    padding-bottom: calc(78px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(108px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* ----------------------------------------------------- cookbook filter bar */
+
+.filter-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: var(--tabbar-height);
+  z-index: 15;
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+  border-top: 1px solid var(--line);
+}
+
+.filter-bar-summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 14px 20px calc(14px + env(safe-area-inset-bottom, 0px));
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.filter-bar-reset {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  color: var(--ink-soft);
+}
+
+.filter-bar-reset:hover {
+  background: var(--paper-alt);
+  color: var(--rose);
+}
+
+.filter-bar-reset svg {
+  width: 16px;
+  height: 16px;
+}
+
+.filter-bar-summary::-webkit-details-marker {
+  display: none;
+}
+
+.filter-bar[open] .filter-bar-summary {
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.filter-bar-panel {
+  /* An explicit max-height (not flex:1 against the .filter-bar parent) -
+     Chromium wraps a <details>'s non-summary content in an internal
+     ::details-content box that doesn't participate in the parent's flex
+     sizing the normal way, so flex-grow/min-height:0 here never actually
+     computes a real constraint: the panel just renders at its full
+     content height and spills out past the tab bar (which sits above it
+     in z-index) with no working internal scroll. Sizing directly off the
+     same --filter-bar-collapsed-height/70vh values used elsewhere sidesteps
+     that entirely. */
+  max-height: calc(70vh - var(--filter-bar-collapsed-height));
+  overflow-y: auto;
+  padding: 16px 20px calc(16px + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.filter-range-grid {
+  display: grid;
+  grid-template-columns: 1fr 90px 90px;
+  gap: 8px 10px;
+  align-items: center;
+}
+
+.filter-range-header {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--ink-soft);
+  text-align: center;
+}
+
+.filter-range-grid label {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.filter-range-grid input[type="number"] {
+  width: 100%;
+}
+
+.filter-sort-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.filter-sort-row select {
+  flex: 1;
+  min-width: 140px;
+  width: auto;
+}
+
+.filter-bar-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.filter-bar-actions .btn {
+  flex: 1;
+}
+
+/* +16px gap + 56px .fab-cookbook height: this page always renders the FAB
+   above the collapsed filter bar (see recipes_list.html), so the last
+   grid row needs enough clearance to never sit under it - otherwise the
+   floating button visually covers that card's badges once scrolled to
+   the bottom. */
+main.content:has(+ .filter-bar) {
+  padding-bottom: calc(var(--tabbar-height) + var(--filter-bar-collapsed-height) + 16px + 56px + 16px + env(safe-area-inset-bottom, 0px));
+}
+
+@media (min-width: 900px) {
+  .filter-bar {
+    left: var(--rail-width);
+    bottom: 0;
+  }
+
+  main.content:has(+ .filter-bar) {
+    padding-bottom: calc(var(--filter-bar-collapsed-height) + 16px + 56px + 16px + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* On the mobile bottom-sheet layout, every field group stacks in one
+     narrow column capped at 70vh so it never grows past the tab bar - the
+     right tradeoff for a small screen. That same layout on a desktop-width
+     viewport just crams everything into a narrow strip with hundreds of
+     empty pixels beside it, so here the groups lay out side by side across
+     the available width instead, and the height cap (a mobile-only
+     concern - there's no tab bar competing for space on desktop) is lifted. */
+  .filter-bar-panel {
+    max-height: none;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 32px;
+  }
+
+  .filter-group {
+    flex: 1 1 200px;
+  }
+
+  .filter-group:has(.filter-range-grid) {
+    flex-basis: 320px;
+  }
+
+  .filter-range-grid {
+    grid-template-columns: 1fr 70px 70px;
+  }
+
+  .filter-bar-actions {
+    flex: 1 1 100%;
+    justify-content: flex-end;
+  }
+
+  .filter-bar-actions .btn {
+    flex: none;
+    min-width: 140px;
   }
 }
 
@@ -1174,6 +1436,13 @@ main.content:has(+ .plan-actions-bar) {
 .stepper-btn {
   width: 30px;
   height: 30px;
+  /* .stepper form{display:contents} unwraps the <form> box, but its
+     <button> still matches the global `form button{margin-top:20px}`
+     spacing rule (meant for a button below other fields in a normal
+     vertical form) - that 20px pushes these buttons visibly below the
+     "Servings" label/count they should sit level with, so it's reset
+     here where it's more specific. */
+  margin-top: 0;
   padding: 0;
   line-height: 1;
   border-radius: 999px;
