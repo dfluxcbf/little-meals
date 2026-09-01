@@ -18,6 +18,8 @@ filegroup(
         "static/**/*.woff2",
         "static/**/*.png",
         "static/**/*.webmanifest",
+        "static/**/*.svg",
+        "static/**/*.json",
     ]),
 )
 

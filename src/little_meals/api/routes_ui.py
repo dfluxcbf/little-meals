@@ -343,8 +343,24 @@ def build_ui_router(
             return RedirectResponse(url=f"/recipes/{recipe_id}/cook/0", status_code=303)
         if step_number > total_steps:
             # Ran past the last step (or there were no steps to begin with) -
-            # the guided walkthrough is done, prompt for the cooked/uncooked choice.
-            return templates.TemplateResponse(request, "cook_finish.html", {"recipe": recipe, "result": None})
+            # the guided walkthrough is done. Mark as cooked/Leave uncooked
+            # only make sense against a finalized plan that actually has
+            # this recipe in it - otherwise there's nothing for them to act
+            # on, so the fallback Return to recipe/Finish recipe pair shows
+            # instead.
+            plan = plan_store.get_current()
+            show_cooked_buttons = plan is not None and plan.finalized and any(
+                m.recipe_id == recipe_id for m in plan.meals
+            )
+            return templates.TemplateResponse(
+                request,
+                "cook_finish.html",
+                {
+                    "recipe": recipe,
+                    "total_steps": total_steps,
+                    "show_cooked_buttons": show_cooked_buttons,
+                },
+            )
 
         session = cook_along_store.save_step(recipe_id, step_number)
 
@@ -355,6 +371,12 @@ def build_ui_router(
                 {"recipe": recipe, "total_steps": total_steps, "checked": set(session.checked_ingredients)},
             )
 
+        def step_icon_at(index: int) -> str | None:
+            return recipe.step_icons[index] if index < len(recipe.step_icons) else None
+
+        has_prev = step_number > 1
+        has_next = step_number < total_steps
+
         return templates.TemplateResponse(
             request,
             "cook_step.html",
@@ -363,6 +385,11 @@ def build_ui_router(
                 "step_number": step_number,
                 "total_steps": total_steps,
                 "step_text": recipe.steps[step_number - 1],
+                "step_icon": step_icon_at(step_number - 1),
+                "prev_step_text": recipe.steps[step_number - 2] if has_prev else None,
+                "prev_step_icon": step_icon_at(step_number - 2) if has_prev else None,
+                "next_step_text": recipe.steps[step_number] if has_next else None,
+                "next_step_icon": step_icon_at(step_number) if has_next else None,
             },
         )
 
@@ -389,10 +416,10 @@ def build_ui_router(
             },
         )
 
-    @router.post("/recipes/{recipe_id}/cook/finish", response_class=HTMLResponse, include_in_schema=False)
-    def cook_finish(request: Request, recipe_id: str, action: str = Form(...)) -> HTMLResponse:
+    @router.post("/recipes/{recipe_id}/cook/finish", include_in_schema=False)
+    def cook_finish(request: Request, recipe_id: str, action: str = Form(...)):
         try:
-            recipe = store.get(recipe_id)
+            store.get(recipe_id)
         except RecipeNotFound:
             return templates.TemplateResponse(
                 request, "recipe_not_found.html", {"recipe_id": recipe_id, "nav_active": "library"}, status_code=404
@@ -400,13 +427,15 @@ def build_ui_router(
 
         if action == "cooked":
             plan = plan_store.get_current()
-            if plan is not None:
+            if plan is not None and plan.finalized:
                 meal = next((m for m in plan.meals if m.recipe_id == recipe_id), None)
                 if meal is not None and not meal.cooked:
                     plan_store.set_cooked(plan.id, meal.id, True)
 
         cook_along_store.delete(recipe_id)
-        return templates.TemplateResponse(request, "cook_finish.html", {"recipe": recipe, "result": action})
+        # Mark as cooked/Leave uncooked go straight back to the app's home
+        # page - no separate "Got it" confirmation page.
+        return RedirectResponse(url="/recipes", status_code=303)
 
     @router.post("/recipes/{recipe_id}/delete", include_in_schema=False)
     def recipe_delete(recipe_id: str) -> RedirectResponse:

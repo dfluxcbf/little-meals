@@ -8,6 +8,9 @@
       <p class="recipe-card-swipe-blocked">Plan is finalized &mdash; can&rsquo;t change</p>
     {% endif %}
     <div class="recipe-card-top">
+      {% if recipe.icon %}
+        <span class="recipe-card-icon" style="-webkit-mask-image: url('/static/icons/ingredients/{{ recipe.icon }}.svg'); mask-image: url('/static/icons/ingredients/{{ recipe.icon }}.svg')" aria-hidden="true"></span>
+      {% endif %}
       <h3><a href="/recipes/{{ recipe.id }}">{{ recipe.name }}</a></h3>
     </div>
     <div class="recipe-card-stats">

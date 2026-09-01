@@ -487,6 +487,7 @@ nav.tabbar {
 }
 
 .recipe-card {
+  position: relative;
   background: var(--paper);
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -494,44 +495,30 @@ nav.tabbar {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  transform: translateX(var(--swipe-x, 0px));
+  transition: transform 200ms ease, background-color 200ms ease;
 }
 
-/* Brief slide-and-flash confirming a swipe registered and which direction,
-   timed to finish right as cookbook-swipe.js fires the add/remove request -
-   the request's own response (a fresh element, no animation class) then
-   settles into its final state with nothing left mid-animation. */
-@keyframes recipe-card-swipe-right {
-  0% {
-    transform: translateX(0);
-  }
-  50% {
-    transform: translateX(14px);
-    background: var(--sage-soft);
-  }
-  100% {
-    transform: translateX(0);
-  }
+/* cookbook-swipe.js sets --swipe-x/--swipe-progress directly from the
+   finger's live position (no animation class, no delay) while dragging -
+   .swiping suspends the transition above so the card tracks 1:1 with the
+   touch instead of lagging behind it; removing .swiping on touchend (both
+   on a committed add/remove and on a released-early cancel) lets the
+   transition spring --swipe-x/background back to resting for the snap-back. */
+.recipe-card.swiping {
+  transition: none;
 }
 
-@keyframes recipe-card-swipe-left {
-  0% {
-    transform: translateX(0);
-  }
-  50% {
-    transform: translateX(-14px);
-    background: var(--rose-soft);
-  }
-  100% {
-    transform: translateX(0);
-  }
+/* Tints the card's own background color directly (blending toward the
+   add/remove hint color as --swipe-progress goes 0 -> 1) rather than a
+   layer drawn on top of the content - so the text, icon, and badges stay
+   fully legible throughout the drag instead of being washed out. */
+.recipe-card-swipe-right-hint {
+  background: color-mix(in srgb, var(--paper), var(--sage-soft) calc(var(--swipe-progress, 0) * 100%));
 }
 
-.recipe-card-swipe-right {
-  animation: recipe-card-swipe-right 220ms ease;
-}
-
-.recipe-card-swipe-left {
-  animation: recipe-card-swipe-left 220ms ease;
+.recipe-card-swipe-left-hint {
+  background: color-mix(in srgb, var(--paper), var(--rose-soft) calc(var(--swipe-progress, 0) * 100%));
 }
 
 .recipe-card-spine {
@@ -547,15 +534,28 @@ nav.tabbar {
 
 .recipe-card-top {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 6px;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 8px;
 }
 
 .recipe-card-top h3 {
   margin: 0;
   font-size: 15.5px;
   line-height: 1.25;
+}
+
+.recipe-card-icon {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  background-color: var(--terracotta);
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
 }
 
 .recipe-card-stats {
@@ -1000,7 +1000,14 @@ form button {
 
 .plan-flipbook {
   position: relative;
-  margin-left: 16px;
+  /* Full-bleed to the true viewport edges (cancels main.content's 20px
+     left/right padding) - the resting inset from both edges is created by
+     .flipbook-track's own padding below instead, which (unlike an outer
+     margin on this element) doesn't shrink the track's scrollport. A
+     margin/padding here would clip a page mid-swipe the moment it crossed
+     that narrower boundary, well short of the actual screen edge - see the
+     comment on .flipbook-track. */
+  margin: 0 -20px;
   flex: 1;
   min-height: 0;
   display: flex;
@@ -1009,7 +1016,7 @@ form button {
 
 .flipbook-spine {
   position: absolute;
-  left: -16px;
+  left: 20px;
   top: 14px;
   bottom: 14px;
   width: 16px;
@@ -1044,6 +1051,15 @@ form button {
   gap: 14px;
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
+  /* The resting inset from both true edges (36px left = 20px margin +
+     16px spine, 20px right) lives here as padding, not as a margin on an
+     ancestor - overflow clips to the padding box, so content can still
+     slide all the way through this reserved space during a swipe instead
+     of being cut off right at its boundary. scroll-padding matches it so
+     scroll-snap-align: center below centers each page within this padded
+     area rather than the full (now edge-to-edge) scrollport. */
+  padding: 0 20px 0 36px;
+  scroll-padding: 0 20px 0 36px;
 }
 
 .flipbook-track::-webkit-scrollbar {
@@ -1666,7 +1682,13 @@ main.content:has(+ .filter-bar) {
 /* ------------------------------------------------------------ cook-along */
 
 .cook-shell {
-  min-height: 100vh;
+  /* Exact viewport height (not min-height) + hidden overflow, so the shell
+     can never grow taller than what's visible and the cook-along pages
+     never scroll - the dvh fallback keeps this correct against mobile
+     Safari's dynamic toolbar, which 100vh alone doesn't account for. */
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   background: var(--cream);
@@ -1743,14 +1765,90 @@ main.content:has(+ .filter-bar) {
   background: var(--terracotta);
 }
 
-.cook-step-body {
+.cook-step-stack {
+  position: relative;
   flex: 1;
+  overflow: hidden;
+  padding-bottom: calc(var(--cook-nav-height) + env(safe-area-inset-bottom, 0px));
+  /* cook-step-swipe.js sets this from the live vertical touch position while
+     dragging (see the card transforms below, each of which adds it on top
+     of their own base position) - 0px at rest. */
+  --drag-y: 0px;
+}
+
+.cook-step-card {
+  position: absolute;
+  left: 50%;
+  width: calc(100% - 60px);
+  max-width: 32rem;
+  box-sizing: border-box;
+  text-align: center;
+  transition: transform 220ms ease;
+}
+
+.cook-step-stack.dragging .cook-step-card {
+  transition: none;
+}
+
+.cook-step-card-inner {
+  background: var(--paper);
+  border-radius: 18px;
+  padding: 22px 26px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  padding: 20px 30px calc(var(--cook-nav-height) + env(safe-area-inset-bottom, 0px));
-  text-align: center;
+}
+
+.cook-step-card-current {
+  top: 50%;
+  transform: translate(-50%, calc(-50% + var(--drag-y, 0px)));
+  z-index: 3;
+}
+
+.cook-step-card-current .cook-step-card-inner {
+  box-shadow: 0 14px 32px rgba(40, 20, 10, 0.14);
+}
+
+.cook-step-card-prev,
+.cook-step-card-next {
+  z-index: 1;
+  transform: translateX(-50%) translateY(var(--drag-y, 0px)) scale(0.92);
+}
+
+.cook-step-card-prev .cook-step-card-inner,
+.cook-step-card-next .cook-step-card-inner {
+  box-shadow: 0 6px 16px rgba(40, 20, 10, 0.07);
+  padding: 16px 22px;
+}
+
+.cook-step-card-prev {
+  top: 6%;
+}
+
+.cook-step-card-next {
+  top: auto;
+  bottom: 6%;
+}
+
+/* Cross-document View Transition tuning (see cook_step.html's
+   `@view-transition` opt-in) - a step card keeps its view-transition-name
+   across a step navigation (named by which step it represents, not its
+   role), so the browser morphs it between slots: center -> top (fading to
+   the faded/small look) or bottom -> center (fading to the full look) and
+   back. No-op where cross-document view transitions aren't supported yet. */
+::view-transition-group(*) {
+  animation-duration: 320ms;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* View transition snapshots render in a browser-level layer above the
+   entire page, including position:fixed elements - so without this, the
+   moving step cards would visibly pass in front of the fixed .cook-nav bar
+   at the bottom. Giving .cook-nav its own stable view-transition-name (see
+   cook_step.html) pulls it into that same layer as its own group, which we
+   can then stack above the step-card groups. */
+::view-transition-group(cook-nav) {
+  z-index: 10;
 }
 
 .cook-ingredients-body {
@@ -1817,6 +1915,30 @@ main.content:has(+ .filter-bar) {
   text-decoration: line-through;
 }
 
+.cook-step-icon {
+  flex: none;
+  width: 72px;
+  height: 72px;
+  margin-bottom: 18px;
+  background-color: var(--terracotta);
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+}
+
+.cook-step-icon-sm {
+  width: 40px;
+  height: 40px;
+  margin-bottom: 10px;
+}
+
+.cook-step-icon-faded {
+  background-color: var(--ink-faint);
+}
+
 .cook-step-number {
   width: 46px;
   height: 46px;
@@ -1832,6 +1954,18 @@ main.content:has(+ .filter-bar) {
   margin-bottom: 22px;
 }
 
+.cook-step-number-sm {
+  width: 32px;
+  height: 32px;
+  font-size: 14px;
+  margin-bottom: 10px;
+}
+
+.cook-step-number-faded {
+  background: var(--paper-alt);
+  color: var(--ink-faint);
+}
+
 .cook-step-text {
   font-family: var(--font-display);
   font-size: 25px;
@@ -1840,6 +1974,19 @@ main.content:has(+ .filter-bar) {
   color: var(--ink);
   margin: 0;
   max-width: 32rem;
+}
+
+.cook-step-text-sm {
+  font-size: 15px;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.cook-step-text-faded {
+  color: var(--ink-faint);
 }
 
 .cook-nav {
@@ -1874,36 +2021,58 @@ main.content:has(+ .filter-bar) {
 }
 
 .cook-finish {
-  align-items: center;
-  justify-content: center;
-  padding: 30px 34px;
+  padding: calc(24px + env(safe-area-inset-top, 0px)) 34px calc(24px + env(safe-area-inset-bottom, 0px));
   text-align: center;
 }
 
-.cook-finish h1 {
-  font-size: 25px;
+.cook-finish-title {
+  font-size: 22px;
   margin: 0 0 8px;
+  flex-shrink: 0;
 }
 
-.cook-finish p {
-  color: var(--ink-soft);
-  margin: 0 0 26px;
-  max-width: 26rem;
+.cook-finish-center {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
 }
 
 .cook-finish-icon {
-  width: 56px;
-  height: 56px;
+  width: 72px;
+  height: 72px;
   border-radius: 999px;
+  background: var(--sage-soft);
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 18px;
+  margin-bottom: 22px;
 }
 
-.cook-finish-icon svg {
-  width: 26px;
-  height: 26px;
+.cook-finish-icon-mask {
+  width: 34px;
+  height: 34px;
+  background-color: var(--sage);
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+}
+
+.cook-finish-secondary-link {
+  margin-top: 14px;
+}
+
+.cook-finish-fallback-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  max-width: 20rem;
 }
 
 .cook-feedback-actions {
