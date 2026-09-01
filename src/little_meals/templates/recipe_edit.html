@@ -16,6 +16,14 @@
   <label for="servings">Servings</label>
   <input type="number" id="servings" name="servings" min="1" value="{{ values.servings }}" required>
 
+  <label>Difficulty</label>
+  <div class="pill-group" id="difficulty-group">
+    {% for d in difficulties %}
+      <input type="radio" class="pill-input pill-input-deselectable" id="difficulty-{{ d.value }}" name="difficulty" value="{{ d.value }}" {% if values.difficulty == d.value %}checked{% endif %}>
+      <label for="difficulty-{{ d.value }}" class="pill-label">{{ d.value|capitalize }}</label>
+    {% endfor %}
+  </div>
+
   <label>Classification</label>
   <div class="pill-group">
     {% for c in classifications %}
@@ -53,7 +61,7 @@
   <div id="step-rows" class="editor-rows">
     {% for step in values.steps %}
       <div class="editor-row editor-row-step">
-        <input type="text" name="step" placeholder="Step" value="{{ step }}">
+        <textarea name="step" placeholder="Step" rows="1" class="step-textarea">{{ step }}</textarea>
         <button type="button" class="row-remove-btn" aria-label="Remove step" onclick="this.closest('.editor-row').remove()">&times;</button>
       </div>
     {% endfor %}
@@ -81,16 +89,39 @@
 </template>
 <template id="step-row-template">
   <div class="editor-row editor-row-step">
-    <input type="text" name="step" placeholder="Step">
+    <textarea name="step" placeholder="Step" rows="1" class="step-textarea"></textarea>
     <button type="button" class="row-remove-btn" aria-label="Remove step" onclick="this.closest('.editor-row').remove()">&times;</button>
   </div>
 </template>
 
 <script>
+  function autoResizeStepTextarea(el) {
+    el.style.height = "auto";
+    // scrollHeight excludes the border (box-sizing: border-box), so add it
+    // back in - otherwise the box ends up a couple px short and the last
+    // line can get clipped.
+    var borderHeight = el.offsetHeight - el.clientHeight;
+    el.style.height = (el.scrollHeight + borderHeight) + "px";
+  }
+  function initStepTextarea(el) {
+    autoResizeStepTextarea(el);
+    el.addEventListener("input", function () {
+      autoResizeStepTextarea(el);
+    });
+  }
+  function resizeAllStepTextareas() {
+    document.querySelectorAll(".step-textarea").forEach(autoResizeStepTextarea);
+  }
   function addEditorRow(containerId, templateId) {
     var container = document.getElementById(containerId);
     var template = document.getElementById(templateId);
-    container.appendChild(template.content.cloneNode(true));
+    var row = template.content.cloneNode(true);
+    container.appendChild(row);
+    var textarea = container.lastElementChild.querySelector(".step-textarea");
+    if (textarea) {
+      initStepTextarea(textarea);
+      textarea.focus();
+    }
   }
   document.getElementById("add-ingredient-btn").addEventListener("click", function () {
     addEditorRow("ingredient-rows", "ingredient-row-template");
@@ -98,5 +129,24 @@
   document.getElementById("add-step-btn").addEventListener("click", function () {
     addEditorRow("step-rows", "step-row-template");
   });
+  document.querySelectorAll(".pill-input-deselectable").forEach(function (el) {
+    el.dataset.wasChecked = el.checked ? "true" : "false";
+    el.addEventListener("mousedown", function () {
+      el.dataset.wasChecked = el.checked ? "true" : "false";
+    });
+    el.addEventListener("click", function () {
+      if (el.dataset.wasChecked === "true") {
+        el.checked = false;
+      }
+      document.querySelectorAll(".pill-input-deselectable").forEach(function (other) {
+        other.dataset.wasChecked = other.checked ? "true" : "false";
+      });
+    });
+  });
+  document.querySelectorAll(".step-textarea").forEach(initStepTextarea);
+  window.addEventListener("resize", resizeAllStepTextareas);
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(resizeAllStepTextareas);
+  }
 </script>
 {% endblock %}

@@ -4,7 +4,6 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 from little_meals.api.errors import ApiError
-from little_meals.llm.extraction import RecipeExtractionService
 from little_meals.models import CookedUpdate, MealPlan, Recipe, ServingsUpdate
 from little_meals.planning.plan_builder import build_meal_specs, generate_single_replacement, list_controlled_reroll_candidates
 from little_meals.store.household_store import HouseholdPreferencesStore
@@ -20,7 +19,6 @@ def build_plan_router(
     store: MealPlanStore,
     recipe_store: RecipeStore,
     household_store: HouseholdPreferencesStore,
-    extractor: RecipeExtractionService,
 ) -> APIRouter:
     router = APIRouter(prefix="/api/plan")
 
@@ -47,19 +45,19 @@ def build_plan_router(
 
     @router.post("/generate", response_model=MealPlan, status_code=201)
     def generate() -> MealPlan:
-        return store.create(build_meal_specs(recipe_store, household_store, extractor))
+        return store.create(build_meal_specs(recipe_store, household_store))
 
     @router.post("/{plan_id}/reroll", response_model=MealPlan)
     def reroll_whole_plan(plan_id: str) -> MealPlan:
         plan = _fetch(plan_id)
         _require_draft(plan)
-        return store.replace_meals(plan_id, build_meal_specs(recipe_store, household_store, extractor))
+        return store.replace_meals(plan_id, build_meal_specs(recipe_store, household_store))
 
     @router.post("/{plan_id}/meals/{meal_id}/reroll", response_model=MealPlan)
     def reroll_single_meal(plan_id: str, meal_id: str) -> MealPlan:
         plan = _fetch(plan_id)
         _require_draft(plan)
-        recipes = recipe_store.list(extractor)
+        recipes = recipe_store.list()
         excluded = {meal.recipe_id for meal in plan.meals}
         replacement = generate_single_replacement(excluded, recipes)
         if replacement is None:
@@ -73,7 +71,7 @@ def build_plan_router(
     def add_meal(plan_id: str) -> MealPlan:
         plan = _fetch(plan_id)
         _require_draft(plan)
-        recipes = recipe_store.list(extractor)
+        recipes = recipe_store.list()
         excluded = {meal.recipe_id for meal in plan.meals}
         replacement = generate_single_replacement(excluded, recipes)
         if replacement is None:
@@ -95,7 +93,7 @@ def build_plan_router(
         if not any(meal.id == meal_id for meal in plan.meals):
             raise ApiError(404, "NOT_FOUND", f"Meal {meal_id} not found in plan {plan_id}")
         excluded = {meal.recipe_id for meal in plan.meals}
-        recipes = recipe_store.list(extractor)
+        recipes = recipe_store.list()
         return list_controlled_reroll_candidates(excluded, recipes)
 
     @router.post("/{plan_id}/meals/{meal_id}/choose", response_model=MealPlan)

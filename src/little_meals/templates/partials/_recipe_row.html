@@ -1,6 +1,12 @@
-<div class="recipe-card" id="recipe-row-{{ recipe.id }}">
+<div class="recipe-card" id="recipe-row-{{ recipe.id }}" data-recipe-id="{{ recipe.id }}">
   <div class="recipe-card-spine badge-{{ recipe.classification.value }}"></div>
   <div class="recipe-card-body">
+    {% if recipe.id in plan_recipe_ids %}
+      <span class="badge badge-added">&#10003; Added to plan</span>
+    {% endif %}
+    {% if swipe_blocked %}
+      <p class="recipe-card-swipe-blocked">Plan is finalized &mdash; can&rsquo;t change</p>
+    {% endif %}
     <div class="recipe-card-top">
       <h3><a href="/recipes/{{ recipe.id }}">{{ recipe.name }}</a></h3>
     </div>
@@ -23,5 +29,6 @@
       </div>
     </div>
     <span class="badge badge-{{ recipe.classification.value }}">{{ recipe.classification.value|capitalize }}</span>
+    <span class="badge badge-{{ recipe.difficulty.value }}">{{ recipe.difficulty.value|capitalize }}</span>
   </div>
 </div>

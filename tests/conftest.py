@@ -2,16 +2,12 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Callable
 
-import httpx
 import pytest
 from fastapi.testclient import TestClient
 
 from little_meals.api.app import create_app
 from little_meals.config import Settings
-from little_meals.llm.extraction import RecipeExtractionService
-from little_meals.llm.ollama_client import OllamaClient
 from little_meals.models import Classification, Ingredient, Nutrition, Recipe
 from little_meals.store.cook_along_store import CookAlongStore
 from little_meals.store.household_store import HouseholdPreferencesStore
@@ -27,7 +23,6 @@ def pytest_configure(config: pytest.Config) -> None:
     # so its pytest11 plugin doesn't self-register the marker there. Registering
     # it here makes `@pytest.mark.requirement(...)` valid in both environments.
     config.addinivalue_line("markers", "requirement(requirement_id): little-requirements requirement ID")
-    config.addinivalue_line("markers", "real_ollama: hits a real local Ollama daemon over HTTP")
 
 
 @pytest.fixture
@@ -88,16 +83,6 @@ def sample_recipe() -> Recipe:
 
 
 @pytest.fixture
-def fake_ollama() -> Callable[[Callable[[httpx.Request], httpx.Response]], OllamaClient]:
-    def _build(handler: Callable[[httpx.Request], httpx.Response]) -> OllamaClient:
-        transport = httpx.MockTransport(handler)
-        http_client = httpx.Client(transport=transport)
-        return OllamaClient("http://ollama.test", "test-model", timeout_s=5.0, client=http_client)
-
-    return _build
-
-
-@pytest.fixture
 def client(
     store: RecipeStore,
     household_store: HouseholdPreferencesStore,
@@ -107,16 +92,9 @@ def client(
     cook_along_store: CookAlongStore,
 ) -> TestClient:
     settings = Settings(data_dir=store._dir.parent)
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(200, json={"response": "{}"})
-
-    ollama_client = OllamaClient(settings.ollama_base_url, settings.ollama_model, 5.0, client=httpx.Client(transport=httpx.MockTransport(handler)))
-    extractor = RecipeExtractionService(ollama_client)
     app = create_app(
         settings=settings,
         store=store,
-        extractor=extractor,
         household_store=household_store,
         plan_store=plan_store,
         shopping_list_store=shopping_list_store,

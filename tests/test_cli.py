@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
+import pytest
+
 import little_meals.cli as cli_module
 from little_meals import __version__
 from little_meals.config import Settings
@@ -114,7 +116,7 @@ def test_preflight_subcommand_matches_preflight_main(monkeypatch, capsys):
     monkeypatch.setattr(
         preflight_module,
         "check",
-        lambda: preflight_module.PreflightResult(missing=[], stopped_at_tier=None, warnings=[]),
+        lambda: preflight_module.PreflightResult(missing=[], stopped_at_tier=None),
     )
     exit_code = cli_module.main(["preflight"])
     assert exit_code == 0
@@ -136,6 +138,54 @@ def test_settings_without_reset_flag_errors(monkeypatch, tmp_path, capsys):
     exit_code = cli_module.main(["settings"])
     assert exit_code == 1
     assert "--reset" in capsys.readouterr().err
+
+
+@pytest.mark.requirement("REQ-000000054")
+def test_settings_view_prints_data_dir_and_household_preferences(monkeypatch, tmp_path, capsys):
+    from datetime import time
+
+    from little_meals.models import DayOfWeek, HouseholdPreferencesUpdate
+
+    monkeypatch.setattr(Settings, "from_env", classmethod(lambda cls: Settings(data_dir=tmp_path)))
+    _settings_store(tmp_path).put(
+        HouseholdPreferencesUpdate(
+            recipes_per_week=7,
+            recommendation_enabled=True,
+            recommendation_day=DayOfWeek.MONDAY,
+            recommendation_time=time(18, 30),
+            auto_confirm_enabled=True,
+            auto_confirm_day=DayOfWeek.FRIDAY,
+            auto_confirm_time=time(8, 0),
+            default_servings="4 adults",
+        )
+    )
+
+    exit_code = cli_module.main(["settings", "--view"])
+
+    assert exit_code == 0
+    out = capsys.readouterr().out
+    assert f"data_dir: {tmp_path}" in out
+    assert f"recipes_dir: {tmp_path / 'recipes'}" in out
+    assert "recipes_per_week: 7" in out
+    assert "recommendation_enabled: True" in out
+    assert "recommendation_day: monday" in out
+    assert "recommendation_time: 18:30" in out
+    assert "auto_confirm_enabled: True" in out
+    assert "auto_confirm_day: friday" in out
+    assert "auto_confirm_time: 08:00" in out
+    assert "default_servings: 4 adults" in out
+
+
+@pytest.mark.requirement("REQ-000000054")
+def test_settings_view_uses_defaults_when_unconfigured(monkeypatch, tmp_path, capsys):
+    monkeypatch.setattr(Settings, "from_env", classmethod(lambda cls: Settings(data_dir=tmp_path)))
+
+    exit_code = cli_module.main(["settings", "--view"])
+
+    assert exit_code == 0
+    out = capsys.readouterr().out
+    assert "recipes_per_week: 5" in out
+    assert "recommendation_day: sunday" in out
 
 
 def test_settings_reset_resets_settings_but_keeps_recipes(monkeypatch, tmp_path, capsys):

@@ -4,6 +4,56 @@ All notable changes to this project are documented in this file, grouped by
 release version. Versions follow the project's [version policy](docs/version_policy.md)
 and are managed exclusively through `lvx`.
 
+## [0.3.5] - 2026-09-01
+
+### Added
+- Cookbook filter/sort bar (M17): a collapsible `<details>` panel above the
+  `/recipes` tab bar with min/max range filters for calories, protein,
+  fiber, and cook time; multi-select classification and difficulty tag
+  filters; and ascending/descending sort by name, calories, protein, fiber,
+  or cook time. Driven entirely by `GET /recipes` query params through a new
+  pure `planning/recipe_filters.py` module, so filtered/sorted views are
+  bookmarkable and need no JS to apply.
+- Swipe-right-to-add-to-plan on cookbook cards (M17): reuses the cook-along
+  swipe's touch-delta technique to dispatch a `swiped-right` event that
+  triggers `POST /recipes/{id}/add-to-plan`, adding the recipe to the
+  current week's plan in place - creates a draft plan if none exists, is a
+  no-op if the recipe's already in the plan, and is blocked with an inline
+  message if the plan is already finalized.
+
+## [0.3.4] - 2026-08-31
+
+### Added
+- `lmeals settings --view` prints the current data/recipes directories and
+  every household setting (recipes per week, recommendation/auto-confirm
+  day/time, default servings) and its current value.
+
+## [0.3.3] - 2026-08-31
+
+### Removed
+- Complete removal of the Ollama/LLM recipe-extraction integration (M16):
+  the `llm/` package, the `POST /api/recipes/extract` endpoint,
+  `ExtractedRecipe`/`ExtractRequest`, the `ollama_*` Settings/env vars, and
+  preflight's "local LLM runtime" dependency tier. Every feature is now
+  purely user-driven: recipes are entered directly (M12's edit form) and
+  plans are drawn purely from the cookbook on a schedule (M3). An
+  unparseable recipe file is simply skipped with a logged warning, same as
+  the pre-existing no-extractor fallback.
+
+## [0.3.2] - 2026-08-31
+
+### Added
+- Recipe difficulty tag (Easy/Medium/Hard/Undefined) (M15): a new
+  `Recipe`/`RecipeCreate`/`RecipeUpdate` field, persisted in the recipe
+  store's frontmatter and defaulting to Undefined for both new and
+  pre-existing recipes. The add/edit form gets a deselectable Easy/Medium/
+  Hard pill-group (clearing it, or leaving it unset, saves Undefined), and a
+  difficulty badge now shows in the cookbook list, the recipe detail page,
+  and the weekly plan's meal card, alongside the classification badge.
+- Vegan, Ketogenic, and Paleo classifications (M15), added to the
+  `Classification` enum and wired into the same add/edit pill-group and
+  JSON API that already handled Vegetarian/Pescetarian/Other.
+
 ## [0.2.10] - 2026-08-31
 
 ### Added

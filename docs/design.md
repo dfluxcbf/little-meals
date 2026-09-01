@@ -21,9 +21,9 @@ already saved.
 
 ## Goals
 
-- Let the user save recipes they like, with the tedious parts (cook time,
-  classification, nutrition/calorie estimate, ingredient list, steps) extracted
-  automatically by a local LLM rather than typed by hand.
+- Let the user save recipes they like by entering them directly - name, cook
+  time, classification, nutrition, ingredient list, and steps - through the
+  recipe edit form.
 - Produce a weekly meal plan sized to the user's configured recipe count, drawn
   from the recipes already in the library.
 - Let the user ask for different recipes when the current ones don't land: reroll
@@ -53,7 +53,7 @@ already saved.
 
 | Concept | Description |
 |---|---|
-| **Recipe** | A saved dish: id/slug, name, estimated cooking time (`cook_time_minutes`), classification (vegetarian, pescetarian, other), nutrition (`calories_per_serving`, `protein_g`, `fiber_g` - all optional, since not every recipe entry has this estimated), servings, ingredient list (name, quantity, unit), and an ordered list of cooking steps. Every recipe in the library got there by direct user submission. Stored as a plain Markdown file the user can open and edit directly, not locked inside a database (see [recipe storage format](architecture.md#recipe-storage-format)). |
+| **Recipe** | A saved dish: id/slug, name, estimated cooking time (`cook_time_minutes`), classification (vegetarian, pescetarian, vegan, ketogenic, paleo, other - Milestone 15 added the vegan/ketogenic/paleo options), difficulty (easy, medium, hard, undefined - Milestone 15; user-selectable only among easy/medium/hard, defaulting to undefined when left unset), nutrition (`calories_per_serving`, `protein_g`, `fiber_g` - all optional, since not every recipe entry has this estimated), servings, ingredient list (name, quantity, unit), and an ordered list of cooking steps. Every recipe in the library got there by direct user submission. Stored as a plain Markdown file the user can open and edit directly, not locked inside a database (see [recipe storage format](architecture.md#recipe-storage-format)). |
 | **Household preferences** | Configuration shared by the whole household (not per person): recipes-per-week count, default servings per meal (e.g. "2 adults", "2 adults + 1 child"), and two independently-toggleable schedule automations - recommendation day/time (when to close out the current plan and start a new draft) and auto-confirm day/time (when to automatically finalize whatever plan is still a draft, so the household never has to click "Confirm Plan" themselves). |
 | **Reroll** | A request for different recipes than the ones currently on the table, at three granularities: reroll the *whole draft plan* (every slot gets a fresh plan, drawn the same way the original was), reroll a *single meal* (swaps in an unused library recipe for that slot), or a *controlled reroll* of a single meal (up to 10 unused library recipes to pick from directly). All three draw only from the existing library — a slot simply can't be filled if the library has nothing unused left to offer. Rerolling is only available on a plan that isn't finalized yet. |
 | **Meal plan** | The set of recipes selected for a given week from the existing library, each with a servings count the user can override from the default. The household can also add or remove individual meal slots directly on a draft plan (an "odd week" adjustment) without changing the household's `recipes_per_week` default. Meals aren't assigned to specific days — the household picks from the week's set and cooks them in whatever order suits them. Each meal carries a cooked/not-cooked state, but the "mark cooked" control only appears once the plan is confirmed (finalized) - a draft has nothing to mark cooked yet. The household can mark a meal cooked directly from the plan (a stamp), or it's set automatically when a cook-along session for that meal finishes. Once every meal in a finalized plan is cooked, the plan's "Cancel Plan" action is replaced by "Plan Ahead", which starts a fresh draft for the next round. |

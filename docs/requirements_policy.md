@@ -179,3 +179,32 @@ test coverage are tracked exclusively through **little-requirements**
   installer assumes `.git` is a directory, and a submodule's `.git` is a file.
   Use `lreq workspace download` instead (as above), which doesn't install hooks
   and isn't affected.
+- Milestone 15 (`m15-difficulty-and-food-types` suite) created four
+  requirements, REQ-000000050 to REQ-000000053, covering recipe difficulty
+  persistence, the add/edit form's deselectable difficulty pill-group, the
+  difficulty badge across the cookbook list/recipe detail/plan meal card, and
+  the three additional food-type classifications (see `milestones.md`'s M15
+  entry) - tagged across `tests/test_recipe_store.py`,
+  `tests/test_api_recipes.py`, `tests/test_api_ui.py`, and
+  `tests/test_plan_ui.py`.
+- Milestone 16 (`m16-remove-llm` suite) removed the Ollama/LLM extraction
+  integration entirely (see `milestones.md`'s M16 entry). Deleted
+  requirements: REQ-000000003 (Ollama HTTP client), REQ-000000004
+  (extraction service produces a validated Recipe from free text),
+  REQ-000000005 (extraction rejects malformed/invalid model output),
+  REQ-000000039 (classification-reconciliation safety net), and
+  REQ-000000040 (recipe file normalization via the extraction pipeline).
+  Edited in place: REQ-000000006 (recipe CRUD JSON API - dropped the
+  extract-and-create clause, `POST /api/recipes/extract` is gone),
+  REQ-000000007 (recipe-library HTML UI - dropped the stale free-text-submit
+  wording left over from before M12, replaced with the actual direct-entry
+  behavior), and REQ-000000008 (preflight system-dependency check - now a
+  single core-tools tier, no local-LLM-runtime tier). No new requirements
+  were created, since this milestone only removes behavior.
+- Milestone 17 (`m17-cookbook-filter-and-swipe` suite) created two
+  requirements, REQ-000000055 (cookbook filter/sort) and REQ-000000056
+  (swipe-to-add-to-plan) - see `milestones.md`'s M17 entry. REQ-000000055 is
+  tagged across `tests/test_recipe_filters.py` (the pure
+  `filter_recipes`/`sort_recipes` module) and the filter/sort cases in
+  `tests/test_api_ui.py`; REQ-000000056 is tagged across the
+  `POST /recipes/{id}/add-to-plan` cases in `tests/test_api_ui.py`.

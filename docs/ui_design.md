@@ -50,8 +50,8 @@ free to redistribute. The shipped app vendors the font files locally under
 `static/vendor/` and serves them via `@font-face`, the same pattern already
 used for `htmx.min.js` — no Google Fonts `<link>`, no third-party CDN call
 on page load, consistent with the project's private-network posture
-(Tailscale-only access, local LLM, no third-party APIs — see
-`architecture.md`). The published design draft itself loads them from Google
+(Tailscale-only access, no third-party APIs — see `architecture.md`). The
+published design draft itself loads them from Google
 Fonts for preview convenience only, since that's the one external font host
 the draft's sandboxed preview environment permits; that shortcut doesn't
 carry over to the real app.

@@ -10,7 +10,17 @@ from pydantic import BaseModel, Field
 class Classification(str, Enum):
     VEGETARIAN = "vegetarian"
     PESCETARIAN = "pescetarian"
+    VEGAN = "vegan"
+    KETOGENIC = "ketogenic"
+    PALEO = "paleo"
     OTHER = "other"
+
+
+class Difficulty(str, Enum):
+    EASY = "easy"
+    MEDIUM = "medium"
+    HARD = "hard"
+    UNDEFINED = "undefined"
 
 
 class DayOfWeek(str, Enum):
@@ -36,25 +46,12 @@ class Nutrition(BaseModel):
     fiber_g: Optional[float] = None
 
 
-class ExtractedRecipe(BaseModel):
-    """The LLM-facing subset of a Recipe: everything the extraction service
-    is responsible for producing. Deliberately excludes id and timestamps so
-    the LLM can never invent an id."""
-
-    name: str
-    cook_time_minutes: int = Field(ge=1)
-    classification: Classification
-    nutrition: Nutrition
-    servings: int = Field(default=2, ge=1)
-    ingredients: list[Ingredient] = Field(min_length=1)
-    steps: list[str] = Field(min_length=1)
-
-
 class Recipe(BaseModel):
     id: str
     name: str
     cook_time_minutes: int = Field(ge=1)
     classification: Classification
+    difficulty: Difficulty = Field(default=Difficulty.UNDEFINED)
     nutrition: Nutrition
     servings: int = Field(default=2, ge=1)
     ingredients: list[Ingredient] = Field(min_length=1)
@@ -63,27 +60,12 @@ class Recipe(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    @classmethod
-    def from_extracted(cls, extracted: ExtractedRecipe, *, id: str, source_text: Optional[str], now: datetime) -> "Recipe":
-        return cls(
-            id=id,
-            name=extracted.name,
-            cook_time_minutes=extracted.cook_time_minutes,
-            classification=extracted.classification,
-            nutrition=extracted.nutrition,
-            servings=extracted.servings,
-            ingredients=extracted.ingredients,
-            steps=extracted.steps,
-            source_text=source_text,
-            created_at=now,
-            updated_at=now,
-        )
-
 
 class RecipeCreate(BaseModel):
     name: str
     cook_time_minutes: int = Field(ge=1)
     classification: Classification
+    difficulty: Difficulty = Field(default=Difficulty.UNDEFINED)
     nutrition: Nutrition
     servings: int = Field(default=2, ge=1)
     ingredients: list[Ingredient] = Field(min_length=1)
@@ -94,14 +76,11 @@ class RecipeUpdate(BaseModel):
     name: str
     cook_time_minutes: int = Field(ge=1)
     classification: Classification
+    difficulty: Difficulty = Field(default=Difficulty.UNDEFINED)
     nutrition: Nutrition
     servings: int = Field(default=2, ge=1)
     ingredients: list[Ingredient] = Field(min_length=1)
     steps: list[str] = Field(min_length=1)
-
-
-class ExtractRequest(BaseModel):
-    text: str
 
 
 class PlanMeal(BaseModel):

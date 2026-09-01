@@ -1,0 +1,80 @@
+<details class="filter-bar" {% if active_filter_count %}open{% endif %}>
+  <summary class="filter-bar-summary">
+    <span>Filters{% if active_filter_count %} ({{ active_filter_count }}){% endif %} &amp; Sort</span>
+    {% if active_filter_count %}
+      <a href="/recipes" class="filter-bar-reset" aria-label="Reset filters" title="Reset filters">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"></path><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"></path><path d="M19 6l-.8 13.2a2 2 0 0 1-2 1.8H7.8a2 2 0 0 1-2-1.8L5 6"></path><path d="M10 11v6M14 11v6"></path></svg>
+      </a>
+    {% endif %}
+  </summary>
+  <form method="get" action="/recipes" class="filter-bar-panel" id="filter-form">
+
+    <div class="filter-group">
+      <div class="filter-range-grid">
+        <span></span>
+        <span class="filter-range-header">Min</span>
+        <span class="filter-range-header">Max</span>
+
+        <label for="min_calories">Calories / serving</label>
+        <input type="number" min="0" id="min_calories" name="min_calories" value="{{ filters.min_calories if filters.min_calories is not none else '' }}">
+        <input type="number" min="0" id="max_calories" name="max_calories" value="{{ filters.max_calories if filters.max_calories is not none else '' }}">
+
+        <label for="min_protein">Protein (g)</label>
+        <input type="number" step="0.1" min="0" id="min_protein" name="min_protein" value="{{ filters.min_protein if filters.min_protein is not none else '' }}">
+        <input type="number" step="0.1" min="0" id="max_protein" name="max_protein" value="{{ filters.max_protein if filters.max_protein is not none else '' }}">
+
+        <label for="min_fiber">Fiber (g)</label>
+        <input type="number" step="0.1" min="0" id="min_fiber" name="min_fiber" value="{{ filters.min_fiber if filters.min_fiber is not none else '' }}">
+        <input type="number" step="0.1" min="0" id="max_fiber" name="max_fiber" value="{{ filters.max_fiber if filters.max_fiber is not none else '' }}">
+
+        <label for="min_cook_time">Cook time (min)</label>
+        <input type="number" min="0" id="min_cook_time" name="min_cook_time" value="{{ filters.min_cook_time if filters.min_cook_time is not none else '' }}">
+        <input type="number" min="0" id="max_cook_time" name="max_cook_time" value="{{ filters.max_cook_time if filters.max_cook_time is not none else '' }}">
+      </div>
+    </div>
+
+    <div class="filter-group">
+      <label>Type</label>
+      <div class="pill-group">
+        {% for c in classifications %}
+          <input type="checkbox" class="pill-input" id="filter-classification-{{ c.value }}" name="classification" value="{{ c.value }}" {% if c.value in filters.classification %}checked{% endif %}>
+          <label for="filter-classification-{{ c.value }}" class="pill-label">{{ c.value|capitalize }}</label>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="filter-group">
+      <label>Difficulty</label>
+      <div class="pill-group">
+        {% for d in difficulties %}
+          <input type="checkbox" class="pill-input" id="filter-difficulty-{{ d.value }}" name="difficulty" value="{{ d.value }}" {% if d.value in filters.difficulty %}checked{% endif %}>
+          <label for="filter-difficulty-{{ d.value }}" class="pill-label">{{ d.value|capitalize }}</label>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="filter-group">
+      <label for="sort_by">Order by</label>
+      <div class="filter-sort-row">
+        <select id="sort_by" name="sort_by">
+          {% for field in sort_fields %}
+            <option value="{{ field.value }}" {% if field.value == filters.sort_by %}selected{% endif %}>
+              {{ {"name": "Alphabetical", "calories": "Calories", "protein": "Protein", "fiber": "Fiber", "cook_time": "Cooking time"}[field.value] }}
+            </option>
+          {% endfor %}
+        </select>
+        <div class="pill-group">
+          <input type="radio" class="pill-input" id="sort-dir-asc" name="sort_dir" value="asc" {% if filters.sort_dir == "asc" %}checked{% endif %}>
+          <label for="sort-dir-asc" class="pill-label">Asc</label>
+          <input type="radio" class="pill-input" id="sort-dir-desc" name="sort_dir" value="desc" {% if filters.sort_dir == "desc" %}checked{% endif %}>
+          <label for="sort-dir-desc" class="pill-label">Desc</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="filter-bar-actions">
+      <button type="submit" class="btn btn-primary">Apply</button>
+      <a href="/recipes" class="btn btn-secondary">Reset</a>
+    </div>
+  </form>
+</details>

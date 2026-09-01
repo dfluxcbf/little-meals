@@ -46,6 +46,32 @@ def test_generate_then_view_shows_the_meal(client: TestClient, sample_recipe):
     assert "Mark cooked" not in response.text  # draft plan - not confirmed yet
 
 
+@pytest.mark.requirement("REQ-000000052")
+def test_plan_meal_card_shows_difficulty_badge_after_classification_badge(client: TestClient, sample_recipe):
+    client.post(
+        "/api/recipes",
+        json={
+            "name": sample_recipe.name,
+            "cook_time_minutes": sample_recipe.cook_time_minutes,
+            "classification": sample_recipe.classification.value,
+            "difficulty": "hard",
+            "nutrition": sample_recipe.nutrition.model_dump(exclude_none=True),
+            "servings": sample_recipe.servings,
+            "ingredients": [i.model_dump(exclude_none=True) for i in sample_recipe.ingredients],
+            "steps": sample_recipe.steps,
+        },
+    )
+    client.post("/plan/generate", follow_redirects=False)
+
+    response = client.get("/plan")
+    assert response.status_code == 200
+    text = response.text
+
+    classification_index = text.index(f"badge-{sample_recipe.classification.value}")
+    difficulty_index = text.index("badge-hard")
+    assert classification_index < difficulty_index
+
+
 @pytest.mark.requirement("REQ-000000046")
 def test_finalized_plan_shows_mark_cooked(client: TestClient, sample_recipe):
     _create_recipe(client, sample_recipe)

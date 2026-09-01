@@ -4,7 +4,6 @@ import random
 from dataclasses import dataclass
 from typing import Optional
 
-from little_meals.llm.extraction import RecipeExtractionService
 from little_meals.models import HouseholdPreferences, Recipe
 from little_meals.planning.selection import select_recipes_for_plan
 from little_meals.store.household_store import HouseholdPreferencesStore
@@ -33,7 +32,6 @@ def build_weekly_plan(recipes: list[Recipe], preferences: HouseholdPreferences, 
 def build_meal_specs(
     recipe_store: RecipeStore,
     household_store: HouseholdPreferencesStore,
-    extractor: RecipeExtractionService,
     rng: Optional[random.Random] = None,
 ) -> list[MealSpec]:
     """The shared "build a fresh plan's worth of meals" call every
@@ -42,7 +40,7 @@ def build_meal_specs(
     exactly one place that reads preferences, lists recipes, and runs
     build_weekly_plan."""
     preferences = household_store.get()
-    recipes = recipe_store.list(extractor)
+    recipes = recipe_store.list()
     generated = build_weekly_plan(recipes, preferences, rng=rng)
     return [MealSpec(g.recipe.id, g.servings) for g in generated]
 
