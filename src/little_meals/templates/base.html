@@ -25,7 +25,7 @@
     </a>
     {% endif %}
     <header class="topbar">
-      <a href="/recipes" class="brand">Little Meals</a>
+      <a href="/recipes" class="brand">Little Meals <span class="brand-version">v{{ app_version }}</span></a>
     </header>
     <main class="content {% block content_class %}{% endblock %}">
       {% block content %}{% endblock %}
