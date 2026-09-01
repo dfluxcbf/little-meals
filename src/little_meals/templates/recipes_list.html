@@ -5,8 +5,10 @@
 {% if recipes %}
   <p class="subtitle">{{ recipes|length }} recipe{{ "s" if recipes|length != 1 else "" }} saved for the household</p>
 {% endif %}
-{% if not recipes %}
+{% if not recipes and library_is_empty %}
   <p>No recipes yet. <a href="/recipes/new">Add your first one</a>.</p>
+{% elif not recipes %}
+  <p>No recipes match these filters. <a href="/recipes">Reset filters</a> to see everything.</p>
 {% else %}
 <div class="recipe-grid">
   {% for recipe in recipes %}
@@ -17,7 +19,16 @@
 {% endblock %}
 
 {% block fab %}
-<a href="/recipes/new" class="fab" aria-label="New recipe">
+<a href="/recipes/new" class="fab fab-cookbook" aria-label="New recipe">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
 </a>
+{% endblock %}
+
+{% block bottom_bar %}
+{% include "partials/_recipe_filter_bar.html" %}
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/cookbook-swipe.js" defer></script>
+<script src="/static/js/recipe-filter-bar.js" defer></script>
 {% endblock %}

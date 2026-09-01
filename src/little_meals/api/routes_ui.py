@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, time, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Form, Request
+from fastapi import APIRouter, Form, Query, Request
 from fastapi.datastructures import FormData
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -11,11 +11,12 @@ from pydantic import BaseModel, ValidationError
 
 from little_meals.models import Classification, DayOfWeek, Difficulty, HouseholdPreferencesUpdate, Ingredient, MealPlan, Recipe, RecipeCreate, RecipeUpdate
 from little_meals.planning.plan_builder import build_meal_specs, generate_single_replacement, list_controlled_reroll_candidates
+from little_meals.planning.recipe_filters import RecipeFilter, SortDirection, SortField, filter_recipes, sort_recipes
 from little_meals.planning.shopping_list import build_shopping_list_items
 from little_meals.store.cook_along_store import CookAlongStore
 from little_meals.store.household_store import HouseholdPreferencesStore
 from little_meals.store.notification_store import NotificationStore
-from little_meals.store.plan_store import MealPlanStore, PlanMealNotFound, PlanNotFound
+from little_meals.store.plan_store import MealPlanStore, MealSpec, PlanMealNotFound, PlanNotFound
 from little_meals.store.recipe_store import RecipeNotFound, RecipeStore
 from little_meals.store.shopping_list_store import ShoppingListItemNotFound, ShoppingListNotFound, ShoppingListStore
 
@@ -61,12 +62,100 @@ def build_ui_router(
         return RedirectResponse(url="/recipes", status_code=303)
 
     @router.get("/recipes", response_class=HTMLResponse, include_in_schema=False)
-    def recipes_list(request: Request) -> HTMLResponse:
-        recipes = store.list()
+    def recipes_list(
+        request: Request,
+        min_calories: Optional[str] = None,
+        max_calories: Optional[str] = None,
+        min_protein: Optional[str] = None,
+        max_protein: Optional[str] = None,
+        min_fiber: Optional[str] = None,
+        max_fiber: Optional[str] = None,
+        min_cook_time: Optional[str] = None,
+        max_cook_time: Optional[str] = None,
+        classification: list[str] = Query(default=[]),
+        difficulty: list[str] = Query(default=[]),
+        sort_by: str = "name",
+        sort_dir: str = "asc",
+    ) -> HTMLResponse:
+        # A blank number field submits as an empty string, not an absent
+        # param - FastAPI's int/float coercion rejects that outright (a 422
+        # for the whole page) rather than treating it as "no bound set", so
+        # these arrive as raw strings and get parsed leniently here instead.
+        min_calories = _parse_optional_int(min_calories)
+        max_calories = _parse_optional_int(max_calories)
+        min_protein = _parse_optional_float(min_protein)
+        max_protein = _parse_optional_float(max_protein)
+        min_fiber = _parse_optional_float(min_fiber)
+        max_fiber = _parse_optional_float(max_fiber)
+        min_cook_time = _parse_optional_int(min_cook_time)
+        max_cook_time = _parse_optional_int(max_cook_time)
+
+        classifications = _parse_enum_set(Classification, classification)
+        difficulties = _parse_enum_set(Difficulty, difficulty)
+        criteria = RecipeFilter(
+            min_calories=min_calories,
+            max_calories=max_calories,
+            min_protein=min_protein,
+            max_protein=max_protein,
+            min_fiber=min_fiber,
+            max_fiber=max_fiber,
+            min_cook_time=min_cook_time,
+            max_cook_time=max_cook_time,
+            classifications=classifications,
+            difficulties=difficulties,
+        )
+        sort_field = _parse_enum(SortField, sort_by, SortField.NAME)
+        sort_direction = _parse_enum(SortDirection, sort_dir, SortDirection.ASC)
+
+        all_recipes = store.list()
+        recipes = filter_recipes(all_recipes, criteria)
+        recipes = sort_recipes(recipes, sort_field, sort_direction)
+
+        current_plan = plan_store.get_current()
+        plan_recipe_ids = {meal.recipe_id for meal in current_plan.meals} if current_plan is not None else set()
+
+        active_filter_count = sum(
+            [
+                min_calories is not None,
+                max_calories is not None,
+                min_protein is not None,
+                max_protein is not None,
+                min_fiber is not None,
+                max_fiber is not None,
+                min_cook_time is not None,
+                max_cook_time is not None,
+                bool(classifications),
+                bool(difficulties),
+            ]
+        )
         return templates.TemplateResponse(
             request,
             "recipes_list.html",
-            {"recipes": recipes, "nav_active": "library", "notification_pending": notification_store.is_pending()},
+            {
+                "recipes": recipes,
+                "nav_active": "library",
+                "notification_pending": notification_store.is_pending(),
+                "library_is_empty": not all_recipes,
+                "plan_recipe_ids": plan_recipe_ids,
+                "filters": {
+                    "min_calories": min_calories,
+                    "max_calories": max_calories,
+                    "min_protein": min_protein,
+                    "max_protein": max_protein,
+                    "min_fiber": min_fiber,
+                    "max_fiber": max_fiber,
+                    "min_cook_time": min_cook_time,
+                    "max_cook_time": max_cook_time,
+                    "classification": {c.value for c in classifications},
+                    "difficulty": {d.value for d in difficulties},
+                    "sort_by": sort_field.value,
+                    "sort_dir": sort_direction.value,
+                },
+                "active_filter_count": active_filter_count,
+                "classifications": list(Classification),
+                "difficulties": list(Difficulty),
+                "sort_fields": list(SortField),
+            },
         )
 
     @router.get("/recipes/new", response_class=HTMLResponse, include_in_schema=False)
@@ -156,6 +245,58 @@ def build_ui_router(
         )
         stored = store.create(duplicate)
         return RedirectResponse(url=f"/recipes/{stored.id}/edit", status_code=303)
+
+    def _recipe_row_response(request: Request, recipe: Recipe, *, swipe_blocked: bool = False, status_code: int = 200) -> HTMLResponse:
+        plan = plan_store.get_current()
+        plan_recipe_ids = {meal.recipe_id for meal in plan.meals} if plan is not None else set()
+        return templates.TemplateResponse(
+            request,
+            "partials/_recipe_row.html",
+            {"recipe": recipe, "plan_recipe_ids": plan_recipe_ids, "swipe_blocked": swipe_blocked},
+            status_code=status_code,
+        )
+
+    @router.post("/recipes/{recipe_id}/add-to-plan", response_class=HTMLResponse, include_in_schema=False)
+    def recipe_add_to_plan(request: Request, recipe_id: str) -> HTMLResponse:
+        try:
+            recipe = store.get(recipe_id)
+        except RecipeNotFound:
+            return templates.TemplateResponse(
+                request, "recipe_not_found.html", {"recipe_id": recipe_id, "nav_active": "library"}, status_code=404
+            )
+
+        plan = plan_store.get_current()
+        if plan is not None and plan.finalized:
+            return _recipe_row_response(request, recipe, swipe_blocked=True, status_code=409)
+
+        already_in_plan = plan is not None and any(meal.recipe_id == recipe_id for meal in plan.meals)
+        if not already_in_plan:
+            if plan is None:
+                plan_store.create([MealSpec(recipe.id, recipe.servings)])
+            else:
+                plan_store.add_meal(plan.id, recipe.id, recipe.servings)
+
+        return _recipe_row_response(request, recipe)
+
+    @router.post("/recipes/{recipe_id}/remove-from-plan", response_class=HTMLResponse, include_in_schema=False)
+    def recipe_remove_from_plan(request: Request, recipe_id: str) -> HTMLResponse:
+        try:
+            recipe = store.get(recipe_id)
+        except RecipeNotFound:
+            return templates.TemplateResponse(
+                request, "recipe_not_found.html", {"recipe_id": recipe_id, "nav_active": "library"}, status_code=404
+            )
+
+        plan = plan_store.get_current()
+        if plan is not None and plan.finalized:
+            return _recipe_row_response(request, recipe, swipe_blocked=True, status_code=409)
+
+        if plan is not None:
+            meal = next((m for m in plan.meals if m.recipe_id == recipe_id), None)
+            if meal is not None:
+                plan_store.remove_meal(plan.id, meal.id)
+
+        return _recipe_row_response(request, recipe)
 
     @router.get("/recipes/{recipe_id}", response_class=HTMLResponse, include_in_schema=False)
     def recipe_detail(request: Request, recipe_id: str) -> HTMLResponse:
@@ -514,6 +655,43 @@ def _render_plan_meal(
     meal = next(m for m in plan.meals if m.id == meal_id)
     recipe = store.get(meal.recipe_id)
     return templates.TemplateResponse(request, "partials/_plan_meal.html", {"plan": plan, "meal": meal, "recipe": recipe})
+
+
+def _parse_optional_int(raw: Optional[str]) -> Optional[int]:
+    if raw is None or not raw.strip():
+        return None
+    try:
+        return int(raw)
+    except ValueError:
+        return None
+
+
+def _parse_optional_float(raw: Optional[str]) -> Optional[float]:
+    if raw is None or not raw.strip():
+        return None
+    try:
+        return float(raw)
+    except ValueError:
+        return None
+
+
+def _parse_enum(enum_cls, raw: str, default):
+    try:
+        return enum_cls(raw)
+    except ValueError:
+        return default
+
+
+def _parse_enum_set(enum_cls, raw_values: list[str]) -> frozenset:
+    # Invalid/stale values (a hand-edited or bookmarked URL) are dropped
+    # rather than erroring the whole page.
+    parsed = set()
+    for raw in raw_values:
+        try:
+            parsed.add(enum_cls(raw))
+        except ValueError:
+            continue
+    return frozenset(parsed)
 
 
 def _empty_recipe_values() -> dict:

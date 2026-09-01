@@ -201,3 +201,10 @@ test coverage are tracked exclusively through **little-requirements**
   behavior), and REQ-000000008 (preflight system-dependency check - now a
   single core-tools tier, no local-LLM-runtime tier). No new requirements
   were created, since this milestone only removes behavior.
+- Milestone 17 (`m17-cookbook-filter-and-swipe` suite) created two
+  requirements, REQ-000000055 (cookbook filter/sort) and REQ-000000056
+  (swipe-to-add-to-plan) - see `milestones.md`'s M17 entry. REQ-000000055 is
+  tagged across `tests/test_recipe_filters.py` (the pure
+  `filter_recipes`/`sort_recipes` module) and the filter/sort cases in
+  `tests/test_api_ui.py`; REQ-000000056 is tagged across the
+  `POST /recipes/{id}/add-to-plan` cases in `tests/test_api_ui.py`.
