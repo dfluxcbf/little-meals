@@ -42,11 +42,7 @@ py_library(
 py_wheel(
     name = "wheel",
     distribution = "little_meals",
-<<<<<<< HEAD
     version = "0.4.0",  # kept in sync by tools/on_version_bump.py
-=======
-    version = "0.3.5",  # kept in sync by tools/on_version_bump.py
->>>>>>> release/0.3.5
     python_tag = "py3",
     abi = "none",
     platform = "any",

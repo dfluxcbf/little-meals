@@ -93,6 +93,7 @@ def create_app(
 
     package_root = importlib.resources.files("little_meals")
     templates = Jinja2Templates(directory=str(package_root / "templates"))
+    templates.env.globals["app_version"] = __version__
     # follow_symlink=True: Bazel runfiles trees are symlink forests, so the
     # served directory's files are individually symlinked to targets outside
     # it - Starlette's default symlink-containment check would 404 them.
