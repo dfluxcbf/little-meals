@@ -63,4 +63,50 @@
     <button type="submit" class="btn btn-primary">Save settings</button>
   </div>
 </form>
+
+<div class="settings-section">
+  <h2>Appearance</h2>
+  <p class="hint" style="text-align: left; margin: -4px 0 12px;">Accent color - saved on this device only, so each phone in the household can pick its own.</p>
+  <div class="accent-swatches" id="accent-swatches">
+    <button type="button" class="accent-swatch" data-accent="terracotta" style="--swatch-color: var(--terracotta);" aria-label="Orange"></button>
+    <button type="button" class="accent-swatch" data-accent="sage" style="--swatch-color: var(--sage);" aria-label="Sage"></button>
+    <button type="button" class="accent-swatch" data-accent="teal" style="--swatch-color: var(--teal);" aria-label="Teal"></button>
+    <button type="button" class="accent-swatch" data-accent="plum" style="--swatch-color: var(--plum);" aria-label="Plum"></button>
+    <button type="button" class="accent-swatch" data-accent="rose" style="--swatch-color: var(--rose);" aria-label="Rose"></button>
+    <button type="button" class="accent-swatch" data-accent="gold" style="--swatch-color: var(--gold);" aria-label="Gold"></button>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function () {
+  var buttons = document.querySelectorAll(".accent-swatch");
+
+  function markActive(name) {
+    buttons.forEach(function (btn) {
+      btn.classList.toggle("accent-swatch-active", btn.dataset.accent === name);
+    });
+  }
+
+  var current;
+  try {
+    current = localStorage.getItem(window.lmAccentStorageKey) || "terracotta";
+  } catch (e) {
+    current = "terracotta";
+  }
+  markActive(current);
+
+  buttons.forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var name = btn.dataset.accent;
+      try {
+        localStorage.setItem(window.lmAccentStorageKey, name);
+      } catch (e) {}
+      window.lmApplyAccent(name);
+      markActive(name);
+    });
+  });
+})();
+</script>
 {% endblock %}

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.resources
+import json
 import logging
 from contextlib import asynccontextmanager
 from datetime import datetime
@@ -98,6 +99,29 @@ def create_app(
     # served directory's files are individually symlinked to targets outside
     # it - Starlette's default symlink-containment check would 404 them.
     app.mount("/static", StaticFiles(directory=str(package_root / "static"), follow_symlink=True), name="static")
+
+    # Kept in sync by hand with THEME_COLORS in static/js/accent.js - the
+    # per-device accent picker sets the "lm_accent" cookie (localStorage
+    # isn't visible to this plain HTTP fetch) so the PWA manifest's
+    # theme_color, which drives the installed app's OS status bar color on
+    # Android, matches whatever the picker applies to the page itself.
+    accent_theme_colors = {
+        "terracotta": "#c55123",
+        "sage": "#4b8358",
+        "rose": "#b65a5c",
+        "teal": "#2c7e8b",
+        "plum": "#814a8d",
+        "gold": "#aa7e00",
+    }
+    manifest_path = package_root / "static" / "manifest.webmanifest"
+
+    @app.get("/manifest.webmanifest", include_in_schema=False)
+    async def manifest(request: Request) -> JSONResponse:
+        manifest_data = json.loads(manifest_path.read_text())
+        accent = request.cookies.get("lm_accent")
+        if accent in accent_theme_colors:
+            manifest_data["theme_color"] = accent_theme_colors[accent]
+        return JSONResponse(manifest_data, media_type="application/manifest+json")
 
     @app.exception_handler(ApiError)
     async def api_error_handler(_: Request, exc: ApiError) -> JSONResponse:

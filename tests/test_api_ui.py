@@ -15,6 +15,33 @@ def _make_client(store: RecipeStore) -> TestClient:
     return TestClient(app)
 
 
+def test_manifest_defaults_to_the_brand_orange_theme_color(store):
+    ui = _make_client(store)
+
+    response = ui.get("/manifest.webmanifest")
+
+    assert response.status_code == 200
+    assert response.json()["theme_color"] == "#c55123"
+
+
+def test_manifest_theme_color_follows_the_accent_cookie(store):
+    ui = _make_client(store)
+    ui.cookies.set("lm_accent", "teal")
+
+    response = ui.get("/manifest.webmanifest")
+
+    assert response.json()["theme_color"] == "#2c7e8b"
+
+
+def test_manifest_ignores_an_unrecognized_accent_cookie(store):
+    ui = _make_client(store)
+    ui.cookies.set("lm_accent", "not-a-real-color")
+
+    response = ui.get("/manifest.webmanifest")
+
+    assert response.json()["theme_color"] == "#c55123"
+
+
 @pytest.mark.requirement("REQ-000000007")
 def test_recipes_list_contains_stored_recipe_name(store, sample_recipe):
     store.create(sample_recipe)

@@ -8,19 +8,27 @@
   --ink-soft: oklch(46% 0.02 55);
   --ink-faint: oklch(66% 0.015 60);
   --line: oklch(88% 0.015 70);
+  --accent: oklch(58% 0.16 40);
+  --accent-dark: oklch(48% 0.15 38);
+  --accent-soft: oklch(93% 0.03 45);
+  --sage: oklch(56% 0.09 150);
+  --sage-dark: oklch(46% 0.085 148);
+  --sage-soft: oklch(93% 0.03 150);
+  --rose: oklch(58% 0.12 20);
+  --rose-dark: oklch(48% 0.115 18);
+  --rose-soft: oklch(93% 0.02 20);
+  --teal: oklch(55% 0.08 210);
+  --teal-dark: oklch(45% 0.075 208);
+  --teal-soft: oklch(93% 0.02 210);
+  --plum: oklch(50% 0.12 320);
+  --plum-dark: oklch(40% 0.115 318);
+  --plum-soft: oklch(93% 0.02 320);
+  --gold: oklch(62% 0.13 85);
+  --gold-dark: oklch(52% 0.125 83);
+  --gold-soft: oklch(93% 0.03 85);
   --terracotta: oklch(58% 0.16 40);
   --terracotta-dark: oklch(48% 0.15 38);
   --terracotta-soft: oklch(93% 0.03 45);
-  --sage: oklch(56% 0.09 150);
-  --sage-soft: oklch(93% 0.03 150);
-  --rose: oklch(58% 0.12 20);
-  --rose-soft: oklch(93% 0.02 20);
-  --teal: oklch(55% 0.08 210);
-  --teal-soft: oklch(93% 0.02 210);
-  --plum: oklch(50% 0.12 320);
-  --plum-soft: oklch(93% 0.02 320);
-  --gold: oklch(62% 0.13 85);
-  --gold-soft: oklch(93% 0.03 85);
   --fridge-bg: oklch(95% 0.015 220);
   --fridge-fg: oklch(45% 0.03 220);
   --font-display: "Fraunces", Georgia, serif;
@@ -51,12 +59,12 @@ body {
 }
 
 a {
-  color: var(--terracotta);
+  color: var(--accent);
   text-decoration: none;
 }
 
 a:hover {
-  color: var(--terracotta-dark);
+  color: var(--accent-dark);
 }
 
 h1,
@@ -104,8 +112,8 @@ h2 {
   align-items: center;
   gap: 8px;
   padding: 10px 20px;
-  background: var(--terracotta-soft);
-  color: var(--terracotta);
+  background: var(--accent-soft);
+  color: var(--accent);
   font-size: 13px;
   font-weight: 600;
 }
@@ -135,6 +143,9 @@ header.topbar {
 }
 
 .brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-family: var(--font-display);
   font-weight: 600;
   font-size: 19px;
@@ -142,7 +153,38 @@ header.topbar {
 }
 
 .brand:hover {
-  color: var(--terracotta);
+  color: var(--accent);
+}
+
+.brand-logo {
+  flex-shrink: 0;
+  width: 20.9px;
+  height: 20.9px;
+  color: var(--accent);
+}
+
+/* ------------------------------------------------------ accent swatches */
+
+.accent-swatches {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.accent-swatch {
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  background: var(--swatch-color);
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  box-shadow: 0 0 0 2px transparent;
+}
+
+.accent-swatch-active {
+  box-shadow: 0 0 0 2px var(--paper), 0 0 0 4px var(--swatch-color);
 }
 
 .brand-version {
@@ -178,6 +220,10 @@ main.content.content-plan > h1,
 main.content.content-plan > .subtitle,
 main.content.content-plan > .badge {
   flex-shrink: 0;
+}
+
+main.content.content-plan > h1 {
+  text-align: center;
 }
 
 .plan-center {
@@ -223,7 +269,7 @@ nav.tabbar {
 }
 
 .tab:hover {
-  color: var(--terracotta);
+  color: var(--accent);
 }
 
 .tab svg {
@@ -233,7 +279,7 @@ nav.tabbar {
 
 .tab-active,
 .tab-active:hover {
-  color: var(--terracotta);
+  color: var(--accent);
   font-weight: 600;
 }
 
@@ -271,7 +317,7 @@ nav.tabbar {
   }
 
   .tab-active {
-    background: var(--terracotta-soft);
+    background: var(--accent-soft);
   }
 
   header.topbar {
@@ -302,12 +348,12 @@ nav.tabbar {
 }
 
 .btn-primary {
-  background: var(--terracotta);
+  background: var(--accent);
   color: white;
 }
 
 .btn-primary:hover {
-  background: var(--terracotta-dark);
+  background: var(--accent-dark);
   color: white;
 }
 
@@ -348,7 +394,7 @@ nav.tabbar {
   width: 56px;
   height: 56px;
   border-radius: 999px;
-  background: var(--terracotta);
+  background: var(--accent);
   color: white;
   border: none;
   display: flex;
@@ -359,7 +405,7 @@ nav.tabbar {
 }
 
 .fab:hover {
-  background: var(--terracotta-dark);
+  background: var(--accent-dark);
   color: white;
 }
 
@@ -417,8 +463,8 @@ nav.tabbar {
 }
 
 .badge-other {
-  background: var(--terracotta-soft);
-  color: var(--terracotta);
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 
 .badge-vegan {
@@ -452,8 +498,8 @@ nav.tabbar {
 }
 
 .badge-hard {
-  background: var(--terracotta-soft);
-  color: var(--terracotta);
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 
 .badge-undefined {
@@ -549,7 +595,7 @@ nav.tabbar {
   flex: none;
   width: 22px;
   height: 22px;
-  background-color: var(--terracotta);
+  background-color: var(--accent);
   -webkit-mask-size: contain;
   mask-size: contain;
   -webkit-mask-repeat: no-repeat;
@@ -576,7 +622,7 @@ nav.tabbar {
   width: 13px;
   height: 13px;
   flex-shrink: 0;
-  color: var(--terracotta);
+  color: var(--accent);
 }
 
 .recipe-card-swipe-blocked {
@@ -701,7 +747,7 @@ nav.tabbar {
 }
 
 .index-card textarea:focus {
-  outline: 2px solid var(--terracotta);
+  outline: 2px solid var(--accent);
   outline-offset: -2px;
 }
 
@@ -745,7 +791,7 @@ form textarea {
 form input:focus,
 form select:focus,
 form textarea:focus {
-  outline: 2px solid var(--terracotta);
+  outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
 
@@ -895,13 +941,13 @@ form button {
 }
 
 .day-radio:checked + .day-pill {
-  background: var(--terracotta);
-  border-color: var(--terracotta);
+  background: var(--accent);
+  border-color: var(--accent);
   color: white;
 }
 
 .day-radio:focus-visible + .day-pill {
-  outline: 2px solid var(--terracotta);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
@@ -922,7 +968,7 @@ form button {
 .checkbox-label input[type="checkbox"] {
   width: 17px;
   height: 17px;
-  accent-color: var(--terracotta);
+  accent-color: var(--accent);
 }
 
 .pill-group {
@@ -952,13 +998,13 @@ form button {
 }
 
 .pill-input:checked + .pill-label {
-  background: var(--terracotta);
-  border-color: var(--terracotta);
+  background: var(--accent);
+  border-color: var(--accent);
   color: white;
 }
 
 .pill-input:focus-visible + .pill-label {
-  outline: 2px solid var(--terracotta);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
@@ -992,7 +1038,7 @@ form button {
 .form-errors {
   margin: 4px 0 12px;
   padding-left: 20px;
-  color: var(--terracotta-dark);
+  color: var(--accent-dark);
   font-size: 13px;
 }
 
@@ -1101,7 +1147,7 @@ form button {
 }
 
 .flipbook-dot-active {
-  background: var(--terracotta);
+  background: var(--accent);
 }
 
 .plan-actions-bar {
@@ -1385,7 +1431,7 @@ main.content:has(+ .filter-bar) {
   width: 17px;
   height: 17px;
   flex-shrink: 0;
-  color: var(--terracotta);
+  color: var(--accent);
 }
 
 .cook-along-btn {
@@ -1399,8 +1445,8 @@ main.content:has(+ .filter-bar) {
   font-weight: 700;
   padding: 9px 16px;
   border-radius: 999px;
-  background: var(--terracotta-soft);
-  color: var(--terracotta-dark);
+  background: var(--accent-soft);
+  color: var(--accent-dark);
 }
 
 .pot-stamp {
@@ -1425,9 +1471,9 @@ main.content:has(+ .filter-bar) {
 }
 
 .pot-stamp-active {
-  background: var(--terracotta-soft);
-  color: var(--terracotta);
-  border-color: var(--terracotta);
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: var(--accent);
   transform: rotate(-6deg);
 }
 
@@ -1470,7 +1516,7 @@ main.content:has(+ .filter-bar) {
   line-height: 1;
   border-radius: 999px;
   border: none;
-  background: var(--terracotta);
+  background: var(--accent);
   color: white;
   cursor: pointer;
   display: inline-flex;
@@ -1543,13 +1589,13 @@ main.content:has(+ .filter-bar) {
 }
 
 .alternative-option:hover {
-  border-color: var(--terracotta);
+  border-color: var(--accent);
 }
 
 .alternative-option input[type="radio"] {
   width: 18px;
   height: 18px;
-  accent-color: var(--terracotta);
+  accent-color: var(--accent);
 }
 
 /* -------------------------------------------------------- shopping list */
@@ -1744,7 +1790,7 @@ main.content:has(+ .filter-bar) {
 .cook-step-label {
   font-size: 12.5px;
   font-weight: 700;
-  color: var(--terracotta);
+  color: var(--accent);
   white-space: nowrap;
 }
 
@@ -1762,7 +1808,7 @@ main.content:has(+ .filter-bar) {
 }
 
 .cook-progress-dot-active {
-  background: var(--terracotta);
+  background: var(--accent);
 }
 
 .cook-step-stack {
@@ -1920,7 +1966,7 @@ main.content:has(+ .filter-bar) {
   width: 72px;
   height: 72px;
   margin-bottom: 18px;
-  background-color: var(--terracotta);
+  background-color: var(--accent);
   -webkit-mask-size: contain;
   mask-size: contain;
   -webkit-mask-repeat: no-repeat;
@@ -1943,8 +1989,8 @@ main.content:has(+ .filter-bar) {
   width: 46px;
   height: 46px;
   border-radius: 999px;
-  background: var(--terracotta-soft);
-  color: var(--terracotta);
+  background: var(--accent-soft);
+  color: var(--accent);
   font-family: var(--font-display);
   font-size: 19px;
   font-weight: 700;
