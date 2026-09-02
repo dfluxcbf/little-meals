@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import importlib.resources
+import json
 from datetime import datetime, time, timezone
+from functools import lru_cache
+from itertools import zip_longest
 from typing import Optional
 
 from fastapi import APIRouter, Form, Query, Request
@@ -723,6 +727,13 @@ def _parse_enum_set(enum_cls, raw_values: list[str]) -> frozenset:
     return frozenset(parsed)
 
 
+@lru_cache(maxsize=1)
+def _load_ingredient_icons() -> list[dict]:
+    manifest_path = importlib.resources.files("little_meals") / "static" / "icons" / "ingredients" / "manifest.json"
+    data = json.loads(manifest_path.read_text())
+    return data.get("icons", [])
+
+
 def _empty_recipe_values() -> dict:
     return {
         "name": "",
@@ -734,7 +745,7 @@ def _empty_recipe_values() -> dict:
         "protein_g": "",
         "fiber_g": "",
         "ingredients": [{"name": "", "quantity": ""}],
-        "steps": [""],
+        "steps": [{"text": "", "icon": None}],
     }
 
 
@@ -765,14 +776,19 @@ def _recipe_values_from_recipe(recipe: Recipe) -> dict:
             for ingredient in recipe.ingredients
         ]
         or [{"name": "", "quantity": ""}],
-        "steps": list(recipe.steps) or [""],
+        "steps": [
+            {"text": text, "icon": icon}
+            for text, icon in zip_longest(recipe.steps, recipe.step_icons, fillvalue=None)
+        ]
+        or [{"text": "", "icon": None}],
     }
 
 
 def _recipe_values_from_form(form: FormData) -> dict:
     names = form.getlist("ingredient_name")
     quantities = form.getlist("ingredient_quantity")
-    steps = list(form.getlist("step"))
+    step_texts = form.getlist("step")
+    step_icons = form.getlist("step_icon")
     return {
         "name": form.get("name", ""),
         "cook_time_minutes": form.get("cook_time_minutes", ""),
@@ -784,7 +800,11 @@ def _recipe_values_from_form(form: FormData) -> dict:
         "fiber_g": form.get("fiber_g", ""),
         "ingredients": [{"name": name, "quantity": quantity} for name, quantity in zip(names, quantities)]
         or [{"name": "", "quantity": ""}],
-        "steps": steps or [""],
+        "steps": [
+            {"text": text, "icon": icon or None}
+            for text, icon in zip_longest(step_texts, step_icons, fillvalue="")
+        ]
+        or [{"text": "", "icon": None}],
     }
 
 
@@ -797,6 +817,7 @@ def _recipe_edit_context(
         "error": error,
         "classifications": list(Classification),
         "difficulties": [d for d in Difficulty if d != Difficulty.UNDEFINED],
+        "icons": _load_ingredient_icons(),
         "form_action": "/recipes/new" if mode == "new" else f"/recipes/{recipe_id}/edit",
         "cancel_url": "/recipes" if mode == "new" else f"/recipes/{recipe_id}",
         "recipe_id": recipe_id,
@@ -813,7 +834,16 @@ def _parse_recipe_form(form: FormData, model_cls: type[BaseModel]) -> BaseModel:
         if not name:
             continue
         ingredients.append(Ingredient(name=name, unit=quantity_text.strip() or None))
-    steps = [step.strip() for step in form.getlist("step") if step.strip()]
+    step_texts = form.getlist("step")
+    step_icon_values = form.getlist("step_icon")
+    steps = []
+    step_icons = []
+    for step_text, icon in zip_longest(step_texts, step_icon_values, fillvalue=""):
+        step_text = step_text.strip()
+        if not step_text:
+            continue
+        steps.append(step_text)
+        step_icons.append(icon.strip() or None)
 
     def _optional_float(key: str) -> Optional[float]:
         raw = str(form.get(key) or "").strip()
@@ -840,5 +870,6 @@ def _parse_recipe_form(form: FormData, model_cls: type[BaseModel]) -> BaseModel:
         "servings": int(str(form.get("servings") or "").strip()),
         "ingredients": ingredients,
         "steps": steps,
+        "step_icons": step_icons,
     }
     return model_cls(**data)

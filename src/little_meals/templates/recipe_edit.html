@@ -61,8 +61,16 @@
   <div id="step-rows" class="editor-rows">
     {% for step in values.steps %}
       <div class="editor-row editor-row-step">
-        <textarea name="step" placeholder="Step" rows="1" class="step-textarea">{{ step }}</textarea>
-        <button type="button" class="row-remove-btn" aria-label="Remove step" onclick="this.closest('.editor-row').remove()">&times;</button>
+        <div class="step-icon-row">
+          <div class="step-icon-picker">
+            <button type="button" class="step-icon-btn" aria-label="Choose image for this step">
+              <span class="step-icon-preview{% if not step.icon %} step-icon-preview-empty{% endif %}"{% if step.icon %} style="-webkit-mask-image: url('/static/icons/ingredients/{{ step.icon }}.svg'); mask-image: url('/static/icons/ingredients/{{ step.icon }}.svg')"{% endif %}>{% if not step.icon %}+{% endif %}</span>
+            </button>
+            <input type="hidden" name="step_icon" value="{{ step.icon or '' }}">
+          </div>
+          <button type="button" class="row-remove-btn step-remove-btn" aria-label="Remove step" onclick="this.closest('.editor-row').remove()">&times;</button>
+        </div>
+        <textarea name="step" placeholder="Step" rows="1" class="step-textarea">{{ step.text }}</textarea>
       </div>
     {% endfor %}
   </div>
@@ -89,10 +97,37 @@
 </template>
 <template id="step-row-template">
   <div class="editor-row editor-row-step">
+    <div class="step-icon-row">
+      <div class="step-icon-picker">
+        <button type="button" class="step-icon-btn" aria-label="Choose image for this step">
+          <span class="step-icon-preview step-icon-preview-empty">+</span>
+        </button>
+        <input type="hidden" name="step_icon" value="">
+      </div>
+      <button type="button" class="row-remove-btn step-remove-btn" aria-label="Remove step" onclick="this.closest('.editor-row').remove()">&times;</button>
+    </div>
     <textarea name="step" placeholder="Step" rows="1" class="step-textarea"></textarea>
-    <button type="button" class="row-remove-btn" aria-label="Remove step" onclick="this.closest('.editor-row').remove()">&times;</button>
   </div>
 </template>
+
+<dialog id="icon-picker-dialog" class="icon-picker-dialog">
+  <div class="icon-picker-header">
+    <h3>Choose an image</h3>
+    <button type="button" class="modal-close-btn" id="icon-picker-close-btn" aria-label="Close">&times;</button>
+  </div>
+  <div class="icon-grid">
+    <button type="button" class="icon-grid-item" data-icon-id="">
+      <span class="icon-grid-item-preview icon-grid-item-preview-none">&times;</span>
+      <span class="icon-grid-item-label">No image</span>
+    </button>
+    {% for icon in icons %}
+      <button type="button" class="icon-grid-item" data-icon-id="{{ icon.id }}">
+        <span class="icon-grid-item-preview" style="-webkit-mask-image: url('/static/icons/ingredients/{{ icon.id }}.svg'); mask-image: url('/static/icons/ingredients/{{ icon.id }}.svg')"></span>
+        <span class="icon-grid-item-label">{{ icon.label }}</span>
+      </button>
+    {% endfor %}
+  </div>
+</dialog>
 
 <script>
   function autoResizeStepTextarea(el) {
@@ -117,10 +152,15 @@
     var template = document.getElementById(templateId);
     var row = template.content.cloneNode(true);
     container.appendChild(row);
-    var textarea = container.lastElementChild.querySelector(".step-textarea");
+    var lastRow = container.lastElementChild;
+    var textarea = lastRow.querySelector(".step-textarea");
     if (textarea) {
       initStepTextarea(textarea);
       textarea.focus();
+    }
+    var iconBtn = lastRow.querySelector(".step-icon-btn");
+    if (iconBtn) {
+      bindStepIconBtn(iconBtn);
     }
   }
   document.getElementById("add-ingredient-btn").addEventListener("click", function () {
@@ -128,6 +168,63 @@
   });
   document.getElementById("add-step-btn").addEventListener("click", function () {
     addEditorRow("step-rows", "step-row-template");
+  });
+
+  var iconPickerDialog = document.getElementById("icon-picker-dialog");
+  var activeStepIconBtn = null;
+
+  function openIconPicker(btn) {
+    activeStepIconBtn = btn;
+    iconPickerDialog.showModal();
+  }
+
+  function applyStepIcon(btn, iconId) {
+    var wrapper = btn.closest(".step-icon-picker");
+    var hiddenInput = wrapper.querySelector('input[name="step_icon"]');
+    hiddenInput.value = iconId;
+    var preview = btn.querySelector(".step-icon-preview");
+    if (iconId) {
+      preview.classList.remove("step-icon-preview-empty");
+      preview.textContent = "";
+      preview.style.webkitMaskImage = "url('/static/icons/ingredients/" + iconId + ".svg')";
+      preview.style.maskImage = "url('/static/icons/ingredients/" + iconId + ".svg')";
+    } else {
+      preview.classList.add("step-icon-preview-empty");
+      preview.style.webkitMaskImage = "none";
+      preview.style.maskImage = "none";
+      preview.textContent = "+";
+    }
+  }
+
+  function bindStepIconBtn(btn) {
+    btn.addEventListener("click", function () {
+      openIconPicker(btn);
+    });
+  }
+
+  document.querySelectorAll(".step-icon-btn").forEach(bindStepIconBtn);
+
+  document.querySelectorAll(".icon-grid-item").forEach(function (item) {
+    item.addEventListener("click", function () {
+      if (activeStepIconBtn) {
+        applyStepIcon(activeStepIconBtn, item.dataset.iconId);
+      }
+      iconPickerDialog.close();
+    });
+  });
+
+  document.getElementById("icon-picker-close-btn").addEventListener("click", function () {
+    iconPickerDialog.close();
+  });
+
+  iconPickerDialog.addEventListener("click", function (e) {
+    if (e.target === iconPickerDialog) {
+      iconPickerDialog.close();
+    }
+  });
+
+  iconPickerDialog.addEventListener("close", function () {
+    activeStepIconBtn = null;
   });
   document.querySelectorAll(".pill-input-deselectable").forEach(function (el) {
     el.dataset.wasChecked = el.checked ? "true" : "false";

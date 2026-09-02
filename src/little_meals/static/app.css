@@ -814,8 +814,161 @@ form button {
 }
 
 .editor-row-step {
-  grid-template-columns: 1fr auto;
-  align-items: start;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.step-icon-row {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.step-icon-picker {
+  display: flex;
+  justify-content: center;
+}
+
+.step-icon-row .step-remove-btn {
+  position: absolute;
+  right: 12px;
+  bottom: 0;
+  margin-top: 0;
+}
+
+.step-icon-btn {
+  margin-top: 0;
+  width: 64px;
+  height: 64px;
+  border-radius: 14px;
+  border: 1.5px dashed var(--line);
+  background: var(--paper);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.step-icon-btn:hover {
+  border-color: var(--accent);
+}
+
+.step-icon-preview {
+  width: 40px;
+  height: 40px;
+  background-color: var(--accent);
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+}
+
+.step-icon-preview-empty {
+  background-color: transparent;
+  color: var(--ink-faint);
+  font-size: 22px;
+  line-height: 1;
+}
+
+.icon-picker-dialog {
+  width: min(560px, calc(100vw - 32px));
+  max-height: min(640px, calc(100vh - 64px));
+  padding: 20px;
+  border: none;
+  border-radius: var(--radius);
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: var(--shadow);
+}
+
+.icon-picker-dialog::backdrop {
+  background: oklch(24% 0.02 50 / 0.45);
+}
+
+.icon-picker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.icon-picker-header h3 {
+  margin: 0;
+}
+
+.modal-close-btn {
+  margin-top: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  border: 1.5px solid var(--line);
+  background: var(--paper);
+  color: var(--ink-soft);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.modal-close-btn:hover {
+  border-color: var(--rose);
+  color: var(--rose);
+}
+
+.icon-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: 8px;
+  overflow-y: auto;
+  max-height: calc(min(640px, calc(100vh - 64px)) - 70px);
+}
+
+.icon-grid-item {
+  margin-top: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 6px;
+  border-radius: 12px;
+  border: 1.5px solid transparent;
+  background: var(--paper-alt);
+  cursor: pointer;
+  text-align: center;
+}
+
+.icon-grid-item:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.icon-grid-item-preview {
+  width: 32px;
+  height: 32px;
+  background-color: var(--accent);
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+}
+
+.icon-grid-item-preview-none {
+  background-color: transparent;
+  color: var(--ink-faint);
+  font-size: 20px;
+  line-height: 32px;
+}
+
+.icon-grid-item-label {
+  font-size: 11px;
+  color: var(--ink-soft);
+  line-height: 1.2;
 }
 
 .step-textarea {
@@ -1214,10 +1367,18 @@ main.content:has(+ .plan-actions-bar) {
   font-size: 13.5px;
   font-weight: 700;
   color: var(--ink);
+  background: var(--accent-soft);
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  touch-action: none;
+}
+
+.filter-bar-summary-icons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .filter-bar-reset {
@@ -1231,13 +1392,28 @@ main.content:has(+ .plan-actions-bar) {
 }
 
 .filter-bar-reset:hover {
-  background: var(--paper-alt);
+  background: var(--paper);
   color: var(--rose);
 }
 
 .filter-bar-reset svg {
   width: 16px;
   height: 16px;
+}
+
+.filter-bar-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  color: var(--accent);
+  flex: none;
+}
+
+.filter-bar-icon svg {
+  width: 100%;
+  height: 100%;
 }
 
 .filter-bar-summary::-webkit-details-marker {

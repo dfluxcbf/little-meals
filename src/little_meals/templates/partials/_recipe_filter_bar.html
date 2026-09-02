@@ -1,11 +1,16 @@
 <details class="filter-bar" {% if active_filter_count %}open{% endif %}>
   <summary class="filter-bar-summary">
     <span>Filters{% if active_filter_count %} ({{ active_filter_count }}){% endif %} &amp; Sort</span>
-    {% if active_filter_count %}
-      <a href="/recipes" class="filter-bar-reset" aria-label="Reset filters" title="Reset filters">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"></path><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"></path><path d="M19 6l-.8 13.2a2 2 0 0 1-2 1.8H7.8a2 2 0 0 1-2-1.8L5 6"></path><path d="M10 11v6M14 11v6"></path></svg>
-      </a>
-    {% endif %}
+    <span class="filter-bar-summary-icons">
+      {% if active_filter_count %}
+        <a href="/recipes" class="filter-bar-reset" aria-label="Reset filters" title="Reset filters">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"></path><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"></path><path d="M19 6l-.8 13.2a2 2 0 0 1-2 1.8H7.8a2 2 0 0 1-2-1.8L5 6"></path><path d="M10 11v6M14 11v6"></path></svg>
+        </a>
+      {% endif %}
+      <span class="filter-bar-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"></line><line x1="4" y1="12" x2="20" y2="12"></line><line x1="4" y1="18" x2="20" y2="18"></line><circle cx="9" cy="6" r="2"></circle><circle cx="15" cy="12" r="2"></circle><circle cx="9" cy="18" r="2"></circle></svg>
+      </span>
+    </span>
   </summary>
   <form method="get" action="/recipes" class="filter-bar-panel" id="filter-form">
 
