@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Little Meals{% endblock %}</title>
-  <link rel="manifest" href="/static/manifest.webmanifest">
+  <link rel="manifest" href="/manifest.webmanifest">
   <meta name="theme-color" content="#c55123">
   <link rel="icon" href="/static/icons/favicon-64.png">
   <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
@@ -12,8 +12,9 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Little Meals">
-  <link rel="stylesheet" href="/static/fonts.css">
-  <link rel="stylesheet" href="/static/app.css">
+  <link rel="stylesheet" href="/static/fonts.css?v={{ app_version }}">
+  <link rel="stylesheet" href="/static/app.css?v={{ app_version }}">
+  <script src="/static/js/accent.js?v={{ app_version }}"></script>
   <script src="/static/vendor/htmx.min.js"></script>
 </head>
 <body>
@@ -25,7 +26,16 @@
     </a>
     {% endif %}
     <header class="topbar">
-      <a href="/recipes" class="brand">Little Meals <span class="brand-version">v{{ app_version }}</span></a>
+      <a href="/recipes" class="brand">
+        <svg class="brand-logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M4 11h16v3a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5v-3Z"></path>
+          <path d="M2 11h20"></path>
+          <path d="M9 7c0-1.2-.8-1.4-.8-2.6S9 2.4 9 2.4"></path>
+          <path d="M12.5 7c0-1.2-.8-1.4-.8-2.6S12.5 2.4 12.5 2.4"></path>
+          <path d="M16 7c0-1.2-.8-1.4-.8-2.6S16 2.4 16 2.4"></path>
+        </svg>
+        Little Meals <span class="brand-version">v{{ app_version }}</span>
+      </a>
     </header>
     <main class="content {% block content_class %}{% endblock %}">
       {% block content %}{% endblock %}

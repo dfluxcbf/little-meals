@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import importlib.resources
+import json
 from datetime import datetime, time, timezone
+from functools import lru_cache
+from itertools import zip_longest
 from typing import Optional
 
 from fastapi import APIRouter, Form, Query, Request
@@ -343,8 +347,24 @@ def build_ui_router(
             return RedirectResponse(url=f"/recipes/{recipe_id}/cook/0", status_code=303)
         if step_number > total_steps:
             # Ran past the last step (or there were no steps to begin with) -
-            # the guided walkthrough is done, prompt for the cooked/uncooked choice.
-            return templates.TemplateResponse(request, "cook_finish.html", {"recipe": recipe, "result": None})
+            # the guided walkthrough is done. Mark as cooked/Leave uncooked
+            # only make sense against a finalized plan that actually has
+            # this recipe in it - otherwise there's nothing for them to act
+            # on, so the fallback Return to recipe/Finish recipe pair shows
+            # instead.
+            plan = plan_store.get_current()
+            show_cooked_buttons = plan is not None and plan.finalized and any(
+                m.recipe_id == recipe_id for m in plan.meals
+            )
+            return templates.TemplateResponse(
+                request,
+                "cook_finish.html",
+                {
+                    "recipe": recipe,
+                    "total_steps": total_steps,
+                    "show_cooked_buttons": show_cooked_buttons,
+                },
+            )
 
         session = cook_along_store.save_step(recipe_id, step_number)
 
@@ -355,6 +375,12 @@ def build_ui_router(
                 {"recipe": recipe, "total_steps": total_steps, "checked": set(session.checked_ingredients)},
             )
 
+        def step_icon_at(index: int) -> str | None:
+            return recipe.step_icons[index] if index < len(recipe.step_icons) else None
+
+        has_prev = step_number > 1
+        has_next = step_number < total_steps
+
         return templates.TemplateResponse(
             request,
             "cook_step.html",
@@ -363,6 +389,11 @@ def build_ui_router(
                 "step_number": step_number,
                 "total_steps": total_steps,
                 "step_text": recipe.steps[step_number - 1],
+                "step_icon": step_icon_at(step_number - 1),
+                "prev_step_text": recipe.steps[step_number - 2] if has_prev else None,
+                "prev_step_icon": step_icon_at(step_number - 2) if has_prev else None,
+                "next_step_text": recipe.steps[step_number] if has_next else None,
+                "next_step_icon": step_icon_at(step_number) if has_next else None,
             },
         )
 
@@ -389,10 +420,10 @@ def build_ui_router(
             },
         )
 
-    @router.post("/recipes/{recipe_id}/cook/finish", response_class=HTMLResponse, include_in_schema=False)
-    def cook_finish(request: Request, recipe_id: str, action: str = Form(...)) -> HTMLResponse:
+    @router.post("/recipes/{recipe_id}/cook/finish", include_in_schema=False)
+    def cook_finish(request: Request, recipe_id: str, action: str = Form(...)):
         try:
-            recipe = store.get(recipe_id)
+            store.get(recipe_id)
         except RecipeNotFound:
             return templates.TemplateResponse(
                 request, "recipe_not_found.html", {"recipe_id": recipe_id, "nav_active": "library"}, status_code=404
@@ -400,13 +431,15 @@ def build_ui_router(
 
         if action == "cooked":
             plan = plan_store.get_current()
-            if plan is not None:
+            if plan is not None and plan.finalized:
                 meal = next((m for m in plan.meals if m.recipe_id == recipe_id), None)
                 if meal is not None and not meal.cooked:
                     plan_store.set_cooked(plan.id, meal.id, True)
 
         cook_along_store.delete(recipe_id)
-        return templates.TemplateResponse(request, "cook_finish.html", {"recipe": recipe, "result": action})
+        # Mark as cooked/Leave uncooked go straight back to the app's home
+        # page - no separate "Got it" confirmation page.
+        return RedirectResponse(url="/recipes", status_code=303)
 
     @router.post("/recipes/{recipe_id}/delete", include_in_schema=False)
     def recipe_delete(recipe_id: str) -> RedirectResponse:
@@ -694,6 +727,13 @@ def _parse_enum_set(enum_cls, raw_values: list[str]) -> frozenset:
     return frozenset(parsed)
 
 
+@lru_cache(maxsize=1)
+def _load_ingredient_icons() -> list[dict]:
+    manifest_path = importlib.resources.files("little_meals") / "static" / "icons" / "ingredients" / "manifest.json"
+    data = json.loads(manifest_path.read_text())
+    return data.get("icons", [])
+
+
 def _empty_recipe_values() -> dict:
     return {
         "name": "",
@@ -705,7 +745,7 @@ def _empty_recipe_values() -> dict:
         "protein_g": "",
         "fiber_g": "",
         "ingredients": [{"name": "", "quantity": ""}],
-        "steps": [""],
+        "steps": [{"text": "", "icon": None}],
     }
 
 
@@ -736,14 +776,19 @@ def _recipe_values_from_recipe(recipe: Recipe) -> dict:
             for ingredient in recipe.ingredients
         ]
         or [{"name": "", "quantity": ""}],
-        "steps": list(recipe.steps) or [""],
+        "steps": [
+            {"text": text, "icon": icon}
+            for text, icon in zip_longest(recipe.steps, recipe.step_icons, fillvalue=None)
+        ]
+        or [{"text": "", "icon": None}],
     }
 
 
 def _recipe_values_from_form(form: FormData) -> dict:
     names = form.getlist("ingredient_name")
     quantities = form.getlist("ingredient_quantity")
-    steps = list(form.getlist("step"))
+    step_texts = form.getlist("step")
+    step_icons = form.getlist("step_icon")
     return {
         "name": form.get("name", ""),
         "cook_time_minutes": form.get("cook_time_minutes", ""),
@@ -755,7 +800,11 @@ def _recipe_values_from_form(form: FormData) -> dict:
         "fiber_g": form.get("fiber_g", ""),
         "ingredients": [{"name": name, "quantity": quantity} for name, quantity in zip(names, quantities)]
         or [{"name": "", "quantity": ""}],
-        "steps": steps or [""],
+        "steps": [
+            {"text": text, "icon": icon or None}
+            for text, icon in zip_longest(step_texts, step_icons, fillvalue="")
+        ]
+        or [{"text": "", "icon": None}],
     }
 
 
@@ -768,6 +817,7 @@ def _recipe_edit_context(
         "error": error,
         "classifications": list(Classification),
         "difficulties": [d for d in Difficulty if d != Difficulty.UNDEFINED],
+        "icons": _load_ingredient_icons(),
         "form_action": "/recipes/new" if mode == "new" else f"/recipes/{recipe_id}/edit",
         "cancel_url": "/recipes" if mode == "new" else f"/recipes/{recipe_id}",
         "recipe_id": recipe_id,
@@ -784,7 +834,16 @@ def _parse_recipe_form(form: FormData, model_cls: type[BaseModel]) -> BaseModel:
         if not name:
             continue
         ingredients.append(Ingredient(name=name, unit=quantity_text.strip() or None))
-    steps = [step.strip() for step in form.getlist("step") if step.strip()]
+    step_texts = form.getlist("step")
+    step_icon_values = form.getlist("step_icon")
+    steps = []
+    step_icons = []
+    for step_text, icon in zip_longest(step_texts, step_icon_values, fillvalue=""):
+        step_text = step_text.strip()
+        if not step_text:
+            continue
+        steps.append(step_text)
+        step_icons.append(icon.strip() or None)
 
     def _optional_float(key: str) -> Optional[float]:
         raw = str(form.get(key) or "").strip()
@@ -811,5 +870,6 @@ def _parse_recipe_form(form: FormData, model_cls: type[BaseModel]) -> BaseModel:
         "servings": int(str(form.get("servings") or "").strip()),
         "ingredients": ingredients,
         "steps": steps,
+        "step_icons": step_icons,
     }
     return model_cls(**data)

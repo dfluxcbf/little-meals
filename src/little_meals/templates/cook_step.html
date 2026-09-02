@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{ recipe.name }} - Step {{ step_number }} - little-meals</title>
-  <link rel="manifest" href="/static/manifest.webmanifest">
+  <link rel="manifest" href="/manifest.webmanifest">
   <meta name="theme-color" content="#c55123">
   <link rel="icon" href="/static/icons/favicon-64.png">
   <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
@@ -12,10 +12,22 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Little Meals">
-  <link rel="stylesheet" href="/static/fonts.css">
-  <link rel="stylesheet" href="/static/app.css">
+  <link rel="stylesheet" href="/static/fonts.css?v={{ app_version }}">
+  <link rel="stylesheet" href="/static/app.css?v={{ app_version }}">
+  <script src="/static/js/accent.js?v={{ app_version }}"></script>
+  <style>
+    /* Opts every cook-along step page into the browser's cross-document
+       View Transition: navigating step-to-step morphs matching
+       view-transition-name elements (see the cards below) instead of an
+       instant swap. No-op in browsers that don't support it yet (e.g.
+       Safari, as of this writing) - navigation just looks like it does
+       today. */
+    @view-transition {
+      navigation: auto;
+    }
+  </style>
   <script src="/static/vendor/htmx.min.js"></script>
-  <script src="/static/js/cook-swipe.js" defer></script>
+  <script src="/static/js/cook-step-swipe.js" defer></script>
 </head>
 <body>
   <div class="cook-shell" data-swipe-prev="/recipes/{{ recipe.id }}/cook/{{ step_number - 1 }}" data-swipe-next="/recipes/{{ recipe.id }}/cook/{{ step_number + 1 }}">
@@ -34,12 +46,43 @@
       {% endfor %}
     </div>
 
-    <div class="cook-step-body">
-      <div class="cook-step-number">{{ step_number }}</div>
-      <p class="cook-step-text">{{ step_text }}</p>
+    <div class="cook-step-stack">
+      {% if prev_step_text %}
+        <div class="cook-step-card cook-step-card-prev" style="view-transition-name: step-{{ recipe.id }}-{{ step_number - 1 }}">
+          <div class="cook-step-card-inner">
+            {% if prev_step_icon %}
+              <span class="cook-step-icon cook-step-icon-sm cook-step-icon-faded" style="-webkit-mask-image: url('/static/icons/ingredients/{{ prev_step_icon }}.svg'); mask-image: url('/static/icons/ingredients/{{ prev_step_icon }}.svg')" aria-hidden="true"></span>
+            {% endif %}
+            <div class="cook-step-number cook-step-number-sm cook-step-number-faded">{{ step_number - 1 }}</div>
+            <p class="cook-step-text cook-step-text-sm cook-step-text-faded">{{ prev_step_text }}</p>
+          </div>
+        </div>
+      {% endif %}
+
+      <div class="cook-step-card cook-step-card-current" style="view-transition-name: step-{{ recipe.id }}-{{ step_number }}">
+        <div class="cook-step-card-inner">
+          {% if step_icon %}
+            <span class="cook-step-icon" style="-webkit-mask-image: url('/static/icons/ingredients/{{ step_icon }}.svg'); mask-image: url('/static/icons/ingredients/{{ step_icon }}.svg')" aria-hidden="true"></span>
+          {% endif %}
+          <div class="cook-step-number">{{ step_number }}</div>
+          <p class="cook-step-text">{{ step_text }}</p>
+        </div>
+      </div>
+
+      {% if next_step_text %}
+        <div class="cook-step-card cook-step-card-next" style="view-transition-name: step-{{ recipe.id }}-{{ step_number + 1 }}">
+          <div class="cook-step-card-inner">
+            {% if next_step_icon %}
+              <span class="cook-step-icon cook-step-icon-sm cook-step-icon-faded" style="-webkit-mask-image: url('/static/icons/ingredients/{{ next_step_icon }}.svg'); mask-image: url('/static/icons/ingredients/{{ next_step_icon }}.svg')" aria-hidden="true"></span>
+            {% endif %}
+            <div class="cook-step-number cook-step-number-sm cook-step-number-faded">{{ step_number + 1 }}</div>
+            <p class="cook-step-text cook-step-text-sm cook-step-text-faded">{{ next_step_text }}</p>
+          </div>
+        </div>
+      {% endif %}
     </div>
 
-    <div class="cook-nav">
+    <div class="cook-nav" style="view-transition-name: cook-nav">
       <a href="/recipes/{{ recipe.id }}/cook/{{ step_number - 1 }}" class="btn btn-secondary cook-prev" aria-label="Previous step">&larr;</a>
       <a href="/recipes/{{ recipe.id }}/cook/{{ step_number + 1 }}" class="btn btn-primary cook-next">
         {{ "Finish cooking" if step_number == total_steps else "Next step" }}

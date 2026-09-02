@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{ recipe.name }} - little-meals</title>
-  <link rel="manifest" href="/static/manifest.webmanifest">
+  <link rel="manifest" href="/manifest.webmanifest">
   <meta name="theme-color" content="#c55123">
   <link rel="icon" href="/static/icons/favicon-64.png">
   <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
@@ -12,39 +12,44 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Little Meals">
-  <link rel="stylesheet" href="/static/fonts.css">
-  <link rel="stylesheet" href="/static/app.css">
+  <link rel="stylesheet" href="/static/fonts.css?v={{ app_version }}">
+  <link rel="stylesheet" href="/static/app.css?v={{ app_version }}">
+  <script src="/static/js/accent.js?v={{ app_version }}"></script>
 </head>
 <body>
   <div class="cook-shell cook-finish">
-    {% if result is none %}
-      <svg width="54" height="54" viewBox="0 0 24 24" fill="none" stroke="var(--sage)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom: 18px;"><path d="M12 2 3 7v6c0 5 4 8 9 9 5-1 9-4 9-9V7l-9-5Z"></path><path d="m9 12 2 2 4-4"></path></svg>
-      <h1>Nicely done!</h1>
-      <p>{{ recipe.name }} is off the stove. Did you cook it?</p>
-      <div class="cook-feedback-actions">
-        <form method="post" action="/recipes/{{ recipe.id }}/cook/finish">
-          <input type="hidden" name="action" value="cooked">
-          <button type="submit" class="cook-feedback-btn">
-            <svg viewBox="0 0 24 24" fill="none" stroke="var(--sage)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"></path></svg>
-            Mark as cooked
-          </button>
-        </form>
-        <form method="post" action="/recipes/{{ recipe.id }}/cook/finish">
-          <input type="hidden" name="action" value="uncooked">
-          <button type="submit" class="cook-feedback-btn">
-            <svg viewBox="0 0 24 24" fill="none" stroke="var(--rose)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"></path></svg>
-            Leave uncooked
-          </button>
-        </form>
-      </div>
-    {% else %}
-      <div class="cook-finish-icon" style="background: {{ 'var(--sage-soft)' if result == 'cooked' else 'var(--rose-soft)' }};">
-        <svg viewBox="0 0 24 24" fill="none" stroke="{{ 'var(--sage)' if result == 'cooked' else 'var(--rose)' }}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"></path></svg>
-      </div>
-      <h1>Got it</h1>
-      <p>{{ "Marked as cooked in this week's plan." if result == "cooked" else "Left uncooked - you can cook it again anytime." }}</p>
-      <a href="/plan" class="btn btn-primary">Back to this week</a>
-    {% endif %}
+    <h1 class="cook-finish-title">{{ recipe.name }}</h1>
+
+    <div class="cook-finish-center">
+      <span class="cook-finish-icon" aria-hidden="true">
+        <span class="cook-finish-icon-mask" style="-webkit-mask-image: url('/static/icons/ingredients/plate.svg'); mask-image: url('/static/icons/ingredients/plate.svg')"></span>
+      </span>
+
+      {% if show_cooked_buttons %}
+        <div class="cook-feedback-actions">
+          <form method="post" action="/recipes/{{ recipe.id }}/cook/finish">
+            <input type="hidden" name="action" value="cooked">
+            <button type="submit" class="cook-feedback-btn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="var(--sage)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"></path></svg>
+              Mark as cooked
+            </button>
+          </form>
+          <form method="post" action="/recipes/{{ recipe.id }}/cook/finish">
+            <input type="hidden" name="action" value="uncooked">
+            <button type="submit" class="cook-feedback-btn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="var(--rose)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+              Leave uncooked
+            </button>
+          </form>
+        </div>
+        <a href="/recipes/{{ recipe.id }}/cook/{{ total_steps }}" class="btn btn-secondary cook-finish-secondary-link">Return to recipe</a>
+      {% else %}
+        <div class="cook-finish-fallback-actions">
+          <a href="/recipes/{{ recipe.id }}/cook/{{ total_steps }}" class="btn btn-secondary">Return to recipe</a>
+          <a href="/recipes" class="btn btn-primary">Finish recipe</a>
+        </div>
+      {% endif %}
+    </div>
   </div>
 </body>
 </html>
