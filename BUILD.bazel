@@ -11,10 +11,11 @@ load("@rules_python//python:pip.bzl", "compile_pip_requirements")
 #   bazel run   //:serve                → run the web app (uvicorn)
 #   bazel run   //:deploy               → rebuild+reinstall, then restart the
 #                                          little-meals systemd --user service
-#   bazel run   //:relaunch             → stop any running lmeals serve,
-#                                          rebuild+reinstall, restart the
-#                                          service, and ensure tailscaled +
-#                                          tailscale serve are up
+#   bazel run   //:relaunch             → rebuild+reinstall, then kill the
+#                                          running lmeals serve process so
+#                                          little-termstyle's server wrapper
+#                                          (tab 9) relaunches it on the new
+#                                          build
 #   bazel test  //...                   → unit tests
 #   bazel run   //:requirements.update  → regenerate requirements_lock.txt
 # ---------------------------------------------------------------------------
@@ -89,9 +90,13 @@ py_binary(
     visibility = ["//visibility:public"],
 )
 
-# Relaunch: stops any running `lmeals serve` (systemd-managed or a stray
-# manual process), rebuilds+reinstalls, restarts the service, and makes sure
-# tailscaled is up. Safe to run unattended (e.g. over Claude Remote Control).
+# Relaunch: rebuilds+reinstalls the wheel, then restarts the running
+# `lmeals serve` process (expected to be a little-termstyle mux "server"
+# session, tab 9 - see tools/relaunch_main.py) by killing it - its
+# crash-respawning wrapper brings it back up a few seconds later on the new
+# build, without tearing down the mux tab. Unlike //:deploy this doesn't
+# touch systemd or tailscale. Safe to run unattended (e.g. over Claude
+# Remote Control).
 py_binary(
     name = "relaunch",
     srcs = [
