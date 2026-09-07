@@ -4,6 +4,62 @@ All notable changes to this project are documented in this file, grouped by
 release version. Versions follow the project's [version policy](docs/version_policy.md)
 and are managed exclusively through `lvx`.
 
+## [0.5.5] - 2026-09-07
+
+### Added
+- Native ingredient icon library: 58 hand-picked SVG icons for foods and
+  cooking techniques, served as CSS masks so they inherit the current accent
+  color, with a `manifest.json` index and attribution in
+  `static/icons/NOTICE.md`. Steps carry an optional `icon`, picked in the
+  recipe editor through an icon-picker `<dialog>`, and shown on the recipe
+  row, the recipe detail page and the cook-along.
+- Cook-along step carousel: each step page renders the previous, current and
+  next step as a stacked card, morphing between steps with the browser's
+  cross-document View Transitions (a plain instant swap where unsupported)
+  and navigable by swipe (`static/js/cook-step-swipe.js`).
+- Per-device accent color: an Appearance section in Settings offers six
+  presets (terracotta, sage, teal, plum, rose, gold), stored in
+  `localStorage` so each phone in the household picks its own, and applied to
+  the native `theme-color` chrome as well as the page. The running app
+  version now shows next to the brand in the top bar.
+- Pantry / never-buy ingredient catalog (M18): a household-wide
+  `IngredientCatalogStore` marks an ingredient *name* as "pantry" (assumed on
+  hand) or "never buy" (excluded from the shopping list entirely).
+  `/settings/ingredients` shows all three lists at once and moves names
+  between them via a hold-to-open action sheet; a glob filter bar
+  (`planning/glob_match.py`) narrows long lists. The recipe detail and
+  cook-along ingredient screens group a recipe's ingredients into
+  Ingredients / Pantry items / Others.
+- Glob search in the cookbook's Filters & Sort bar, with a Name / Ingredients
+  / Steps / All scope selector (`GlobScope` in `planning/recipe_filters.py`),
+  and a reworked filter bar driven by `static/js/recipe-filter-bar.js`.
+- Settings > Development gained "Clear shopping list", which deletes the
+  current plan's shopping list while keeping the plan itself.
+- Server and CI manifests for `little-runner` (M19, M20):
+  `.lrun/config.toml` declares how to build, stop and launch this app's
+  server, plus the `[server.screenshot]` pages used in change reports;
+  `.github/workflows/` gained issue hand-off, server up/down and
+  pull-request check workflows.
+
+### Changed
+- The shopping list drops the tilted notebook-paper styling for a plain
+  checklist card, grouped into To buy / Pantry / Checked / Checked (pantry)
+  and sorted alphabetically within each section
+  (`group_shopping_list_items`); never-buy ingredients are filtered out
+  before quantities are merged.
+- "Cancel Plan" moved from the bottom action bar to the top of `/plan`, away
+  from the other thumb-reachable buttons.
+- `//:relaunch` was simplified and is now deprecated in favour of the
+  little-runner server workflows (M19); `//:deploy` remains available.
+
+### Fixed
+- Recipe editor ingredient rows had a single free-text amount field whose
+  whole value ("2 piece") was stored as `unit`, leaving `quantity` unset - so
+  two entries of the same ingredient with different amounts could never merge
+  or sum in the shopping list. Quantity and unit are now separate inputs, and
+  `RecipeStore` splits the legacy combined form when reading existing recipe
+  files.
+
 ## [0.3.5] - 2026-09-01
 
 ### Added
