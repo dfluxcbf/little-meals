@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       branch:
-        description: "Branch to check out, build, install and run"
+        description: "Any branch to deploy (local or remote-only), e.g. dev, master, feature/something"
         required: true
         default: "dev"
         type: string
