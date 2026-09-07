@@ -44,6 +44,10 @@ class Settings:
     def cook_along_db_path(self) -> Path:
         return self.data_dir / "cook_along.db"
 
+    @property
+    def ingredient_catalog_db_path(self) -> Path:
+        return self.data_dir / "ingredient_catalog.db"
+
     @classmethod
     def from_env(cls) -> "Settings":
         return cls(data_dir=_default_data_dir())

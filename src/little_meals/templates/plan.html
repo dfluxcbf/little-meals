@@ -7,9 +7,16 @@
 {% if plan is none %}
   <p class="subtitle">No plan yet - the household picks meals from the cookbook whenever suits them, no day-to-day schedule.</p>
 {% else %}
-  {% if plan.finalized %}
-    <p class="badge badge-finalized" style="margin-bottom: 16px;">Finalized</p>
-  {% endif %}
+  <div class="plan-header-row">
+    {% if plan.finalized %}
+      <p class="badge badge-finalized">Finalized</p>
+    {% endif %}
+    {% if not all_cooked %}
+      <form method="post" action="/plan/cancel" onsubmit="return confirm('Cancel this week\'s plan? This deletes all planned meals and the shopping list. This cannot be undone.');" class="plan-cancel-top-form">
+        <button type="submit" class="plan-cancel-top-btn">Cancel Plan</button>
+      </form>
+    {% endif %}
+  </div>
 {% endif %}
 
 <div class="plan-center">
@@ -57,7 +64,7 @@
 {% endblock %}
 
 {% block bottom_bar %}
-{% if plan is not none %}
+{% if plan is not none and (not plan.finalized or all_cooked) %}
 <div class="plan-actions-bar">
   {% if not plan.finalized %}
     <form method="post" action="/plan/reroll">
@@ -72,10 +79,6 @@
   {% if all_cooked %}
     <form method="post" action="/plan/generate">
       <button type="submit" class="btn btn-primary">Plan Ahead</button>
-    </form>
-  {% else %}
-    <form method="post" action="/plan/cancel" onsubmit="return confirm('Cancel this week\'s plan? This deletes all planned meals and the shopping list. This cannot be undone.');">
-      <button type="submit" class="btn btn-danger">Cancel Plan</button>
     </form>
   {% endif %}
 </div>

@@ -236,6 +236,22 @@ def test_plan_page_shows_cancel_button_when_plan_exists(client: TestClient, samp
     assert "Cancel Plan" in response.text
 
 
+@pytest.mark.requirement("REQ-000000061")
+def test_cancel_plan_button_is_near_the_top_not_in_the_bottom_action_bar(client: TestClient, sample_recipe):
+    _create_recipe(client, sample_recipe)
+    client.post("/plan/generate", follow_redirects=False)
+
+    response = client.get("/plan")
+    text = response.text
+    header_index = text.index("plan-header-row")
+    cancel_index = text.index('action="/plan/cancel"')
+    actions_bar_index = text.index("plan-actions-bar")
+    # Cancel Plan's form sits inside the top header row, before the bottom
+    # action bar's markup - not inside it - so a mistap while reaching for
+    # Reroll/Confirm at the bottom can't hit it.
+    assert header_index < cancel_index < actions_bar_index
+
+
 @pytest.mark.requirement("REQ-000000046")
 def test_plan_ahead_replaces_cancel_once_every_meal_is_cooked(client: TestClient, sample_recipe):
     _create_recipe(client, sample_recipe)

@@ -120,3 +120,43 @@ def test_write_leaves_no_tmp_file_behind(store: RecipeStore, sample_recipe: Reci
     store.create(sample_recipe)
     tmp_files = list(tmp_recipes_dir.glob("*.tmp"))
     assert tmp_files == []
+
+
+@pytest.mark.requirement("REQ-000000058")
+def test_legacy_combined_quantity_unit_is_split_on_read(store: RecipeStore, tmp_recipes_dir: Path):
+    tmp_recipes_dir.mkdir(parents=True, exist_ok=True)
+    (tmp_recipes_dir / "legacy.md").write_text(
+        """---
+name: Legacy Recipe
+cook_time_minutes: 10
+classification: other
+nutrition: {}
+servings: 2
+ingredients:
+- name: garlic clove
+  unit: 2 piece
+- name: salt
+  unit: a pinch
+created_at: '2026-01-01T00:00:00+00:00'
+updated_at: '2026-01-01T00:00:00+00:00'
+---
+1. Cook it.
+""",
+        encoding="utf-8",
+    )
+
+    recipe = store.get("legacy")
+
+    assert recipe.ingredients[0].name == "garlic clove"
+    assert recipe.ingredients[0].quantity == 2.0
+    assert recipe.ingredients[0].unit == "piece"
+    # No leading number to split out - left untouched.
+    assert recipe.ingredients[1].quantity is None
+    assert recipe.ingredients[1].unit == "a pinch"
+
+
+@pytest.mark.requirement("REQ-000000058")
+def test_already_split_quantity_unit_is_left_unchanged(store: RecipeStore, sample_recipe: Recipe):
+    created = store.create(sample_recipe)
+    reread = store.get(created.id)
+    assert reread.ingredients == sample_recipe.ingredients

@@ -67,6 +67,18 @@ def test_cook_step_0_shows_ingredients_checklist(client: TestClient, sample_reci
         assert ingredient.name in response.text
 
 
+@pytest.mark.requirement("REQ-000000060")
+def test_cook_step_0_groups_ingredients_by_pantry_flag(client: TestClient, sample_recipe, ingredient_catalog_store):
+    created = _create_recipe(client, sample_recipe)
+    pantry_ingredient = sample_recipe.ingredients[0].name
+    ingredient_catalog_store.set_flags(pantry_ingredient, pantry=True, never_buy=False)
+
+    response = client.get(f"/recipes/{created['id']}/cook/0")
+    text = response.text[response.text.index("cook-ingredients-list") :]
+    assert ">Pantry items<" in text
+    assert text.index(">Ingredients<") < text.index(">Pantry items<")
+
+
 @pytest.mark.requirement("REQ-000000033")
 def test_cook_step_shows_the_right_step_text(client: TestClient, sample_recipe):
     created = _create_recipe(client, sample_recipe)

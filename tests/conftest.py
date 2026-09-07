@@ -11,6 +11,7 @@ from little_meals.config import Settings
 from little_meals.models import Classification, Ingredient, Nutrition, Recipe
 from little_meals.store.cook_along_store import CookAlongStore
 from little_meals.store.household_store import HouseholdPreferencesStore
+from little_meals.store.ingredient_catalog_store import IngredientCatalogStore
 from little_meals.store.notification_store import NotificationStore
 from little_meals.store.plan_store import MealPlanStore
 from little_meals.store.recipe_store import RecipeStore
@@ -61,6 +62,11 @@ def cook_along_store(tmp_path: Path) -> CookAlongStore:
 
 
 @pytest.fixture
+def ingredient_catalog_store(tmp_path: Path) -> IngredientCatalogStore:
+    return IngredientCatalogStore(tmp_path / "ingredient_catalog.db")
+
+
+@pytest.fixture
 def sample_recipe() -> Recipe:
     now = datetime(2026, 1, 1, tzinfo=timezone.utc)
     return Recipe(
@@ -90,6 +96,7 @@ def client(
     shopping_list_store: ShoppingListStore,
     notification_store: NotificationStore,
     cook_along_store: CookAlongStore,
+    ingredient_catalog_store: IngredientCatalogStore,
 ) -> TestClient:
     settings = Settings(data_dir=store._dir.parent)
     app = create_app(
@@ -100,5 +107,6 @@ def client(
         shopping_list_store=shopping_list_store,
         notification_store=notification_store,
         cook_along_store=cook_along_store,
+        ingredient_catalog_store=ingredient_catalog_store,
     )
     return TestClient(app)

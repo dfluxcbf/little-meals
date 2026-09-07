@@ -147,6 +147,7 @@ class ShoppingListItem(BaseModel):
     quantity: Optional[float] = None
     unit: Optional[str] = None
     checked: bool = False
+    pantry: bool = False
 
 
 class ShoppingList(BaseModel):

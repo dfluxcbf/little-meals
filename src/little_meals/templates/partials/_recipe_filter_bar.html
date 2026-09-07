@@ -15,6 +15,18 @@
   <form method="get" action="/recipes" class="filter-bar-panel" id="filter-form">
 
     <div class="filter-group">
+      <label for="glob">Search</label>
+      <input type="text" id="glob" name="glob" value="{{ filters.glob }}" placeholder="e.g. *chicken*, gar?ic">
+      <p class="hint" style="text-align: left; margin-top: 6px;">Supports glob wildcards - <code>*</code> matches anything, <code>?</code> matches one character.</p>
+      <div class="pill-group">
+        {% for scope in glob_scopes %}
+          <input type="radio" class="pill-input" id="glob-scope-{{ scope.value }}" name="glob_scope" value="{{ scope.value }}" {% if scope.value == filters.glob_scope %}checked{% endif %}>
+          <label for="glob-scope-{{ scope.value }}" class="pill-label">{{ {"name": "Name", "ingredients": "Ingredients", "steps": "Steps", "all": "All"}[scope.value] }}</label>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="filter-group">
       <div class="filter-range-grid">
         <span></span>
         <span class="filter-range-header">Min</span>

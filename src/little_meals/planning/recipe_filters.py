@@ -5,6 +5,14 @@ from enum import Enum
 from typing import Optional
 
 from little_meals.models import Classification, Difficulty, Recipe
+from little_meals.planning.glob_match import matches_glob
+
+
+class GlobScope(str, Enum):
+    NAME = "name"
+    INGREDIENTS = "ingredients"
+    STEPS = "steps"
+    ALL = "all"
 
 
 @dataclass(frozen=True)
@@ -23,6 +31,8 @@ class RecipeFilter:
     max_cook_time: Optional[int] = None
     classifications: frozenset[Classification] = field(default_factory=frozenset)
     difficulties: frozenset[Difficulty] = field(default_factory=frozenset)
+    glob_pattern: Optional[str] = None
+    glob_scope: GlobScope = GlobScope.ALL
 
 
 class SortField(str, Enum):
@@ -71,7 +81,23 @@ def _matches(recipe: Recipe, criteria: RecipeFilter) -> bool:
         return False
     if criteria.difficulties and recipe.difficulty not in criteria.difficulties:
         return False
+    if not _matches_glob_scope(recipe, criteria.glob_pattern, criteria.glob_scope):
+        return False
     return True
+
+
+def _matches_glob_scope(recipe: Recipe, pattern: Optional[str], scope: GlobScope) -> bool:
+    if pattern is None or not pattern.strip():
+        return True
+    if scope in (GlobScope.NAME, GlobScope.ALL) and matches_glob(recipe.name, pattern):
+        return True
+    if scope in (GlobScope.INGREDIENTS, GlobScope.ALL) and any(
+        matches_glob(ingredient.name, pattern) for ingredient in recipe.ingredients
+    ):
+        return True
+    if scope in (GlobScope.STEPS, GlobScope.ALL) and any(matches_glob(step, pattern) for step in recipe.steps):
+        return True
+    return False
 
 
 _SORT_KEY_FNS = {
