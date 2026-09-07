@@ -25,6 +25,7 @@ from little_meals.planning.plan_builder import build_meal_specs
 from little_meals.scheduler import WeeklyScheduler
 from little_meals.store.cook_along_store import CookAlongStore
 from little_meals.store.household_store import HouseholdPreferencesStore
+from little_meals.store.ingredient_catalog_store import IngredientCatalogStore
 from little_meals.store.notification_store import NotificationStore
 from little_meals.store.plan_store import MealPlanStore
 from little_meals.store.recipe_store import RecipeStore
@@ -41,6 +42,7 @@ def create_app(
     shopping_list_store: Optional[ShoppingListStore] = None,
     notification_store: Optional[NotificationStore] = None,
     cook_along_store: Optional[CookAlongStore] = None,
+    ingredient_catalog_store: Optional[IngredientCatalogStore] = None,
     enable_scheduler: bool = False,
 ) -> FastAPI:
     settings = settings or Settings.from_env()
@@ -50,6 +52,7 @@ def create_app(
     shopping_list_store = shopping_list_store or ShoppingListStore(settings.shopping_list_db_path)
     notification_store = notification_store or NotificationStore(settings.notification_db_path)
     cook_along_store = cook_along_store or CookAlongStore(settings.cook_along_db_path)
+    ingredient_catalog_store = ingredient_catalog_store or IngredientCatalogStore(settings.ingredient_catalog_db_path)
 
     background_scheduler = None
     if enable_scheduler:
@@ -90,6 +93,7 @@ def create_app(
     app.state.shopping_list_store = shopping_list_store
     app.state.notification_store = notification_store
     app.state.cook_along_store = cook_along_store
+    app.state.ingredient_catalog_store = ingredient_catalog_store
     app.state.scheduler = background_scheduler
 
     package_root = importlib.resources.files("little_meals")
@@ -148,7 +152,7 @@ def create_app(
     app.include_router(build_recipes_router(store, settings))
     app.include_router(build_household_router(household_store))
     app.include_router(build_plan_router(plan_store, store, household_store))
-    app.include_router(build_shopping_router(shopping_list_store, plan_store, store))
+    app.include_router(build_shopping_router(shopping_list_store, plan_store, store, ingredient_catalog_store))
     app.include_router(
         build_ui_router(
             store,
@@ -157,6 +161,7 @@ def create_app(
             shopping_list_store,
             notification_store,
             cook_along_store,
+            ingredient_catalog_store,
             templates,
         )
     )

@@ -14,6 +14,7 @@ from little_meals.store.frontmatter import FrontmatterError, render, slugify, sp
 logger = logging.getLogger(__name__)
 
 _STEP_PREFIX_RE = re.compile(r"^\s*(?:\d+[.)]|[-*])\s+")
+_LEGACY_QUANTITY_UNIT_RE = re.compile(r"^\s*(-?\d+(?:\.\d+)?)\s*(.+?)\s*$")
 
 
 class RecipeStoreError(RuntimeError):
@@ -106,7 +107,7 @@ class RecipeStore:
             difficulty=data.get("difficulty", "undefined"),
             nutrition=data["nutrition"],
             servings=data.get("servings", 2),
-            ingredients=data["ingredients"],
+            ingredients=_normalize_ingredients(data["ingredients"]),
             steps=steps,
             icon=data.get("icon"),
             step_icons=data.get("step_icons", []),
@@ -137,6 +138,24 @@ class RecipeStore:
         tmp_path = path.with_suffix(".md.tmp")
         tmp_path.write_text(text, encoding="utf-8")
         os.replace(tmp_path, path)
+
+
+def _normalize_ingredients(raw_ingredients: list[dict]) -> list[dict]:
+    """Split a legacy combined "<quantity> <unit>" string out of `unit` into
+    proper `quantity`/`unit` fields, for files written before the recipe
+    editor had separate quantity/unit inputs. A file already using split
+    fields (`quantity` already set) is left untouched."""
+    normalized = []
+    for raw in raw_ingredients:
+        raw = dict(raw)
+        unit = raw.get("unit")
+        if raw.get("quantity") is None and isinstance(unit, str):
+            match = _LEGACY_QUANTITY_UNIT_RE.match(unit)
+            if match:
+                raw["quantity"] = float(match.group(1))
+                raw["unit"] = match.group(2)
+        normalized.append(raw)
+    return normalized
 
 
 def _render_steps(steps: list[str]) -> str:

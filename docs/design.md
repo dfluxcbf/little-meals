@@ -44,7 +44,11 @@ already saved.
 - Per-person accounts or separate preferences within the household — there is one
   shared recipe library, one set of preferences, and one meal plan, even though
   several people/devices in the household use it.
-- Pantry/inventory tracking (the shopping list assumes nothing is already on hand).
+- Real pantry/inventory tracking (quantities on hand, expiry, stock levels). The
+  household can flag an ingredient as a "pantry item" (see the ingredient
+  catalog concept below) to keep it off the main to-buy section of the
+  shopping list, but this is a simple assumed-on-hand tag, not counted
+  inventory.
 - Photo/OCR recipe import (recipes are provided as text).
 - A native mobile app.
 - Budget planning beyond recording the actual cost of a generated shopping list.
@@ -57,7 +61,8 @@ already saved.
 | **Household preferences** | Configuration shared by the whole household (not per person): recipes-per-week count, default servings per meal (e.g. "2 adults", "2 adults + 1 child"), and two independently-toggleable schedule automations - recommendation day/time (when to close out the current plan and start a new draft) and auto-confirm day/time (when to automatically finalize whatever plan is still a draft, so the household never has to click "Confirm Plan" themselves). |
 | **Reroll** | A request for different recipes than the ones currently on the table, at three granularities: reroll the *whole draft plan* (every slot gets a fresh plan, drawn the same way the original was), reroll a *single meal* (swaps in an unused library recipe for that slot), or a *controlled reroll* of a single meal (up to 10 unused library recipes to pick from directly). All three draw only from the existing library — a slot simply can't be filled if the library has nothing unused left to offer. Rerolling is only available on a plan that isn't finalized yet. |
 | **Meal plan** | The set of recipes selected for a given week from the existing library, each with a servings count the user can override from the default. The household can also add or remove individual meal slots directly on a draft plan (an "odd week" adjustment) without changing the household's `recipes_per_week` default. Meals aren't assigned to specific days — the household picks from the week's set and cooks them in whatever order suits them. Each meal carries a cooked/not-cooked state, but the "mark cooked" control only appears once the plan is confirmed (finalized) - a draft has nothing to mark cooked yet. The household can mark a meal cooked directly from the plan (a stamp), or it's set automatically when a cook-along session for that meal finishes. Once every meal in a finalized plan is cooked, the plan's "Cancel Plan" action is replaced by "Plan Ahead", which starts a fresh draft for the next round. |
-| **Shopping list** | The ingredient list for an entire meal plan: same ingredients across recipes are merged, quantities scaled to each recipe's servings, presented with checkboxes, in one flat list (no grocery-aisle categorization). The user records the actual amount spent once shopping is done. |
+| **Shopping list** | The ingredient list for an entire meal plan: same ingredients across recipes are merged, quantities scaled to each recipe's servings, presented with checkboxes, grouped into four sections (to buy, pantry, checked, checked pantry - no grocery-aisle categorization). An ingredient flagged "never buy" in the catalog never reaches the list at all. The user records the actual amount spent once shopping is done. |
+| **Ingredient catalog** | A household-wide list of per-ingredient-name flags, independent of any single recipe: "pantry" (assumed already on hand - salt, pepper, oil, milk) and "never buy" (never added to a shopping list - e.g. water). Tagging an ingredient once (Settings > Ingredient categories) applies everywhere that name appears, across every recipe and the shopping list. The management page presents every tracked name as one of 3 lists - Regular Ingredients, Pantry Ingredients, Never Buy - moved between them by holding a row to open a "Move to..." action sheet, with a glob-pattern filter to narrow a long list. |
 | **Cook-along session** | A guided, step-by-step walkthrough of a single recipe's cooking steps, used while actually cooking - reachable for any recipe, whether or not it's in this week's plan; ends with a cooked/left-uncooked choice, which marks the meal cooked in the current plan if that recipe happens to be in it (the same flag the plan review pot-stamp toggle controls). |
 
 ## Data flow

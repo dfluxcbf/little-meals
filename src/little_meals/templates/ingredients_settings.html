@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Ingredient categories - little-meals{% endblock %}
+{% block content %}
+<h1>Ingredient categories</h1>
+<p class="subtitle">Tap to select ingredients, then hold any one of them to move the whole selection - or just hold a single ingredient to move it on its own. Pantry items are assumed to already be on hand and get their own shopping list section; Never Buy items are left off the shopping list entirely.</p>
+<p class="subtitle"><a href="/settings">&larr; Back to settings</a></p>
+
+<details class="filter-bar" {% if active_filter_count %}open{% endif %}>
+  <summary class="filter-bar-summary">
+    <span>Filter{% if active_filter_count %} ({{ active_filter_count }}){% endif %}</span>
+    <span class="filter-bar-summary-icons">
+      {% if active_filter_count %}
+        <a href="/settings/ingredients" class="filter-bar-reset" aria-label="Reset filter" title="Reset filter">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"></path><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"></path><path d="M19 6l-.8 13.2a2 2 0 0 1-2 1.8H7.8a2 2 0 0 1-2-1.8L5 6"></path><path d="M10 11v6M14 11v6"></path></svg>
+        </a>
+      {% endif %}
+      <span class="filter-bar-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"></line><line x1="4" y1="12" x2="20" y2="12"></line><line x1="4" y1="18" x2="20" y2="18"></line><circle cx="9" cy="6" r="2"></circle><circle cx="15" cy="12" r="2"></circle><circle cx="9" cy="18" r="2"></circle></svg>
+      </span>
+    </span>
+  </summary>
+  <form method="get" action="/settings/ingredients" class="filter-bar-panel" id="filter-form">
+    <div class="filter-group">
+      <label for="q">Search</label>
+      <input type="text" id="q" name="q" value="{{ filters.q }}" placeholder="e.g. *garlic*, sal?">
+      <p class="hint" style="text-align: left; margin-top: 6px;">Supports glob wildcards - <code>*</code> matches anything, <code>?</code> matches one character.</p>
+    </div>
+    <div class="filter-bar-actions">
+      <button type="submit" class="btn btn-primary">Apply</button>
+      <a href="/settings/ingredients" class="btn btn-secondary">Reset</a>
+    </div>
+  </form>
+</details>
+
+<div id="ingredient-lists">
+  {% include "partials/_ingredient_lists.html" %}
+</div>
+
+<div class="settings-section">
+  <h2>Track a new ingredient</h2>
+  <p class="hint" style="text-align: left; margin: -4px 0 12px;">Add an ingredient that isn't in any recipe yet (e.g. to pre-mark it never-buy).</p>
+  <form method="post" action="/settings/ingredients/add" class="amount-input">
+    <input type="text" name="name" placeholder="Ingredient name" required>
+    <button type="submit" class="btn btn-secondary">Add</button>
+  </form>
+</div>
+
+<dialog id="ingredient-action-dialog" class="icon-picker-dialog">
+  <div class="icon-picker-header">
+    <h3 id="ingredient-action-dialog-title">Ingredient</h3>
+    <button type="button" class="modal-close-btn" id="ingredient-action-dialog-close" aria-label="Close">&times;</button>
+  </div>
+  <div class="action-sheet">
+    <button type="button" class="action-sheet-item" data-category="regular" data-label="Regular Ingredients">Move to 'Regular Ingredients'</button>
+    <button type="button" class="action-sheet-item" data-category="pantry" data-label="Pantry Ingredients">Move to 'Pantry Ingredients'</button>
+    <button type="button" class="action-sheet-item" data-category="never_buy" data-label="Never Buy">Move to 'Never Buy'</button>
+  </div>
+</dialog>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/recipe-filter-bar.js" defer></script>
+<script src="/static/js/ingredient-hold-menu.js" defer></script>
+{% endblock %}

@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 import pytest
 
 from little_meals.models import Classification, Difficulty, Ingredient, Nutrition, Recipe
-from little_meals.planning.recipe_filters import RecipeFilter, SortDirection, SortField, filter_recipes, sort_recipes
+from little_meals.planning.recipe_filters import GlobScope, RecipeFilter, SortDirection, SortField, filter_recipes, sort_recipes
 
 
 def _recipe(
@@ -17,6 +17,8 @@ def _recipe(
     calories: int | None = 400,
     protein: float | None = 20.0,
     fiber: float | None = 5.0,
+    ingredients: list[Ingredient] | None = None,
+    steps: list[str] | None = None,
 ) -> Recipe:
     now = datetime(2026, 1, 1, tzinfo=timezone.utc)
     return Recipe(
@@ -27,8 +29,8 @@ def _recipe(
         difficulty=difficulty,
         nutrition=Nutrition(calories_per_serving=calories, protein_g=protein, fiber_g=fiber),
         servings=2,
-        ingredients=[Ingredient(name="something", quantity=1, unit="cup")],
-        steps=["Cook it."],
+        ingredients=ingredients or [Ingredient(name="something", quantity=1, unit="cup")],
+        steps=steps or ["Cook it."],
         created_at=now,
         updated_at=now,
     )
@@ -194,3 +196,62 @@ def test_sort_missing_values_sort_last_descending():
     recipes = [_recipe("Unknown", calories=None), _recipe("Known", calories=100)]
     result = sort_recipes(recipes, SortField.CALORIES, SortDirection.DESC)
     assert [r.name for r in result] == ["Known", "Unknown"]
+
+
+GLOB_REQ = "REQ-000000063"
+
+
+@pytest.mark.requirement(GLOB_REQ)
+def test_blank_glob_pattern_matches_everything():
+    recipes = [_recipe("Chicken Soup"), _recipe("Beef Stew")]
+    result = filter_recipes(recipes, RecipeFilter(glob_pattern=""))
+    assert len(result) == 2
+
+
+@pytest.mark.requirement(GLOB_REQ)
+def test_glob_scope_name_matches_only_recipe_name():
+    recipes = [
+        _recipe("Chicken Soup", ingredients=[Ingredient(name="broth", quantity=1, unit="cup")]),
+        _recipe("Beef Stew", ingredients=[Ingredient(name="chicken stock", quantity=1, unit="cup")]),
+    ]
+    result = filter_recipes(recipes, RecipeFilter(glob_pattern="*chicken*", glob_scope=GlobScope.NAME))
+    assert [r.name for r in result] == ["Chicken Soup"]
+
+
+@pytest.mark.requirement(GLOB_REQ)
+def test_glob_scope_ingredients_matches_any_ingredient_name():
+    recipes = [
+        _recipe("Soup", ingredients=[Ingredient(name="garlic clove", quantity=2, unit="piece")]),
+        _recipe("Stew", ingredients=[Ingredient(name="beef", quantity=1, unit="kg")]),
+    ]
+    result = filter_recipes(recipes, RecipeFilter(glob_pattern="garlic*", glob_scope=GlobScope.INGREDIENTS))
+    assert [r.name for r in result] == ["Soup"]
+
+
+@pytest.mark.requirement(GLOB_REQ)
+def test_glob_scope_steps_matches_any_step_text():
+    recipes = [
+        _recipe("Soup", steps=["Simmer for 20 minutes."]),
+        _recipe("Stew", steps=["Roast the beef."]),
+    ]
+    result = filter_recipes(recipes, RecipeFilter(glob_pattern="*simmer*", glob_scope=GlobScope.STEPS))
+    assert [r.name for r in result] == ["Soup"]
+
+
+@pytest.mark.requirement(GLOB_REQ)
+def test_glob_scope_all_matches_name_ingredients_or_steps():
+    recipes = [
+        _recipe("Garlic Soup"),
+        _recipe("Beef Stew", ingredients=[Ingredient(name="garlic clove", quantity=1, unit="piece")]),
+        _recipe("Chicken Bake", steps=["Add garlic and roast."]),
+        _recipe("Plain Rice"),
+    ]
+    result = filter_recipes(recipes, RecipeFilter(glob_pattern="*garlic*", glob_scope=GlobScope.ALL))
+    assert {r.name for r in result} == {"Garlic Soup", "Beef Stew", "Chicken Bake"}
+
+
+@pytest.mark.requirement(GLOB_REQ)
+def test_glob_pattern_is_case_insensitive():
+    recipes = [_recipe("Chicken Soup")]
+    result = filter_recipes(recipes, RecipeFilter(glob_pattern="CHICKEN*", glob_scope=GlobScope.NAME))
+    assert len(result) == 1

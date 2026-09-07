@@ -4,8 +4,9 @@ import pytest
 
 from datetime import datetime, timezone
 
-from little_meals.models import Classification, Ingredient, MealPlan, Nutrition, PlanMeal, Recipe
-from little_meals.planning.shopping_list import build_shopping_list_items
+from little_meals.models import Classification, Ingredient, MealPlan, Nutrition, PlanMeal, Recipe, ShoppingListItem
+from little_meals.planning.shopping_list import build_shopping_list_items, group_shopping_list_items
+from little_meals.store.ingredient_catalog_store import IngredientFlags
 from little_meals.store.recipe_store import RecipeStore
 
 
@@ -34,7 +35,7 @@ def test_scales_quantities_to_meal_servings(store: RecipeStore):
     recipe = store.create(_recipe("Soup", servings=2, ingredients=[Ingredient(name="Carrot", quantity=2, unit="pieces")]))
     plan = _plan([PlanMeal(id="m1", recipe_id=recipe.id, servings=4)])
 
-    items = build_shopping_list_items(plan, store)
+    items = build_shopping_list_items(plan, store, {})
 
     assert len(items) == 1
     assert items[0].name == "Carrot"
@@ -48,7 +49,7 @@ def test_merges_same_name_and_unit_across_meals(store: RecipeStore):
     b = store.create(_recipe("B", servings=2, ingredients=[Ingredient(name="garlic", quantity=3, unit="Cloves")]))
     plan = _plan([PlanMeal(id="m1", recipe_id=a.id, servings=2), PlanMeal(id="m2", recipe_id=b.id, servings=2)])
 
-    items = build_shopping_list_items(plan, store)
+    items = build_shopping_list_items(plan, store, {})
 
     assert len(items) == 1
     assert items[0].quantity == 5.0
@@ -60,7 +61,7 @@ def test_keeps_mismatched_units_as_separate_lines(store: RecipeStore):
     b = store.create(_recipe("B", servings=2, ingredients=[Ingredient(name="Flour", quantity=500, unit="g")]))
     plan = _plan([PlanMeal(id="m1", recipe_id=a.id, servings=2), PlanMeal(id="m2", recipe_id=b.id, servings=2)])
 
-    items = build_shopping_list_items(plan, store)
+    items = build_shopping_list_items(plan, store, {})
 
     assert len(items) == 2
     units = {item.unit for item in items}
@@ -73,7 +74,7 @@ def test_ingredients_with_no_quantity_are_deduplicated_by_name(store: RecipeStor
     b = store.create(_recipe("B", servings=2, ingredients=[Ingredient(name="Salt", quantity=None, unit=None)]))
     plan = _plan([PlanMeal(id="m1", recipe_id=a.id, servings=2), PlanMeal(id="m2", recipe_id=b.id, servings=2)])
 
-    items = build_shopping_list_items(plan, store)
+    items = build_shopping_list_items(plan, store, {})
 
     assert len(items) == 1
     assert items[0].quantity is None
@@ -93,7 +94,7 @@ def test_preserves_first_appearance_order(store: RecipeStore):
     )
     plan = _plan([PlanMeal(id="m1", recipe_id=recipe.id, servings=2)])
 
-    items = build_shopping_list_items(plan, store)
+    items = build_shopping_list_items(plan, store, {})
 
     assert [item.name for item in items] == ["Zucchini", "Apple"]
 
@@ -104,7 +105,7 @@ def test_skips_meals_whose_recipe_was_deleted(store: RecipeStore):
     store.delete(recipe.id)
     plan = _plan([PlanMeal(id="m1", recipe_id=recipe.id, servings=2)])
 
-    items = build_shopping_list_items(plan, store)
+    items = build_shopping_list_items(plan, store, {})
 
     assert items == []
 
@@ -112,4 +113,68 @@ def test_skips_meals_whose_recipe_was_deleted(store: RecipeStore):
 @pytest.mark.requirement("REQ-000000029")
 def test_empty_plan_yields_empty_list(store: RecipeStore):
     plan = _plan([])
-    assert build_shopping_list_items(plan, store) == []
+    assert build_shopping_list_items(plan, store, {}) == []
+
+
+@pytest.mark.requirement("REQ-000000058")
+def test_never_buy_ingredient_is_excluded(store: RecipeStore):
+    recipe = store.create(_recipe("Soup", servings=2, ingredients=[Ingredient(name="Water", quantity=1, unit="L")]))
+    plan = _plan([PlanMeal(id="m1", recipe_id=recipe.id, servings=2)])
+
+    items = build_shopping_list_items(plan, store, {"water": IngredientFlags(never_buy=True)})
+
+    assert items == []
+
+
+@pytest.mark.requirement("REQ-000000058")
+def test_pantry_flag_is_carried_onto_merged_item(store: RecipeStore):
+    recipe = store.create(_recipe("Soup", servings=2, ingredients=[Ingredient(name="Salt", quantity=1, unit="tsp")]))
+    plan = _plan([PlanMeal(id="m1", recipe_id=recipe.id, servings=2)])
+
+    items = build_shopping_list_items(plan, store, {"salt": IngredientFlags(pantry=True)})
+
+    assert len(items) == 1
+    assert items[0].pantry is True
+
+
+@pytest.mark.requirement("REQ-000000058")
+def test_matching_quantity_and_unit_merge_across_meals(store: RecipeStore):
+    a = store.create(_recipe("A", servings=2, ingredients=[Ingredient(name="garlic clove", quantity=2, unit="piece")]))
+    b = store.create(_recipe("B", servings=2, ingredients=[Ingredient(name="garlic clove", quantity=1, unit="piece")]))
+    plan = _plan([PlanMeal(id="m1", recipe_id=a.id, servings=2), PlanMeal(id="m2", recipe_id=b.id, servings=2)])
+
+    items = build_shopping_list_items(plan, store, {})
+
+    assert len(items) == 1
+    assert items[0].quantity == 3.0
+    assert items[0].unit == "piece"
+
+
+def _item(name: str, *, checked: bool = False, pantry: bool = False) -> ShoppingListItem:
+    return ShoppingListItem(id=name, name=name, checked=checked, pantry=pantry)
+
+
+@pytest.mark.requirement("REQ-000000059")
+def test_group_shopping_list_items_sections_and_order():
+    items = [
+        _item("Zucchini"),
+        _item("Apple"),
+        _item("Salt", pantry=True),
+        _item("Oil", pantry=True),
+        _item("Bread", checked=True),
+        _item("Pepper", checked=True, pantry=True),
+    ]
+
+    sections = group_shopping_list_items(items)
+
+    assert [label for label, _ in sections] == ["To buy", "Pantry", "Checked", "Checked (pantry)"]
+    to_buy = dict(sections)["To buy"]
+    assert [i.name for i in to_buy] == ["Apple", "Zucchini"]
+    pantry = dict(sections)["Pantry"]
+    assert [i.name for i in pantry] == ["Oil", "Salt"]
+
+
+@pytest.mark.requirement("REQ-000000059")
+def test_group_shopping_list_items_omits_empty_sections():
+    sections = group_shopping_list_items([_item("Apple")])
+    assert [label for label, _ in sections] == ["To buy"]

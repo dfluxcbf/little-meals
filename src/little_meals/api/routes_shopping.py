@@ -5,12 +5,18 @@ from fastapi import APIRouter
 from little_meals.api.errors import ApiError
 from little_meals.models import ActualCostUpdate, ItemCheckedUpdate, ShoppingList
 from little_meals.planning.shopping_list import build_shopping_list_items
+from little_meals.store.ingredient_catalog_store import IngredientCatalogStore
 from little_meals.store.plan_store import MealPlanStore
 from little_meals.store.recipe_store import RecipeStore
 from little_meals.store.shopping_list_store import ShoppingListItemNotFound, ShoppingListNotFound, ShoppingListStore
 
 
-def build_shopping_router(store: ShoppingListStore, plan_store: MealPlanStore, recipe_store: RecipeStore) -> APIRouter:
+def build_shopping_router(
+    store: ShoppingListStore,
+    plan_store: MealPlanStore,
+    recipe_store: RecipeStore,
+    ingredient_catalog_store: IngredientCatalogStore,
+) -> APIRouter:
     router = APIRouter(prefix="/api/shopping-list")
 
     def _current_finalized_plan():
@@ -35,7 +41,7 @@ def build_shopping_router(store: ShoppingListStore, plan_store: MealPlanStore, r
         existing = store.get_for_plan(plan.id)
         if existing is not None:
             return existing
-        items = build_shopping_list_items(plan, recipe_store)
+        items = build_shopping_list_items(plan, recipe_store, ingredient_catalog_store.get_all())
         return store.create(plan.id, items)
 
     @router.patch("/{list_id}/items/{item_id}/checked", response_model=ShoppingList)

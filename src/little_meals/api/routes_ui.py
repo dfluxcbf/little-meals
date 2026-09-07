@@ -14,11 +14,14 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, ValidationError
 
 from little_meals.models import Classification, DayOfWeek, Difficulty, HouseholdPreferencesUpdate, Ingredient, MealPlan, Recipe, RecipeCreate, RecipeUpdate
+from little_meals.planning.glob_match import matches_glob
+from little_meals.planning.ingredient_grouping import categorize_ingredients, group_ingredient_names_by_category
 from little_meals.planning.plan_builder import build_meal_specs, generate_single_replacement, list_controlled_reroll_candidates
-from little_meals.planning.recipe_filters import RecipeFilter, SortDirection, SortField, filter_recipes, sort_recipes
-from little_meals.planning.shopping_list import build_shopping_list_items
+from little_meals.planning.recipe_filters import GlobScope, RecipeFilter, SortDirection, SortField, filter_recipes, sort_recipes
+from little_meals.planning.shopping_list import build_shopping_list_items, group_shopping_list_items
 from little_meals.store.cook_along_store import CookAlongStore
 from little_meals.store.household_store import HouseholdPreferencesStore
+from little_meals.store.ingredient_catalog_store import IngredientCatalogStore
 from little_meals.store.notification_store import NotificationStore
 from little_meals.store.plan_store import MealPlanStore, MealSpec, PlanMealNotFound, PlanNotFound
 from little_meals.store.recipe_store import RecipeNotFound, RecipeStore
@@ -32,6 +35,7 @@ def build_ui_router(
     shopping_list_store: ShoppingListStore,
     notification_store: NotificationStore,
     cook_along_store: CookAlongStore,
+    ingredient_catalog_store: IngredientCatalogStore,
     templates: Jinja2Templates,
 ) -> APIRouter:
     router = APIRouter()
@@ -78,6 +82,8 @@ def build_ui_router(
         max_cook_time: Optional[str] = None,
         classification: list[str] = Query(default=[]),
         difficulty: list[str] = Query(default=[]),
+        glob: Optional[str] = None,
+        glob_scope: str = "all",
         sort_by: str = "name",
         sort_dir: str = "asc",
     ) -> HTMLResponse:
@@ -96,6 +102,7 @@ def build_ui_router(
 
         classifications = _parse_enum_set(Classification, classification)
         difficulties = _parse_enum_set(Difficulty, difficulty)
+        glob_scope_enum = _parse_enum(GlobScope, glob_scope, GlobScope.ALL)
         criteria = RecipeFilter(
             min_calories=min_calories,
             max_calories=max_calories,
@@ -107,6 +114,8 @@ def build_ui_router(
             max_cook_time=max_cook_time,
             classifications=classifications,
             difficulties=difficulties,
+            glob_pattern=glob,
+            glob_scope=glob_scope_enum,
         )
         sort_field = _parse_enum(SortField, sort_by, SortField.NAME)
         sort_direction = _parse_enum(SortDirection, sort_dir, SortDirection.ASC)
@@ -130,6 +139,7 @@ def build_ui_router(
                 max_cook_time is not None,
                 bool(classifications),
                 bool(difficulties),
+                bool(glob and glob.strip()),
             ]
         )
         return templates.TemplateResponse(
@@ -152,12 +162,15 @@ def build_ui_router(
                     "max_cook_time": max_cook_time,
                     "classification": {c.value for c in classifications},
                     "difficulty": {d.value for d in difficulties},
+                    "glob": glob or "",
+                    "glob_scope": glob_scope_enum.value,
                     "sort_by": sort_field.value,
                     "sort_dir": sort_direction.value,
                 },
                 "active_filter_count": active_filter_count,
                 "classifications": list(Classification),
                 "difficulties": list(Difficulty),
+                "glob_scopes": list(GlobScope),
                 "sort_fields": list(SortField),
             },
         )
@@ -310,7 +323,10 @@ def build_ui_router(
             return templates.TemplateResponse(
                 request, "recipe_not_found.html", {"recipe_id": recipe_id, "nav_active": "library"}, status_code=404
             )
-        return templates.TemplateResponse(request, "recipe_detail.html", {"recipe": recipe, "nav_active": "library"})
+        groups = categorize_ingredients(recipe.ingredients, ingredient_catalog_store.get_all())
+        return templates.TemplateResponse(
+            request, "recipe_detail.html", {"recipe": recipe, "groups": groups, "nav_active": "library"}
+        )
 
     @router.get("/recipes/{recipe_id}/cook", response_class=HTMLResponse, include_in_schema=False)
     def cook_start(request: Request, recipe_id: str):
@@ -369,10 +385,16 @@ def build_ui_router(
         session = cook_along_store.save_step(recipe_id, step_number)
 
         if step_number == 0:
+            groups = categorize_ingredients(recipe.ingredients, ingredient_catalog_store.get_all())
             return templates.TemplateResponse(
                 request,
                 "cook_ingredients.html",
-                {"recipe": recipe, "total_steps": total_steps, "checked": set(session.checked_ingredients)},
+                {
+                    "recipe": recipe,
+                    "total_steps": total_steps,
+                    "groups": groups,
+                    "checked": set(session.checked_ingredients),
+                },
             )
 
         def step_icon_at(index: int) -> str | None:
@@ -454,12 +476,14 @@ def build_ui_router(
         *,
         error: Optional[str] = None,
         saved: bool = False,
+        cleared: bool = False,
     ) -> dict:
         return {
             "preferences": preferences,
             "days": list(DayOfWeek),
             "error": error,
             "saved": saved,
+            "cleared": cleared,
             "nav_active": "settings",
         }
 
@@ -502,6 +526,55 @@ def build_ui_router(
 
         preferences = household_store.put(update)
         return templates.TemplateResponse(request, "settings.html", _settings_context(preferences, saved=True))
+
+    @router.post("/settings/dev/clear-shopping-list", response_class=HTMLResponse, include_in_schema=False)
+    def settings_clear_shopping_list(request: Request) -> HTMLResponse:
+        plan = plan_store.get_current()
+        if plan is not None:
+            shopping_list_store.delete_for_plan(plan.id)
+        preferences = household_store.get()
+        return templates.TemplateResponse(request, "settings.html", _settings_context(preferences, cleared=True))
+
+    _VALID_INGREDIENT_CATEGORIES = {"regular", "pantry", "never_buy"}
+
+    def _ingredient_names() -> list[str]:
+        library_names = {ingredient.name.strip().lower() for recipe in store.list() for ingredient in recipe.ingredients}
+        return sorted(library_names | set(ingredient_catalog_store.get_all().keys()))
+
+    def _ingredient_groups(q: Optional[str]) -> list[tuple[str, str, list[str]]]:
+        names = [name for name in _ingredient_names() if matches_glob(name, q)]
+        return group_ingredient_names_by_category(names, ingredient_catalog_store.get_all())
+
+    @router.get("/settings/ingredients", response_class=HTMLResponse, include_in_schema=False)
+    def ingredients_settings_form(request: Request, q: Optional[str] = None) -> HTMLResponse:
+        return templates.TemplateResponse(
+            request,
+            "ingredients_settings.html",
+            {
+                "groups": _ingredient_groups(q),
+                "filters": {"q": q or ""},
+                "active_filter_count": 1 if q and q.strip() else 0,
+                "nav_active": "settings",
+            },
+        )
+
+    @router.post("/settings/ingredients/move", response_class=HTMLResponse, include_in_schema=False)
+    async def ingredients_settings_move(request: Request) -> HTMLResponse:
+        form = await request.form()
+        names = [n.strip() for n in form.getlist("name") if n.strip()]
+        category = str(form.get("category") or "")
+        q = str(form.get("q") or "")
+        if category in _VALID_INGREDIENT_CATEGORIES:
+            for name in names:
+                ingredient_catalog_store.set_flags(name, pantry=category == "pantry", never_buy=category == "never_buy")
+        return templates.TemplateResponse(
+            request, "partials/_ingredient_lists.html", {"groups": _ingredient_groups(q), "filters": {"q": q}}
+        )
+
+    @router.post("/settings/ingredients/add", include_in_schema=False)
+    def ingredients_settings_add(name: str = Form(...)) -> RedirectResponse:
+        ingredient_catalog_store.add(name)
+        return RedirectResponse(url="/settings/ingredients", status_code=303)
 
     @router.get("/plan", response_class=HTMLResponse, include_in_schema=False)
     def plan_view(request: Request) -> HTMLResponse:
@@ -630,19 +703,22 @@ def build_ui_router(
     def shopping_view(request: Request) -> HTMLResponse:
         plan = plan_store.get_current()
         shopping_list = None
+        sections = []
         if plan is not None and plan.finalized:
             shopping_list = shopping_list_store.get_for_plan(plan.id)
+            if shopping_list is not None:
+                sections = group_shopping_list_items(shopping_list.items)
         return templates.TemplateResponse(
             request,
             "shopping.html",
-            {"plan": plan, "shopping_list": shopping_list, "nav_active": "shopping"},
+            {"plan": plan, "shopping_list": shopping_list, "sections": sections, "nav_active": "shopping"},
         )
 
     @router.post("/shopping/generate", include_in_schema=False)
     def shopping_generate() -> RedirectResponse:
         plan = plan_store.get_current()
         if plan is not None and plan.finalized and shopping_list_store.get_for_plan(plan.id) is None:
-            items = build_shopping_list_items(plan, store)
+            items = build_shopping_list_items(plan, store, ingredient_catalog_store.get_all())
             shopping_list_store.create(plan.id, items)
         return RedirectResponse(url="/shopping", status_code=303)
 
@@ -744,21 +820,17 @@ def _empty_recipe_values() -> dict:
         "calories_per_serving": "",
         "protein_g": "",
         "fiber_g": "",
-        "ingredients": [{"name": "", "quantity": ""}],
+        "ingredients": [{"name": "", "quantity": "", "unit": ""}],
         "steps": [{"text": "", "icon": None}],
     }
 
 
-def _format_ingredient_quantity(ingredient: Ingredient) -> str:
-    parts = []
-    if ingredient.quantity is not None:
-        quantity = ingredient.quantity
-        if quantity == int(quantity):
-            quantity = int(quantity)
-        parts.append(str(quantity))
-    if ingredient.unit:
-        parts.append(ingredient.unit)
-    return " ".join(parts)
+def _format_ingredient_quantity(quantity: Optional[float]) -> str:
+    if quantity is None:
+        return ""
+    if quantity == int(quantity):
+        return str(int(quantity))
+    return str(quantity)
 
 
 def _recipe_values_from_recipe(recipe: Recipe) -> dict:
@@ -772,10 +844,14 @@ def _recipe_values_from_recipe(recipe: Recipe) -> dict:
         "protein_g": recipe.nutrition.protein_g if recipe.nutrition.protein_g is not None else "",
         "fiber_g": recipe.nutrition.fiber_g if recipe.nutrition.fiber_g is not None else "",
         "ingredients": [
-            {"name": ingredient.name, "quantity": _format_ingredient_quantity(ingredient)}
+            {
+                "name": ingredient.name,
+                "quantity": _format_ingredient_quantity(ingredient.quantity),
+                "unit": ingredient.unit or "",
+            }
             for ingredient in recipe.ingredients
         ]
-        or [{"name": "", "quantity": ""}],
+        or [{"name": "", "quantity": "", "unit": ""}],
         "steps": [
             {"text": text, "icon": icon}
             for text, icon in zip_longest(recipe.steps, recipe.step_icons, fillvalue=None)
@@ -787,6 +863,7 @@ def _recipe_values_from_recipe(recipe: Recipe) -> dict:
 def _recipe_values_from_form(form: FormData) -> dict:
     names = form.getlist("ingredient_name")
     quantities = form.getlist("ingredient_quantity")
+    units = form.getlist("ingredient_unit")
     step_texts = form.getlist("step")
     step_icons = form.getlist("step_icon")
     return {
@@ -798,8 +875,11 @@ def _recipe_values_from_form(form: FormData) -> dict:
         "calories_per_serving": form.get("calories_per_serving", ""),
         "protein_g": form.get("protein_g", ""),
         "fiber_g": form.get("fiber_g", ""),
-        "ingredients": [{"name": name, "quantity": quantity} for name, quantity in zip(names, quantities)]
-        or [{"name": "", "quantity": ""}],
+        "ingredients": [
+            {"name": name, "quantity": quantity, "unit": unit}
+            for name, quantity, unit in zip_longest(names, quantities, units, fillvalue="")
+        ]
+        or [{"name": "", "quantity": "", "unit": ""}],
         "steps": [
             {"text": text, "icon": icon or None}
             for text, icon in zip_longest(step_texts, step_icons, fillvalue="")
@@ -828,12 +908,20 @@ def _recipe_edit_context(
 def _parse_recipe_form(form: FormData, model_cls: type[BaseModel]) -> BaseModel:
     names = form.getlist("ingredient_name")
     quantities = form.getlist("ingredient_quantity")
+    units = form.getlist("ingredient_unit")
     ingredients = []
-    for name, quantity_text in zip(names, quantities):
+    for name, quantity_text, unit_text in zip_longest(names, quantities, units, fillvalue=""):
         name = name.strip()
         if not name:
             continue
-        ingredients.append(Ingredient(name=name, unit=quantity_text.strip() or None))
+        quantity_text = quantity_text.strip()
+        ingredients.append(
+            Ingredient(
+                name=name,
+                quantity=float(quantity_text) if quantity_text else None,
+                unit=unit_text.strip() or None,
+            )
+        )
     step_texts = form.getlist("step")
     step_icon_values = form.getlist("step_icon")
     steps = []

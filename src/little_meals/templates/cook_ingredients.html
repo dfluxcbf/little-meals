@@ -32,10 +32,12 @@
     <div class="cook-ingredients-body">
       <h2 class="cook-ingredients-heading">Gather your ingredients</h2>
       <div class="cook-ingredients-list">
-        {% for ingredient in recipe.ingredients %}
-          {% set index = loop.index0 %}
-          {% set checked = index in checked %}
-          {% include "partials/_cook_ingredient.html" %}
+        {% for label, group_items in groups %}
+          <h3 class="cook-ingredients-group-heading">{{ label }}</h3>
+          {% for index, ingredient in group_items %}
+            {% set checked = index in checked %}
+            {% include "partials/_cook_ingredient.html" %}
+          {% endfor %}
         {% endfor %}
       </div>
     </div>

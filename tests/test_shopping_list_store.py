@@ -103,3 +103,17 @@ def test_delete_all_removes_every_list_and_its_items(shopping_list_store: Shoppi
 
 def test_delete_all_is_a_no_op_when_nothing_stored(shopping_list_store: ShoppingListStore):
     assert shopping_list_store.delete_all() == 0
+
+
+@pytest.mark.requirement("REQ-000000058")
+def test_pantry_flag_round_trips(shopping_list_store: ShoppingListStore):
+    created = shopping_list_store.create(
+        "plan-1", [MergedItem("Salt", None, None, pantry=True), MergedItem("Carrot", 2.0, "pieces", pantry=False)]
+    )
+
+    assert created.items[0].pantry is True
+    assert created.items[1].pantry is False
+
+    fetched = shopping_list_store.get(created.id)
+    assert fetched.items[0].pantry is True
+    assert fetched.items[1].pantry is False
