@@ -88,6 +88,29 @@ steps, a definition of done, and should be documented as it's done.
 
 ## Deployment
 
+**Current mechanism (M19): `lrun server up little-meals --branch <b>`**, driven
+from GitHub (the `Server up`/`Server down` workflows in this repo, or the
+`Servers` hub workflow in `little-projects`) or run by hand on the host. The
+project only declares *what* its server is in `.lrun/config.toml` (`[server]`:
+`lmeals serve`, port 8765, process match `.local/bin/lmeals serve`, `bazel run
+//:install`, `tailscale serve --https=443`); `little-runner` does the rest — stop
+whatever is running (systemd unit, lterm `: server` session, stray process),
+switch the checkout to the requested branch, rebuild/reinstall, launch as the
+`lrun-server-little-meals` `systemd --user` transient unit, wait for the port,
+re-apply `tailscale serve`. See the root
+[server management](../../docs/features/server_management.md) design.
+
+**Deprecated (kept for now):** `tools/little-meals.service` + `bazel run
+//:deploy` (M11) and `bazel run //:relaunch` (lterm-kill variant) implement the
+same idea for this project only and are superseded by the manifest above. They
+still work, but new deployment behaviour goes into `little-runner`, not here.
+The lterm autostart entry that runs `lmeals serve` in tab 0 must be removed once
+`lrun` manages the server (two supervisors would fight over port 8765) — see the
+root `starting_guide.md`.
+
+The text below describes the M11 design as it was built.
+
+
 Development happens by sending prompts to a Claude Code session running directly
 on the home server (via Claude Remote Control), rather than editing locally and
 pushing/pulling. The remaining gap that closes with Milestone 11 is getting an

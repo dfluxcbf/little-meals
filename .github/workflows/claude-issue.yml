@@ -1,0 +1,32 @@
+# Installed by `lrun init` (little-runner). Do not edit by hand: change the
+# template in little-runner and re-run `lrun init`.
+# See little-projects/docs/policies/automation_policy.md.
+name: Claude issue handler
+
+on:
+  issues:
+    types: [assigned, labeled]
+
+permissions:
+  contents: read
+  issues: read
+
+concurrency:
+  group: claude-issue-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  handle:
+    name: Hand the issue to Claude on the WSL host
+    runs-on: [self-hosted, little-runner]
+    timeout-minutes: 240
+    steps:
+      - name: little-runner issue run
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PATH="$HOME/.local/bin:$PATH"
+          little-runner issue run \
+            --repo "$GITHUB_REPOSITORY" \
+            --number "${{ github.event.issue.number }}" \
+            --event-path "$GITHUB_EVENT_PATH"

@@ -17,7 +17,11 @@ py_test(
         "@pip//uvicorn",
         "@pip//apscheduler",
     ],
-    data = ["//src/little_meals:package_data"],
+    data = [
+        "//src/little_meals:package_data",
+        "//:lrun_manifest",
+        "//:lrun_workflows",
+    ],
     python_version = "PY3",
     visibility = ["//visibility:public"],
 )
