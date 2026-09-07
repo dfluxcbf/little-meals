@@ -16,6 +16,11 @@ on:
         default: "finish"
         type: choice
         options: [finish, skip]
+      force:
+        description: "Finish even though the branch's last test run failed"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -36,9 +41,10 @@ jobs:
         run: |
           set -euo pipefail
           export PATH="$HOME/.local/bin:$PATH"
-          SKIP=""
-          if [[ "${{ inputs.action }}" == "skip" ]]; then SKIP="--skip"; fi
+          ARGS=""
+          if [[ "${{ inputs.action }}" == "skip" ]]; then ARGS="$ARGS --skip"; fi
+          if [[ "${{ inputs.force }}" == "true" ]]; then ARGS="$ARGS --force"; fi
           little-runner issue finish \
             --repo "$GITHUB_REPOSITORY" \
             --number "${{ inputs.issue }}" \
-            --event-path "$GITHUB_EVENT_PATH" $SKIP
+            --event-path "$GITHUB_EVENT_PATH" $ARGS

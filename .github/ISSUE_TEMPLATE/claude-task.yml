@@ -55,10 +55,15 @@ body:
       label: Branch name
       description: For an existing, unfinished branch. Ignored otherwise.
       placeholder: improvement/better_something
-  - type: checkboxes
-    id: finish
+  - type: dropdown
+    id: review
     attributes:
-      label: Finish the branch when done
+      label: Review
+      description: >-
+        Manual review posts the change report and waits for your /finish. Auto approve posts
+        the same report and then merges the branch with little-versions and closes this issue,
+        as long as Claude reports success and the branch's tests did not fail.
+      default: 0
       options:
-        - label: Run the little-versions finish command automatically if Claude reports success
-          required: false
+        - Manual review
+        - Auto approve
