@@ -1,0 +1,16 @@
+{% for key, label, names in groups %}
+  <div class="settings-section">
+    <h2 class="shopping-section-heading">{{ label }}</h2>
+    {% if names %}
+      <div class="ingredient-catalog-rows">
+        {% for name in names %}
+          <div class="ingredient-row" data-name="{{ name }}" data-category="{{ key }}" tabindex="0" role="button" aria-haspopup="dialog">
+            {{ name }}
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="hint" style="text-align: left;">No ingredients here yet.</p>
+    {% endif %}
+  </div>
+{% endfor %}

@@ -1,0 +1,31 @@
+# Installed by `lrun init` (little-runner). Do not edit by hand: change the
+# template in little-runner and re-run `lrun init`.
+# See little-projects/docs/policies/automation_policy.md.
+name: Pull request checks
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: pr-checks-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: Run the project's tests on the WSL host
+    runs-on: [self-hosted, little-runner]
+    timeout-minutes: 120
+    steps:
+      - name: little-runner ci run
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PATH="$HOME/.local/bin:$PATH"
+          little-runner ci run \
+            --repo "$GITHUB_REPOSITORY" \
+            --pr "${{ github.event.pull_request.number }}"

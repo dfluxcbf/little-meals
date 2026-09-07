@@ -15,9 +15,8 @@
 {% else %}
   {% set checked_count = shopping_list.items | selectattr("checked") | list | length %}
   {% set total_count = shopping_list.items | length %}
-  <div class="shopping-note-wrap">
-    <div class="shopping-note">
-      <div class="magnet"></div>
+  <div class="shopping-card-wrap">
+    <div class="shopping-card">
       {% if not shopping_list.items %}
         <p>No ingredients to list - the recipes in this plan may have been removed since it was finalized.</p>
       {% else %}
@@ -27,8 +26,11 @@
           </div>
           <span class="shopping-progress-count">{{ checked_count }} of {{ total_count }}</span>
         </div>
-        {% for item in shopping_list.items %}
-          {% include "partials/_shopping_item.html" %}
+        {% for label, items in sections %}
+          <h2 class="shopping-section-heading">{{ label }}</h2>
+          {% for item in items %}
+            {% include "partials/_shopping_item.html" %}
+          {% endfor %}
         {% endfor %}
       {% endif %}
 

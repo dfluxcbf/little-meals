@@ -208,3 +208,25 @@ test coverage are tracked exclusively through **little-requirements**
   `filter_recipes`/`sort_recipes` module) and the filter/sort cases in
   `tests/test_api_ui.py`; REQ-000000056 is tagged across the
   `POST /recipes/{id}/add-to-plan` cases in `tests/test_api_ui.py`.
+- Milestone 18 (`m18-pantry-and-shopping-list-ui` suite) created seven
+  requirements, REQ-000000057 to REQ-000000063 - see `milestones.md`'s M18
+  entry. REQ-000000057 (ingredient catalog store + the 3-list/long-press
+  settings UI - description updated in place once that UI was redesigned
+  from an initial checkbox-grid) is tagged in
+  `tests/test_ingredient_catalog_store.py`, `tests/test_ingredient_grouping.py`
+  (`group_ingredient_names_by_category`/`category_for`), and the
+  `/settings/ingredients` cases in `tests/test_settings_ui.py`;
+  REQ-000000058 (never-buy filtering, pantry flag, quantity/unit merge fix)
+  is tagged across `tests/test_shopping_list_generation.py`,
+  `tests/test_recipe_store.py` (legacy combined-unit parsing), and
+  `tests/test_shopping_list_store.py` (the `pantry` column); REQ-000000059
+  (shopping list section grouping) is tagged in the
+  `group_shopping_list_items` cases in `tests/test_shopping_list_generation.py`;
+  REQ-000000060 (recipe/cook-along ingredient grouping) is tagged in
+  `tests/test_api_ui.py` and `tests/test_cook_along.py`; REQ-000000061
+  (Cancel Plan moved to the top) is tagged in `tests/test_plan_ui.py`;
+  REQ-000000062 (clear-shopping-list dev action) is tagged in the
+  `/settings/dev/clear-shopping-list` cases in `tests/test_settings_ui.py`;
+  REQ-000000063 (cookbook glob search filter) is tagged in
+  `tests/test_glob_match.py`, the glob cases in `tests/test_recipe_filters.py`,
+  and the `/recipes?glob=...` case in `tests/test_api_ui.py`.

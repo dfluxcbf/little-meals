@@ -61,6 +61,9 @@ class ShoppingListStore:
                 )
                 """
             )
+            existing_columns = {row[1] for row in conn.execute("PRAGMA table_info(shopping_list_items)")}
+            if "pantry" not in existing_columns:
+                conn.execute("ALTER TABLE shopping_list_items ADD COLUMN pantry INTEGER NOT NULL DEFAULT 0")
 
     @contextlib.contextmanager
     def _connection(self) -> Iterator[sqlite3.Connection]:
@@ -88,10 +91,10 @@ class ShoppingListStore:
             for position, item in enumerate(items):
                 conn.execute(
                     """
-                    INSERT INTO shopping_list_items (list_id, item_id, name, quantity, unit, checked, position)
-                    VALUES (?, ?, ?, ?, ?, 0, ?)
+                    INSERT INTO shopping_list_items (list_id, item_id, name, quantity, unit, checked, position, pantry)
+                    VALUES (?, ?, ?, ?, ?, 0, ?, ?)
                     """,
-                    (list_id, f"i{position + 1}", item.name, item.quantity, item.unit, position),
+                    (list_id, f"i{position + 1}", item.name, item.quantity, item.unit, position, int(item.pantry)),
                 )
         return self.get(list_id)
 
@@ -111,7 +114,7 @@ class ShoppingListStore:
                 raise ShoppingListNotFound(list_id)
             item_rows = conn.execute(
                 """
-                SELECT item_id, name, quantity, unit, checked FROM shopping_list_items
+                SELECT item_id, name, quantity, unit, checked, pantry FROM shopping_list_items
                 WHERE list_id = ? ORDER BY position ASC
                 """,
                 (list_id,),
@@ -172,8 +175,10 @@ class ShoppingListStore:
 def _row_to_list(list_row: tuple, item_rows: list[tuple]) -> ShoppingList:
     list_id, plan_id, created_at, actual_cost = list_row
     items = [
-        ShoppingListItem(id=item_id, name=name, quantity=quantity, unit=unit, checked=bool(checked))
-        for item_id, name, quantity, unit, checked in item_rows
+        ShoppingListItem(
+            id=item_id, name=name, quantity=quantity, unit=unit, checked=bool(checked), pantry=bool(pantry)
+        )
+        for item_id, name, quantity, unit, checked, pantry in item_rows
     ]
     return ShoppingList(
         id=list_id,

@@ -50,7 +50,8 @@
     {% for ingredient in values.ingredients %}
       <div class="editor-row">
         <input type="text" name="ingredient_name" placeholder="Ingredient" value="{{ ingredient.name }}">
-        <input type="text" name="ingredient_quantity" placeholder="Quantity" value="{{ ingredient.quantity }}">
+        <input type="number" step="any" name="ingredient_quantity" placeholder="Qty" value="{{ ingredient.quantity }}">
+        <input type="text" name="ingredient_unit" placeholder="Unit" value="{{ ingredient.unit }}">
         <button type="button" class="row-remove-btn" aria-label="Remove ingredient" onclick="this.closest('.editor-row').remove()">&times;</button>
       </div>
     {% endfor %}
@@ -91,7 +92,8 @@
 <template id="ingredient-row-template">
   <div class="editor-row">
     <input type="text" name="ingredient_name" placeholder="Ingredient">
-    <input type="text" name="ingredient_quantity" placeholder="Quantity">
+    <input type="number" step="any" name="ingredient_quantity" placeholder="Qty">
+    <input type="text" name="ingredient_unit" placeholder="Unit">
     <button type="button" class="row-remove-btn" aria-label="Remove ingredient" onclick="this.closest('.editor-row').remove()">&times;</button>
   </div>
 </template>

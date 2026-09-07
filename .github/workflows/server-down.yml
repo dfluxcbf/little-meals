@@ -1,0 +1,37 @@
+# Installed by `lrun init --server` (little-runner). Do not edit by hand: change
+# the template in little-runner and re-run `lrun init`.
+# See little-projects/docs/policies/automation_policy.md.
+name: Server down
+
+on:
+  workflow_dispatch:
+    inputs:
+      all:
+        description: "Stop every little-runner managed server on the host, not just this one"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: server-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  down:
+    name: Stop the server
+    runs-on: [self-hosted, little-runner]
+    timeout-minutes: 15
+    steps:
+      - name: little-runner server down
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PATH="$HOME/.local/bin:$PATH"
+          if [[ "${{ inputs.all }}" == "true" ]]; then
+            little-runner server down --all
+          else
+            little-runner server down "${GITHUB_REPOSITORY##*/}"
+          fi

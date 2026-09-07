@@ -5,13 +5,14 @@ from fastapi.testclient import TestClient
 
 from little_meals.api.app import create_app
 from little_meals.config import Settings
-from little_meals.models import Classification, Difficulty, Nutrition
+from little_meals.models import Classification, Difficulty, Ingredient, Nutrition
+from little_meals.store.ingredient_catalog_store import IngredientCatalogStore
 from little_meals.store.recipe_store import RecipeStore
 
 
-def _make_client(store: RecipeStore) -> TestClient:
+def _make_client(store: RecipeStore, ingredient_catalog_store: IngredientCatalogStore | None = None) -> TestClient:
     settings = Settings(data_dir=store._dir.parent)
-    app = create_app(settings=settings, store=store)
+    app = create_app(settings=settings, store=store, ingredient_catalog_store=ingredient_catalog_store)
     return TestClient(app)
 
 
@@ -97,6 +98,28 @@ def test_recipe_detail_unknown_id_returns_404(store):
     assert response.status_code == 404
 
 
+@pytest.mark.requirement("REQ-000000060")
+def test_recipe_detail_groups_ingredients_by_pantry_and_never_buy(store, sample_recipe, tmp_path):
+    catalog_store = IngredientCatalogStore(tmp_path / "catalog.db")
+    pantry_ingredient = sample_recipe.ingredients[0].name
+    never_buy_ingredient = sample_recipe.ingredients[1].name
+    catalog_store.set_flags(pantry_ingredient, pantry=True, never_buy=False)
+    catalog_store.set_flags(never_buy_ingredient, pantry=False, never_buy=True)
+
+    created = store.create(sample_recipe)
+    ui = _make_client(store, catalog_store)
+
+    response = ui.get(f"/recipes/{created.id}")
+    text = response.text
+    assert "Ingredients" in text
+    assert "Pantry items" in text
+    assert "Others" in text
+    ingredients_index = text.index(">Ingredients<")
+    pantry_index = text.index(">Pantry items<")
+    others_index = text.index(">Others<")
+    assert ingredients_index < pantry_index < others_index
+
+
 NEW_RECIPE_FORM_DATA = {
     "name": "Tomato Soup",
     "cook_time_minutes": "20",
@@ -104,7 +127,8 @@ NEW_RECIPE_FORM_DATA = {
     "servings": "4",
     "calories_per_serving": "180",
     "ingredient_name": ["tomato"],
-    "ingredient_quantity": ["4 pieces"],
+    "ingredient_quantity": ["4"],
+    "ingredient_unit": ["pieces"],
     "step": ["Simmer the tomatoes.", "Blend until smooth."],
 }
 
@@ -382,6 +406,22 @@ def test_recipes_list_difficulty_filter_narrows_results(store, sample_recipe):
 
     assert "Easy One" in response.text
     assert "Hard One" not in response.text
+
+
+@pytest.mark.requirement("REQ-000000063")
+def test_recipes_list_glob_filter_scoped_to_ingredients(store, sample_recipe):
+    store.create(sample_recipe.model_copy(update={"name": "Garlic Dish"}))
+    store.create(
+        sample_recipe.model_copy(
+            update={"name": "No Garlic Dish", "ingredients": [Ingredient(name="rice", quantity=1, unit="cup")]}
+        )
+    )
+    ui = _make_client(store)
+
+    response = ui.get("/recipes", params={"glob": "*garlic*", "glob_scope": "ingredients"})
+
+    assert "Garlic Dish" in response.text
+    assert "No Garlic Dish" not in response.text
 
 
 @pytest.mark.requirement("REQ-000000055")

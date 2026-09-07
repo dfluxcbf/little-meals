@@ -65,6 +65,12 @@
 </form>
 
 <div class="settings-section">
+  <h2>Ingredient categories</h2>
+  <p class="hint" style="text-align: left; margin: -4px 0 12px;">Mark ingredients as pantry items (already on hand) or never-buy (never added to the shopping list).</p>
+  <a href="/settings/ingredients" class="btn btn-secondary">Manage pantry &amp; never-buy items &rarr;</a>
+</div>
+
+<div class="settings-section">
   <h2>Appearance</h2>
   <p class="hint" style="text-align: left; margin: -4px 0 12px;">Accent color - saved on this device only, so each phone in the household can pick its own.</p>
   <div class="accent-swatches" id="accent-swatches">
@@ -75,6 +81,17 @@
     <button type="button" class="accent-swatch" data-accent="rose" style="--swatch-color: var(--rose);" aria-label="Rose"></button>
     <button type="button" class="accent-swatch" data-accent="gold" style="--swatch-color: var(--gold);" aria-label="Gold"></button>
   </div>
+</div>
+
+<div class="settings-section">
+  <h2>Development</h2>
+  {% if cleared %}
+    <p class="success">Shopping list cleared.</p>
+  {% endif %}
+  <p class="hint" style="text-align: left; margin: -4px 0 12px;">Deletes the current plan's shopping list only - the plan itself is kept, and you can regenerate the list from it.</p>
+  <form method="post" action="/settings/dev/clear-shopping-list" onsubmit="return confirm('Clear the current shopping list? You can regenerate it from the current plan.');">
+    <button type="submit" class="btn btn-danger">Clear shopping list</button>
+  </form>
 </div>
 {% endblock %}
 

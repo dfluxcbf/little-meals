@@ -1,0 +1,50 @@
+# Installed by `lrun init` (little-runner). Do not edit by hand: change the
+# template in little-runner and re-run `lrun init`.
+# See little-projects/docs/policies/automation_policy.md.
+name: Claude finish
+
+on:
+  workflow_dispatch:
+    inputs:
+      issue:
+        description: "Issue number whose branch is waiting to be finished"
+        required: true
+        type: string
+      action:
+        description: "finish = run the little-versions finish command; skip = stop waiting and leave the branch"
+        required: true
+        default: "finish"
+        type: choice
+        options: [finish, skip]
+      force:
+        description: "Finish even though the branch's last test run failed"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  issues: read
+
+concurrency:
+  group: claude-issue-${{ inputs.issue }}
+  cancel-in-progress: false
+
+jobs:
+  finish:
+    name: Finish or skip the waiting branch
+    runs-on: [self-hosted, little-runner]
+    timeout-minutes: 60
+    steps:
+      - name: little-runner issue finish
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PATH="$HOME/.local/bin:$PATH"
+          ARGS=""
+          if [[ "${{ inputs.action }}" == "skip" ]]; then ARGS="$ARGS --skip"; fi
+          if [[ "${{ inputs.force }}" == "true" ]]; then ARGS="$ARGS --force"; fi
+          little-runner issue finish \
+            --repo "$GITHUB_REPOSITORY" \
+            --number "${{ inputs.issue }}" \
+            --event-path "$GITHUB_EVENT_PATH" $ARGS

@@ -1,0 +1,69 @@
+# Installed by `lrun init` (little-runner). Do not edit by hand: change the
+# template in little-runner and re-run `lrun init`.
+# See little-projects/docs/policies/automation_policy.md.
+name: Claude task
+description: Describe work for Claude to do on the WSL host, and how it should be branched.
+title: "[task] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Fill this in, then add the **claude** label (or assign the issue to Claude)
+        when you want it to run. Leave the branching fields alone to let Claude
+        decide for itself.
+  - type: textarea
+    id: task
+    attributes:
+      label: Task
+      description: What should be done, and anything Claude needs to know.
+      placeholder: Add a --dry-run flag to the import command.
+    validations:
+      required: true
+  - type: dropdown
+    id: branching
+    attributes:
+      label: Branching
+      description: >-
+        Who decides the branch. Anything other than "Let Claude decide" is executed by
+        the workflow with little-versions, and Claude is forbidden from touching branches.
+      default: 0
+      options:
+        - Let Claude decide
+        - New branch
+        - Existing branch
+  - type: dropdown
+    id: branch-type
+    attributes:
+      label: Branch type
+      description: For a new branch. Ignored otherwise.
+      default: 0
+      options:
+        - feature
+        - improvement
+        - hotfix
+  - type: input
+    id: base-branch
+    attributes:
+      label: Start from
+      description: >-
+        Branch the new branch is created from. feature/improvement start from the
+        integration branch, hotfix from the production branch (.lvx/config.json).
+      placeholder: dev
+  - type: input
+    id: existing-branch
+    attributes:
+      label: Branch name
+      description: For an existing, unfinished branch. Ignored otherwise.
+      placeholder: improvement/better_something
+  - type: dropdown
+    id: review
+    attributes:
+      label: Review
+      description: >-
+        Manual review posts the change report and waits for your /finish. Auto approve posts
+        the same report and then merges the branch with little-versions and closes this issue,
+        as long as Claude reports success and the branch's tests did not fail.
+      default: 0
+      options:
+        - Manual review
+        - Auto approve
