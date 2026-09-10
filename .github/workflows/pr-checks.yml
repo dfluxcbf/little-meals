@@ -17,6 +17,11 @@ concurrency:
 
 jobs:
   tests:
+    # Never run a fork's code on the self-hosted runner: only pull requests
+    # opened from a branch of this same repository qualify (forks can't be
+    # collaborators, so this can only be tightened, never loosened, by an
+    # untrusted PR author).
+    if: github.event.pull_request.head.repo.full_name == github.repository
     name: Run the project's tests on the WSL host
     runs-on: [self-hosted, little-runner]
     timeout-minutes: 120
