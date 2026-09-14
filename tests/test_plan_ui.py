@@ -101,7 +101,7 @@ def test_servings_update_returns_fragment_not_full_page(client: TestClient, samp
     assert response.status_code == 200
     assert "<html" not in response.text.lower()
     assert f'id="plan-meal-{meal_id}"' in response.text
-    assert 'value="7"' in response.text
+    assert '<span class="stepper-value">7</span>' in response.text
 
 
 @pytest.mark.requirement("REQ-000000021")
