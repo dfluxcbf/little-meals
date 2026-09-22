@@ -19,8 +19,6 @@ py_test(
     ],
     data = [
         "//src/little_meals:package_data",
-        "//:lrun_manifest",
-        "//:lrun_workflows",
     ],
     python_version = "PY3",
     visibility = ["//visibility:public"],

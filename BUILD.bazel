@@ -22,20 +22,6 @@ load("@rules_python//python:pip.bzl", "compile_pip_requirements")
 
 exports_files(["VERSION", "requirements.in", "requirements_lock.txt"])
 
-# little-runner server manifest + workflows, so tests/test_lrun_manifest.py can
-# sanity-check them under `bazel test` too.
-filegroup(
-    name = "lrun_manifest",
-    srcs = [".lrun/config.toml"],
-    visibility = ["//visibility:public"],
-)
-
-filegroup(
-    name = "lrun_workflows",
-    srcs = glob([".github/workflows/*.yml"]),
-    visibility = ["//visibility:public"],
-)
-
 # Regenerate the pinned lock:  bazel run //:requirements.update
 # Verify it is current:        bazel test //:requirements_test
 # Tagged manual so this network-requiring check does not run under
