@@ -42,3 +42,4 @@ Runtime configuration is via environment variables:
 | Variable | Default | Purpose |
 |---|---|---|
 | `LITTLE_MEALS_DATA_DIR` | `~/.local/share/little-meals` | Where the `recipes/` Markdown library lives. |
+test
