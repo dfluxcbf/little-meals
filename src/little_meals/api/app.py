@@ -21,6 +21,7 @@ from little_meals.api.routes_recipes import build_recipes_router
 from little_meals.api.routes_shopping import build_shopping_router
 from little_meals.api.routes_ui import build_ui_router
 from little_meals.config import Settings
+from little_meals.incident_reporter import install_incident_reporting
 from little_meals.planning.plan_builder import build_meal_specs
 from little_meals.scheduler import WeeklyScheduler
 from little_meals.store.cook_along_store import CookAlongStore
@@ -86,6 +87,7 @@ def create_app(
             background_scheduler.shutdown(wait=False)
 
     app = FastAPI(title="little-meals", version=__version__, lifespan=lifespan)
+    install_incident_reporting(app, project_id="little-meals")
     app.state.settings = settings
     app.state.store = store
     app.state.household_store = household_store
