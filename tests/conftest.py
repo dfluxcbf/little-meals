@@ -22,7 +22,7 @@ def pytest_configure(config: pytest.Config) -> None:
     # little_requirements isn't importable under `bazel test` (it's a
     # pipx-installed dev tool, not a pip.parse dep - see requirements_policy.md),
     # so its pytest11 plugin doesn't self-register the marker there. Registering
-    # it here makes `@pytest.mark.requirement(...)` valid in both environments.
+    # it here makes pytest's `requirement` marker valid in both environments.
     config.addinivalue_line("markers", "requirement(requirement_id): little-requirements requirement ID")
 
 
