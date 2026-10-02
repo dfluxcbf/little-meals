@@ -12,3 +12,5 @@ dist/
 *.egg-info/
 MODULE.bazel.lock
 CLAUDE.md
+.claude/settings.local.json
+.claude/worktrees/
