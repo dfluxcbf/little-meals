@@ -170,7 +170,8 @@
       "mcp__little-workshop__workshop_deployment_confirm",
       "mcp__little-workshop__workshop_build_publish_pypi",
       "mcp__little-workshop__workshop_build_publish_vsix",
-      "mcp__little-workshop__workshop_build_package_delete"
+      "mcp__little-workshop__workshop_build_package_delete",
+      "Bash(python3 .claude/skills/try-the-app/scripts/serve_scratch.py*)"
     ],
     "ask": [
       "mcp__little-workshop__workshop_policy_confirm",
@@ -272,7 +273,7 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Bash|mcp__little-workshop__.*",
+        "matcher": "Bash|Edit|Write|MultiEdit|NotebookEdit|mcp__little-workshop__.*",
         "hooks": [
           {
             "type": "command",
