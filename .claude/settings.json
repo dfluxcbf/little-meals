@@ -27,10 +27,14 @@
       "Bash(lws project list *)",
       "Bash(lws job list *)",
       "Bash(lws job status *)",
+      "Bash(lws job wait *)",
+      "Bash(lws job watch *)",
       "Bash(lws job queue show *)",
       "Bash(lws schedule list *)",
       "Bash(lws schedule status *)",
       "Bash(lws schedule queue get *)",
+      "Bash(lws trigger list *)",
+      "Bash(lws usage candidates *)",
       "Bash(lws policy list *)",
       "Bash(lws policy status *)",
       "Bash(lws policy catalog list *)",
@@ -66,6 +70,8 @@
       "Bash(lws agent run-status --project-id little-meals *)",
       "Bash(lws agent ci-list --project-id little-meals *)",
       "Bash(lws agent ci-status --project-id little-meals *)",
+      "Bash(lws usage summary --project-id little-meals *)",
+      "Bash(lws usage findings --project-id little-meals *)",
       "Bash(lws version feature-start --project-id little-meals *)",
       "Bash(lws version improvement-start --project-id little-meals *)",
       "Bash(lws version hotfix-start --project-id little-meals *)",
@@ -85,6 +91,7 @@
       "Bash(lws requirements result record --project-id little-meals *)",
       "Bash(lws requirements import-junit --project-id little-meals *)",
       "Bash(lws requirements run-tests --project-id little-meals *)",
+      "Bash(lws requirements sync-markers --project-id little-meals *)",
       "Bash(lws build run --project-id little-meals *)",
       "Bash(lws version feature-finish --project-id little-meals *)",
       "Bash(lws version improvement-finish --project-id little-meals *)",
@@ -105,6 +112,7 @@
       "mcp__little-workshop__workshop_project_get",
       "mcp__little-workshop__workshop_job_list",
       "mcp__little-workshop__workshop_job_status",
+      "mcp__little-workshop__workshop_job_wait",
       "mcp__little-workshop__workshop_version_status",
       "mcp__little-workshop__workshop_version_config",
       "mcp__little-workshop__workshop_version_issue_list",
@@ -139,6 +147,10 @@
       "mcp__little-workshop__workshop_schedule_list",
       "mcp__little-workshop__workshop_schedule_status",
       "mcp__little-workshop__workshop_schedule_queue_get",
+      "mcp__little-workshop__workshop_usage_summary",
+      "mcp__little-workshop__workshop_usage_findings",
+      "mcp__little-workshop__workshop_usage_candidates",
+      "mcp__little-workshop__workshop_trigger_list",
       "mcp__little-workshop__workshop_version_feature_start",
       "mcp__little-workshop__workshop_version_improvement_start",
       "mcp__little-workshop__workshop_version_hotfix_start",
@@ -156,6 +168,7 @@
       "mcp__little-workshop__workshop_requirements_result_record",
       "mcp__little-workshop__workshop_requirements_import_junit",
       "mcp__little-workshop__workshop_requirements_run_tests",
+      "mcp__little-workshop__workshop_requirements_sync_markers",
       "mcp__little-workshop__workshop_build_run",
       "mcp__little-workshop__workshop_version_feature_finish",
       "mcp__little-workshop__workshop_version_improvement_finish",
@@ -195,14 +208,19 @@
       "mcp__little-workshop__workshop_requirements_delete",
       "mcp__little-workshop__workshop_requirements_suite_delete",
       "mcp__little-workshop__workshop_job_stop",
+      "mcp__little-workshop__workshop_job_answer",
       "mcp__little-workshop__workshop_schedule_add",
       "mcp__little-workshop__workshop_schedule_remove",
       "mcp__little-workshop__workshop_schedule_trigger",
       "mcp__little-workshop__workshop_schedule_cancel",
       "mcp__little-workshop__workshop_schedule_postpone",
       "mcp__little-workshop__workshop_schedule_queue_set",
+      "mcp__little-workshop__workshop_usage_configure_claude",
+      "mcp__little-workshop__workshop_trigger_add",
+      "mcp__little-workshop__workshop_trigger_remove",
       "Bash(lws job stop *)",
       "Bash(lws job policy-confirm *)",
+      "Bash(lws job answer *)",
       "Bash(lws schedule add *)",
       "Bash(lws schedule edit *)",
       "Bash(lws schedule remove *)",
@@ -230,6 +248,12 @@
       "Bash(lws agent ci-check *)",
       "Bash(lws agent session-start *)",
       "Bash(lws agent session-stop *)",
+      "Bash(lws usage configure-claude *)",
+      "Bash(lws trigger add *)",
+      "Bash(lws trigger remove *)",
+      "Bash(lws trigger enable *)",
+      "Bash(lws trigger disable *)",
+      "Bash(lws trigger install-defaults *)",
       "mcp__little-workshop__workshop_policy_check_all",
       "mcp__little-workshop__workshop_policy_author",
       "mcp__little-workshop__workshop_policy_draft_import",
@@ -238,6 +262,12 @@
       "mcp__little-workshop__workshop_policy_activate",
       "mcp__little-workshop__workshop_policy_configure",
       "mcp__little-workshop__workshop_deployment_redeploy_pillar",
+      "mcp__little-workshop__workshop_deployment_redeploy_pillars",
+      "mcp__little-workshop__workshop_usage_doctor",
+      "mcp__little-workshop__workshop_usage_ingest_transcripts",
+      "mcp__little-workshop__workshop_usage_analyze",
+      "mcp__little-workshop__workshop_usage_mine_automation",
+      "mcp__little-workshop__workshop_deployment_redeploy_changed_pillars",
       "Bash(lws policy author *)",
       "Bash(lws policy draft import *)",
       "Bash(lws policy activate *)",
@@ -245,7 +275,13 @@
       "Bash(lws policy remove *)",
       "Bash(lws policy check-all *)",
       "Bash(lws policy catalog run *)",
-      "Bash(lws deployment redeploy-pillar *)"
+      "Bash(lws deployment redeploy-pillar *)",
+      "Bash(lws deployment redeploy-pillars *)",
+      "Bash(lws usage doctor *)",
+      "Bash(lws usage ingest-transcripts *)",
+      "Bash(lws usage analyze *)",
+      "Bash(lws usage mine-automation *)",
+      "Bash(lws deployment redeploy-changed-pillars *)"
     ],
     "deny": [
       "Bash(git merge *)",
@@ -267,7 +303,11 @@
       "Bash(gh repo create *)",
       "Bash(gh pr create *)",
       "Bash(gh pr merge *)",
-      "Bash(gh release *)"
+      "Bash(gh release *)",
+      "Read(./bazel-*/**)",
+      "Read(./.venv*/**)",
+      "Read(./node_modules/**)",
+      "Read(./**/node_modules/**)"
     ]
   },
   "hooks": {
@@ -281,7 +321,20 @@
             "timeout": 10
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PROJECT_DIR}\"/.claude/hooks/test_output_filter.py",
+            "timeout": 10
+          }
+        ]
       }
     ]
+  },
+  "enabledPlugins": {
+    "pyright-lsp@claude-plugins-official": true
   }
 }
