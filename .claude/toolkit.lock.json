@@ -1,5 +1,20 @@
 {
   "sources": {
+    "mattpocock/skills": {
+      "items": {
+        "skill:diagnosing-bugs": {
+          "files": [
+            ".claude/skills/diagnosing-bugs/SKILL.md",
+            ".claude/skills/diagnosing-bugs/agents/openai.yaml",
+            ".claude/skills/diagnosing-bugs/scripts/hitl-loop.template.sh"
+          ],
+          "kind": "skill",
+          "path": "skills/engineering/diagnosing-bugs"
+        }
+      },
+      "licence": "MIT",
+      "sha": "4ae2317ddb22b046e26455e4f9c9b3aaaf62212d"
+    },
     "pbakaus/impeccable": {
       "items": {
         "skill:impeccable": {
