@@ -52,10 +52,10 @@ ROUTES = {
     "cherry-pick": "a fix reaches the integration branch through workshop_version_hotfix_start / _finish (hotfix-propagates-by-merge)",
     "destructive": "it discards work that may not be yours: ask the user what to remove",
     "github": "workshop_project_connect_github creates the repository, little-workshop's agent flow opens and merges pull requests, and a release comes from workshop_version_release_finish",
-    "hooks-path": "core.hooksPath stays .githooks, where the VERSION sync and the commit-gated policies run",
+    "hooks-path": "core.hooksPath stays .githooks, where the commit-msg secret scan runs",
     "install": "the project installs with `bazel run //:install`; a server is deployed with workshop_deployment_deploy",
-    "merge": "a branch is finished with workshop_version_<type>_finish, which runs the branch_finish policies and merges with --no-ff",
-    "no-verify": "the commit hooks write VERSION and run the commit-gated policies: fix what the hook reports and commit again",
+    "merge": "a branch is finished with workshop_version_<type>_finish, which runs the branch_finish policies and squash-merges a feature or improvement (a hotfix or a release merges with --no-ff)",
+    "no-verify": "the commit-msg hook refuses a commit that adds a secret: take the secret out and commit again",
     "publish": "packages are published with workshop_build_publish_pypi / _vsix (wheel-filename-has-version runs there)",
     "push": "little-workshop pushes when it finishes or releases, and workshop_project_connect_github creates the remote; a push the user asks for is theirs to run",
     "systemd": "servers run through workshop_deployment_deploy / _stop / _status",
@@ -64,6 +64,7 @@ ROUTES = {
 # Files little-workshop writes, relative to the checkout -> how they change.
 GENERATED = {
     ".claude/hooks/lws_scope_guard.py": "little-workshop generates it: change src/registry/claude_templates.py in little-workshop and run its `python3 tools/sync_claude_files.py --write`",
+    ".claude/hooks/run_hook.sh": "little-workshop generates it: change src/registry/claude_templates.py in little-workshop and run its `python3 tools/sync_claude_files.py --write`",
     ".claude/hooks/test_output_filter.py": "little-workshop generates it: change src/registry/claude_templates.py in little-workshop and run its `python3 tools/sync_claude_files.py --write`",
     ".claude/little-workshop.md": "little-workshop generates it: change src/registry/claude_templates.py in little-workshop and run its `python3 tools/sync_claude_files.py --write`",
     ".claude/rules/claude-instructions.md": "little-workshop generates it: change src/registry/claude_templates.py in little-workshop and run its `python3 tools/sync_claude_files.py --write`",
@@ -72,11 +73,13 @@ GENERATED = {
     ".claude/skills/policy-preflight/SKILL.md": "little-workshop generates it: change src/registry/claude_templates.py in little-workshop and run its `python3 tools/sync_claude_files.py --write`",
     ".claude/skills/policy-preflight/scripts/preflight.py": "little-workshop generates it: change src/registry/claude_templates.py in little-workshop and run its `python3 tools/sync_claude_files.py --write`",
     ".claude/skills/workshop-lifecycle/SKILL.md": "little-workshop generates it: change src/registry/claude_templates.py in little-workshop and run its `python3 tools/sync_claude_files.py --write`",
-    "VERSION": "little-workshop writes VERSION: the pre-commit hook on feature/ and improvement/ branches (`lws version sync-version-files`), the finish and release commands elsewhere"
+    "VERSION": "little-workshop writes VERSION: the feature, improvement, hotfix and release finishes write it once; working branches leave it alone"
 }
 GIT_HOOKS = ('.githooks/pre-commit', '.githooks/commit-msg')
 EDIT_TOOLS = ('Edit', 'Write', 'MultiEdit', 'NotebookEdit')
 STRAY_INSTRUCTIONS = ("CLAUDE.md", "CLAUDE.local.md")
+LEARNED_RULES = '.claude/rules/learned.md'
+SECTION_START, SECTION_END = ('<!-- project -->', '<!-- /project -->')
 SHELLS = ("bash", "sh", "zsh", "dash")
 OPERATORS = set("();<>|&`")
 HEREDOC = re.compile(r"(?<!<)<<-?\s*(['\"]?)([A-Za-z_]\w*)\1")
@@ -276,6 +279,34 @@ def mcp_violation(tool, args, own):
     return None
 
 
+def outside_section(text):
+    """The text before and after the project's own section of a generated file, or None without one."""
+    start = text.find(SECTION_START)
+    end = text.find(SECTION_END, start + 1) if start >= 0 else -1
+    return (text[:start], text[end:]) if start >= 0 and end >= 0 else None
+
+
+def edits_only_own_section(full, args):
+    """Whether the edit changes nothing of a generated file but its project-owned section."""
+    try:
+        with open(full, encoding="utf-8") as fh:
+            current = fh.read()
+    except (OSError, UnicodeDecodeError):
+        return False
+    kept = outside_section(current)
+    if kept is None:
+        return False
+    if isinstance(args.get("content"), str):
+        return outside_section(args["content"]) == kept
+    edited = current
+    for edit in args.get("edits") or [args]:
+        old, new = edit.get("old_string"), edit.get("new_string")
+        if not isinstance(old, str) or not isinstance(new, str) or not old or old not in edited:
+            return False
+        edited = edited.replace(old, new) if edit.get("replace_all") else edited.replace(old, new, 1)
+    return outside_section(edited) == kept
+
+
 def edit_violation(args, root, own):
     """Why editing this file is refused, or None. Paths outside the checkout pass."""
     path = args.get("file_path") or args.get("notebook_path")
@@ -287,13 +318,16 @@ def edit_violation(args, root, own):
         return None
     if rel.rsplit("/", 1)[-1] in STRAY_INSTRUCTIONS or rel == ".claude/CLAUDE.md":
         return (f"{rel} is refused here: Claude Code reads AGENTS.md only where no CLAUDE.md, .claude/CLAUDE.md or "
-                "CLAUDE.local.md exists. Put project guidance in .claude/AGENTS.md or a path-scoped "
-                ".claude/rules/ file, and personal notes in ~/.claude/.")
-    if rel in GENERATED:
-        return f"{rel} is refused here: {GENERATED[rel]}."
+                "CLAUDE.local.md exists. Write a learned rule (claude-reflect's included) as a bullet in "
+                f"{LEARNED_RULES}, project guidance in .claude/AGENTS.md or a path-scoped .claude/rules/ file, and "
+                "personal notes in ~/.claude/.")
+    if rel in GENERATED and not edits_only_own_section(full, args):
+        own_section = (f" Only the part between {SECTION_START} and {SECTION_END} is the project's to edit."
+                       if rel.endswith(".md") else "")
+        return f"{rel} is refused here: {GENERATED[rel]}.{own_section}"
     if rel in GIT_HOOKS:
         return (f"{rel} is refused here: `lws version install-hooks --project-id {own}` writes it (generator: "
-                "little-workshop's src/version/commands/sync_version_files.py).")
+                "little-workshop's src/version/commands/git_hooks.py).")
     return None
 
 

@@ -1,22 +1,18 @@
 ## little-workshop
 
-This project is registered in little-workshop as `little-meals`, which runs its branches, releases, deploys and
-publishes and checks its policies at each step. Use the `little-workshop` MCP tools (`workshop_<pillar>_*`) or
-`lws`, naming the project every time (`project_id` `little-meals`, `--project-id little-meals`); the
-`workshop-lifecycle` skill has the routes and the steps before a finish.
-Work on another project, policy authoring and project registration belong in a session started from
-`little-projects`.
+little-workshop runs the branches, releases, deploys and publishes of `little-meals`, checking its policies at
+each: use the `workshop_*` MCP tools (`project_id` `little-meals`) or `lws --project-id little-meals`
+(routes: the `workshop-lifecycle` skill). Other projects belong in a session started from `little-projects`.
 
-These are checked, not remembered. When one refuses something, its message says what to do instead:
+The user's newest request outranks earlier decisions (design docs, instruction files, memories,
+requirement rows, tests that pin a look): follow it, change the old item in the same work and
+say what you changed. Read the request and the files it names in full; when it is unclear, ask.
 
-- Every commit: `.githooks/pre-commit` writes `VERSION` on `feature/` and `improvement/` branches, and
-  `.githooks/commit-msg` runs the policies gating `commit` (`VERSION` raised and well-formed, a `REQ-nnnnnnnnn`
-  or `REQ-NONE` citation when source changes, no committed secrets) and refuses a commit that breaks one.
-- A branch finish, release, deploy or publish: little-workshop runs the policies gating it and holds a failing
-  action in `pending_confirmation`. Run the `policy-preflight` skill first, and report a held action rather
-  than working around it.
-- This session: `.claude/hooks/lws_scope_guard.py` refuses the raw git, systemd and publishing commands that
-  would skip those checks, calls that name another project, and hand edits of what little-workshop generates
-  (`VERSION`, `.githooks/`, its `.claude/` files) or of a `CLAUDE.md`.
-- Decisions that stand in for a human (confirming a held action, finishing or skipping an agent task,
-  scheduling) always prompt.
+Checked, and each refusal says what to do instead: `.githooks/commit-msg` refuses a secret (`VERSION` is
+written by the finish); a finish, release, deploy or publish holds a failing policy in `pending_confirmation`
+(run the `policy-preflight` skill first, report a hold); the guard `lws_scope_guard.py` refuses raw git, systemd
+and publishing commands, other projects, edits of generated files and any `CLAUDE.md` (a learned rule goes in
+`.claude/rules/learned.md`); human decisions prompt.
+
+<!-- project -->
+<!-- /project -->
